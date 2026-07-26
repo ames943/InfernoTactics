@@ -1,0 +1,9 @@
+.venv/
+cache/
+__pycache__/
+*.pyc
+data/*.graphml
+data/*.geojson
+data/*.tif
+data/*.npy
+data/*.png

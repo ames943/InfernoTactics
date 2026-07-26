@@ -8,3 +8,5 @@ rasterio
 shapely
 requests
 matplotlib
+owslib
+pyproj
