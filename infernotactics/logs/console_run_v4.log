@@ -5,33 +5,26 @@
 [InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches there will always be wasted for trench_crew).
 [InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches there will always be wasted for rescue_vehicle).
 [train-multi-v4] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints/best.pt (original single-scenario best.pt, ep 260) -- all layers loaded unchanged except mlp.net.0.weight, which gained one zero-initialized column for the anchor-identity flag (N_SCALARS=9, was 8) -- see ANCHOR_FLAG_DIM docstring for why.
-    [ppo-kl] ep 20: approx_KL before epoch 1 = 0.00000  final = 0.05997  entropy=0.32231  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(177,511)  n_ticks=150  timeout=True  other_grad_norm=56303.5
-[status @ ep    20/500] episodes/min(last20)=  5.13  avg_reward(last20)=  -82210.5  entropy=0.322  policy_loss=   0.020  value_loss=  35.590  class_loss=0.045  reward_scale_std=835.08  value_grad_norm=19510.0  other_grad_norm=56303.5  device=mps
-    [anchor-flag probe] resource_logits(flag=0)=[0.311, 1.279, 0.837, 0.328]  resource_logits(flag=1)=[0.311, 1.279, 0.837, 0.328]  max_abs_diff=0.0001
+    [ppo-kl] ep 20: approx_KL before epoch 1 = 0.00000  final = -0.00349  entropy=0.01077  epochs_run=4 minibatches_run=40  ignition=(177,511)  n_ticks=150  timeout=True  other_grad_norm=24665.2
+[status @ ep    20/500] episodes/min(last20)=  1.91  avg_reward(last20)=  -84026.0  entropy=0.011  policy_loss=  -0.002  value_loss=  40.471  class_loss=0.026  reward_scale_std=845.86  value_grad_norm=9787.5  other_grad_norm=24665.2  device=mps
+    [anchor-flag probe] resource_logits(flag=0)=[0.09, 0.694, 0.911, 0.114]  resource_logits(flag=1)=[0.09, 0.694, 0.911, 0.114]  max_abs_diff=0.0002
   [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/episode_0020.pt (and latest.pt, resume_state.pt)
-    [grad-norm SPIKE] ep 25: other_grad_norm=323062.1 vs recent median=43953.6 (7.4x) -- watch next few episodes' entropy closely
-    [grad-norm SPIKE] ep 27: other_grad_norm=389218.1 vs recent median=44950.6 (8.7x) -- watch next few episodes' entropy closely
-    [grad-norm SPIKE] ep 32: other_grad_norm=381571.6 vs recent median=58209.2 (6.6x) -- watch next few episodes' entropy closely
-    [grad-norm SPIKE] ep 36: other_grad_norm=374304.6 vs recent median=66816.5 (5.6x) -- watch next few episodes' entropy closely
-    [ppo-kl] ep 40: approx_KL before epoch 1 = 0.00000  final = -0.00005  entropy=0.00169  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=entropy_floor)  ignition=(238,531)  n_ticks=102  timeout=False  other_grad_norm=64278.6
-[status @ ep    40/500] episodes/min(last20)=  5.44  avg_reward(last20)=  -70679.7  entropy=0.002  policy_loss=   0.114  value_loss= 208.192  class_loss=0.018  reward_scale_std=827.44  value_grad_norm=24716.8  other_grad_norm=64278.6  device=mps
-    [anchor-flag probe] resource_logits(flag=0)=[0.236, 1.117, 0.661, 0.282]  resource_logits(flag=1)=[0.236, 1.117, 0.661, 0.282]  max_abs_diff=0.0001
-  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/episode_0040.pt (and latest.pt, resume_state.pt)
+    [grad-norm SPIKE] ep 21: other_grad_norm=128690.1 vs recent median=24665.2 (5.2x) -- watch next few episodes' entropy closely
 
-[train-multi-v4] Caught interrupt (Ctrl+C or SIGTERM) after episode 46/500 -- saving checkpoint + resume state before exit.
+[train-multi-v4] Caught interrupt (Ctrl+C or SIGTERM) after episode 23/500 -- saving checkpoint + resume state before exit.
   [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/latest.pt and /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/resume_state.pt
 
-=== Multi-ignition v4 (GAE + multi-epoch PPO + continuous ignition) summary (INTERRUPTED at episode 46/500) ===
-Total wall time: 498.7s  Overall episodes/min: 5.53
-Policy loss: moved (range -0.54 to 0.465)
-Value loss: moved (range 2.03 to 4.11e+03)
-Classification loss: moved (range 0.00135 to 0.218)
-Entropy: moved (range 0.000177 to 4.47)
-Final reward_scale_normalizer: mean=-709.78 std=844.84 n=5184
-Early-stopping: triggered in 46/46 episodes (100%), average stop after 2.1 minibatch(es)  -- by reason: {'kl': 23, 'entropy_floor': 23}  (KL_threshold=0.03, ENTROPY_FLOOR=0.005)
-Ignition variety check: 41 unique points sampled out of 46 episodes; distance-to-nearest-named-point (grid cells): min=0.0 mean=76.4 max=172.2
-Stochastic rollout reward (raw, unshaped), first->last episode: -142623.8 -> -95371.5
-Stochastic rollout reward, mean first 20 vs last 20: -82210.5 vs -72519.0
+=== Multi-ignition v4 (GAE + multi-epoch PPO + continuous ignition) summary (INTERRUPTED at episode 23/500) ===
+Total wall time: 958.7s  Overall episodes/min: 1.44
+Policy loss: moved (range -0.335 to 0.323)
+Value loss: moved (range 2.07 to 3.96e+03)
+Classification loss: moved (range 0.00125 to 0.277)
+Entropy: moved (range 0.00202 to 4.47)
+Final reward_scale_normalizer: mean=-726.30 std=861.75 n=2799
+Early-stopping: triggered in 17/23 episodes (74%), average stop after 4.4 minibatch(es)  -- by reason: {'kl': 16, 'entropy_floor+grad_spike': 1}  (KL_threshold=0.03, ENTROPY_FLOOR=0.005)
+Ignition variety check: 21 unique points sampled out of 23 episodes; distance-to-nearest-named-point (grid cells): min=0.0 mean=75.0 max=152.6
+Stochastic rollout reward (raw, unshaped), first->last episode: -162478.4 -> -80333.1
+Stochastic rollout reward, mean first 20 vs last 20: -84026.0 vs -85018.1
 No eval completed yet (fewer than EVAL_EVERY episodes ran).
 No best.pt saved yet (fewer than EVAL_EVERY episodes ran).
 MPS errors encountered: none

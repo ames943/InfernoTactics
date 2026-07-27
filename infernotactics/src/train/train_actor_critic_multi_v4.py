@@ -648,7 +648,7 @@ def compute_batch_entropy(model, steps, device):
     return total / len(steps)
 
 
-def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl):
+def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl, seed, grad_norm_baseline):
     """PPO_EPOCHS epochs of shuffled MINIBATCH_SIZE-tick minibatches over
     ONE episode's collected steps. old_log_prob (rollout-time) stays fixed
     across all epochs; new_log_prob is recomputed every epoch as the model
@@ -673,13 +673,36 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl):
     log_kl only controls whether the full trace gets printed, not whether
     the safety check runs.
 
-    ALSO checks current entropy after every minibatch, alongside KL --
-    see ENTROPY_FLOOR's docstring for why KL alone has a blind spot once a
-    distribution is already near-deterministic (KL(old||new)~=0 for two
-    near-delta-functions pointing at the same action, even as the
-    underlying logits keep growing). Whichever condition trips first stops
-    the update; stop_reason records which one (or None if PPO_EPOCHS
-    completed cleanly)."""
+    ALSO checks current entropy after every minibatch, alongside KL -- but
+    ONLY stops on low entropy if a gradient-norm spike was ALSO seen earlier
+    in this SAME update (see ENTROPY_FLOOR's docstring for why entropy alone
+    isn't enough: a real-500-episode run with an unconditional entropy-floor
+    stop found the policy getting trapped at a low-entropy plateau for 19+
+    consecutive episodes, each capped to just 1 minibatch, unable to
+    accumulate enough gradient signal to recover -- the floor was correctly
+    preventing further damage but had no way to distinguish "this update is
+    pushing entropy down" from "this is routine single-episode noise that
+    doesn't need braking." Corroborating with the grad-norm spike detector
+    (GRAD_NORM_SPIKE_MULTIPLIER/GRAD_NORM_SPIKE_WINDOW, already validated as
+    the earliest real warning signal in an earlier run's collapse) means
+    isolated low-entropy readings are treated as normal variance, and only
+    entropy drops that coincide with an actual anomalous gradient event get
+    braked. grad_norm_baseline is the rolling median other_grad_norm from
+    completed episodes BEFORE this one (None during the first
+    GRAD_NORM_SPIKE_WINDOW episodes, before there's enough history --
+    combined stopping simply can't trigger yet in that warmup window,
+    matching how the standalone spike print behaves too).
+
+    seed: shuffles minibatch order via a LOCAL random.Random(seed) instance,
+    not the global random module -- added after a real run comparison
+    turned out to be confounded by random.shuffle() using unseeded global
+    state, meaning minibatch order (and therefore the exact SGD step
+    sequence) was never reproducible run-to-run even with identical
+    BASE_SEED+ep environment seeding. Ties this to the same seed=BASE_SEED+ep
+    convention every other part of this file already uses.
+
+    Whichever condition trips first stops the update; stop_reason records
+    which one (or None if PPO_EPOCHS completed cleanly)."""
     n = len(steps)
     adv_mean = sum(advantages) / n
     adv_var = sum((a - adv_mean) ** 2 for a in advantages) / n
@@ -702,13 +725,15 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl):
     minibatches_run = 0
     early_stopped = False
     stop_reason = None
+    saw_grad_norm_spike = False
 
+    shuffle_rng = random.Random(seed)
     indices = list(range(n))
     stop = False
     for epoch in range(PPO_EPOCHS):
         if stop:
             break
-        random.shuffle(indices)
+        shuffle_rng.shuffle(indices)
         for mb_start in range(0, n, MINIBATCH_SIZE):
             mb_idx = indices[mb_start:mb_start + MINIBATCH_SIZE]
             optimizer.zero_grad()
@@ -760,6 +785,9 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl):
             optimizer.step()
             minibatches_run += 1
 
+            if grad_norm_baseline is not None and other_grad_norm_last > GRAD_NORM_SPIKE_MULTIPLIER * grad_norm_baseline:
+                saw_grad_norm_spike = True
+
             kl_last = compute_batch_kl(model, steps, device)
             entropy_last = compute_batch_entropy(model, steps, device)
             if abs(kl_last) > KL_EARLY_STOP_THRESHOLD:
@@ -767,9 +795,9 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl):
                 stop_reason = "kl"
                 stop = True
                 break
-            if entropy_last < ENTROPY_FLOOR:
+            if entropy_last < ENTROPY_FLOOR and saw_grad_norm_spike:
                 early_stopped = True
-                stop_reason = "entropy_floor"
+                stop_reason = "entropy_floor+grad_spike"
                 stop = True
                 break
 
@@ -784,7 +812,8 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl):
     )
 
 
-def run_training_episode(env, model, optimizer, device, seed, reward_scale_normalizer, log_kl, ignition_point=None):
+def run_training_episode(env, model, optimizer, device, seed, reward_scale_normalizer, log_kl,
+                          grad_norm_baseline, ignition_point=None):
     rollout = collect_rollout(env, model, device, seed, ignition_point=ignition_point)
     steps = rollout["steps"]
     raw_rewards = [s["raw_reward"] for s in steps]
@@ -799,7 +828,7 @@ def run_training_episode(env, model, optimizer, device, seed, reward_scale_norma
     (policy_loss, value_loss, classification_loss, entropy,
      value_grad_norm, other_grad_norm, kl_first, kl_last,
      epochs_run, minibatches_run, early_stopped, stop_reason) = ppo_update(
-        model, optimizer, steps, advantages, returns, device, log_kl
+        model, optimizer, steps, advantages, returns, device, log_kl, seed, grad_norm_baseline
     )
 
     return {
@@ -1017,10 +1046,17 @@ def main():
                 seed = BASE_SEED + ep
                 log_kl = LOG_KL_EVERY_EPISODE or (ep % STATUS_EVERY == 0)
                 anchor_point = TRAINING_IGNITION_POINT if ep % ANCHOR_REPLAY_EVERY_N == 0 else None
+                # Baseline from episodes BEFORE this one only -- see ppo_update()'s docstring
+                # for why this gates the entropy-floor+grad-spike combined stop.
+                grad_norm_baseline = (
+                    sorted(grad_norm_history)[len(grad_norm_history) // 2]
+                    if len(grad_norm_history) >= GRAD_NORM_SPIKE_WINDOW else None
+                )
 
                 try:
                     result = run_training_episode(env, model, optimizer, device, seed,
-                                                   reward_scale_normalizer, log_kl, ignition_point=anchor_point)
+                                                   reward_scale_normalizer, log_kl, grad_norm_baseline,
+                                                   ignition_point=anchor_point)
                 except Exception as e:
                     if not _is_mps_unimplemented_error(e):
                         raise
@@ -1032,7 +1068,8 @@ def main():
                     model = model.to(device)
                     anchor_probe_grid, anchor_probe_scalars = anchor_probe_grid.to(device), anchor_probe_scalars.to(device)
                     result = run_training_episode(env, model, optimizer, device, seed,
-                                                   reward_scale_normalizer, log_kl, ignition_point=anchor_point)
+                                                   reward_scale_normalizer, log_kl, grad_norm_baseline,
+                                                   ignition_point=anchor_point)
 
                 wall_s = time.perf_counter() - ep_t0
                 episode_wall_times.append(wall_s)
