@@ -6,7 +6,8 @@
     "building_height",
     "road_mask",
     "fuel_density",
-    "water_mask"
+    "water_mask",
+    "population_density"
   ],
   "cell_size_m": 30.0,
   "width": 595,

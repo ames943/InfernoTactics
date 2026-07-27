@@ -16,7 +16,10 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from env.fire_sim import BLAZE, THREAT  # noqa: E402
 from env.inferno_env import (  # noqa: E402
+    GROUND_RESOURCE_TYPES,
+    MULTI_IGNITION_TRAINING_SCENARIO,
     RESOURCE_COUNTS,
     RESOURCE_TYPES,
     InfernoEnv,
@@ -34,9 +37,9 @@ def random_action(rng, n_zones):
     return None
 
 
-def run_episode(env, episode_seed):
+def run_episode(env, episode_seed, scenario="single"):
     rng = np.random.default_rng(episode_seed)
-    obs = env.reset(seed=episode_seed)
+    obs = env.reset(seed=episode_seed, scenario=scenario)
 
     total_reward = 0.0
     rewards = []
@@ -51,6 +54,7 @@ def run_episode(env, episode_seed):
     fires_extinguished_events = 0
     buildings_destroyed = 0
     buildings_destroyed_evacuated = 0
+    building_destruction_events = []  # population-aware penalty detail, see inferno_env._score_building_destruction
     availability_snapshots = []  # (tick, {rtype: n_available})
     tick_wall_times = []
 
@@ -80,7 +84,7 @@ def run_episode(env, episode_seed):
             if ev["success"]:
                 resource_effect_success += 1
                 effect_success_by_type[ev["resource_type"]] += 1
-                if ev["resource_type"] == "water_team":
+                if ev["resource_type"] in ("water_team", "helicopter"):
                     fires_extinguished_events += 1
             else:
                 resource_effect_wasted += 1
@@ -88,6 +92,7 @@ def run_episode(env, episode_seed):
 
         buildings_destroyed += info["buildings_destroyed"]
         buildings_destroyed_evacuated += info["buildings_destroyed_evacuated"]
+        building_destruction_events.extend(info["building_destruction_events"])
 
         available_now = {
             rtype: sum(1 for u in env.resources[rtype] if u["state"] == "available")
@@ -115,6 +120,7 @@ def run_episode(env, episode_seed):
         "fires_extinguished_events": fires_extinguished_events,
         "buildings_destroyed": buildings_destroyed,
         "buildings_destroyed_evacuated": buildings_destroyed_evacuated,
+        "building_destruction_events": building_destruction_events,
         "availability_snapshots": availability_snapshots,
         "tick_wall_times": tick_wall_times,
     }
@@ -141,10 +147,13 @@ def main():
     env = InfernoEnv(seed=123)
     env_init_s = time.perf_counter() - t0
     print(f"Env init time: {env_init_s:.2f}s")
-    print(f"Zones: {env.n_zones}, travel times (s): "
-          f"min={min(t for t in env.zone_travel_time_s if math.isfinite(t)):.0f}  "
-          f"max={max(t for t in env.zone_travel_time_s if math.isfinite(t)):.0f}  "
-          f"unreachable={sum(1 for t in env.zone_travel_time_s if not math.isfinite(t))}")
+    print(f"Zones: {env.n_zones}")
+    for rtype in RESOURCE_TYPES:
+        times = env.zone_travel_time_s[rtype]
+        finite = [t for t in times if math.isfinite(t)]
+        print(f"  {rtype:15s} depot={env.depots[rtype]['station_name']:45s} "
+              f"travel times (s): min={min(finite):.0f}  max={max(finite):.0f}  "
+              f"unreachable={sum(1 for t in times if not math.isfinite(t))}")
     print()
 
     all_results = []
@@ -237,12 +246,52 @@ def main():
                 f"lot less once a trained policy can aim at the actual fire front instead of a random zone"
             )
 
-    finite_travel_times = [t for t in env.zone_travel_time_s if math.isfinite(t)]
-    mean_travel_min = (sum(finite_travel_times) / len(finite_travel_times)) / 60.0
-    print(f"Mean zone travel time from depot: {mean_travel_min:.1f} min "
-          f"(range {min(finite_travel_times) / 60:.1f}-{max(finite_travel_times) / 60:.1f} min) "
-          f"-- plausible for a ~{env.width * env.meta['cell_size_m'] / 1000:.0f}km x "
-          f"{env.height * env.meta['cell_size_m'] / 1000:.0f}km study area")
+    for rtype in RESOURCE_TYPES:
+        finite_travel_times = [t for t in env.zone_travel_time_s[rtype] if math.isfinite(t)]
+        mean_travel_min = (sum(finite_travel_times) / len(finite_travel_times)) / 60.0
+        print(f"Mean {rtype} zone travel time from depot: {mean_travel_min:.1f} min "
+              f"(range {min(finite_travel_times) / 60:.1f}-{max(finite_travel_times) / 60:.1f} min) "
+              f"-- plausible for a ~{env.width * env.meta['cell_size_m'] / 1000:.0f}km x "
+              f"{env.height * env.meta['cell_size_m'] / 1000:.0f}km study area")
+
+    ground_unreachable_zones = {
+        z for rtype in GROUND_RESOURCE_TYPES
+        for z, t in enumerate(env.zone_travel_time_s[rtype]) if not math.isfinite(t)
+    }
+    if ground_unreachable_zones:
+        heli_times_there = [env.zone_travel_time_s["helicopter"][z] for z in ground_unreachable_zones]
+        print(f"\nZones unreachable by at least one ground resource type via the road graph: "
+              f"{sorted(ground_unreachable_zones)}")
+        print(f"Helicopter travel time (straight-line) to those same zones (s): "
+              f"{[f'{t:.0f}' for t in heli_times_there]} -- all finite, confirming helicopter "
+              f"reaches zones ground routing cannot.")
+    else:
+        print("\nNo zones unreachable by any ground resource type in this build of the road graph.")
+
+    # --- Population-aware penalty check ---------------------------------------
+    all_destruction_events = [ev for r in all_results for ev in r["building_destruction_events"]]
+    print(f"\nBuilding-destruction events across all episodes: {len(all_destruction_events)}")
+    if all_destruction_events:
+        penalties = [ev["penalty_applied"] for ev in all_destruction_events]
+        densities = [ev["population_density"] for ev in all_destruction_events]
+        distinct_penalties = len(set(round(p, 3) for p in penalties))
+        print(f"Applied penalty range: {min(penalties):.1f} to {max(penalties):.1f} "
+              f"({distinct_penalties} distinct values across {len(penalties)} events) "
+              f"-- population_density range seen: {min(densities):.3f} to {max(densities):.3f}")
+        if distinct_penalties <= 1:
+            issues.append("Every building-destroyed penalty was identical -- population scaling is not "
+                           "actually varying the reward (still effectively flat -100)")
+        print("Example events (sorted by population_density, low -> high):")
+        for ev in sorted(all_destruction_events, key=lambda e: e["population_density"])[:2]:
+            print(f"  row={ev['row']:3d} col={ev['col']:3d}  population_density={ev['population_density']:.3f}  "
+                  f"multiplier={ev['multiplier']:.2f}x  evacuated={ev['evacuated']}  "
+                  f"penalty_applied={ev['penalty_applied']:.1f}")
+        for ev in sorted(all_destruction_events, key=lambda e: e["population_density"])[-2:]:
+            print(f"  row={ev['row']:3d} col={ev['col']:3d}  population_density={ev['population_density']:.3f}  "
+                  f"multiplier={ev['multiplier']:.2f}x  evacuated={ev['evacuated']}  "
+                  f"penalty_applied={ev['penalty_applied']:.1f}")
+    else:
+        print("\nNo building-destruction events occurred across any episode -- can't verify population scaling.")
 
     print()
     if issues:
@@ -251,6 +300,89 @@ def main():
             print(f"  ! {issue}")
     else:
         print("No anomalies flagged.")
+
+    verify_multi_ignition(env, issues)
+
+    print()
+    if issues:
+        print("=== FLAGGED ISSUES (final, includes multi-ignition checks) ===")
+        for issue in issues:
+            print(f"  ! {issue}")
+
+
+def _n_active_fire_clusters(sim):
+    """Connected-component count (8-connectivity) over currently active
+    (Threat/Blaze) cells -- how many separate fire fronts exist right now,
+    as opposed to state_counts()'s flat cell tally."""
+    from scipy.ndimage import label
+    active = np.isin(sim.state, (THREAT, BLAZE))
+    structure = np.ones((3, 3), dtype=bool)  # 8-connected
+    _labeled, n = label(active, structure=structure)
+    return n
+
+
+def verify_multi_ignition(env, issues):
+    """scenario='multi' -- confirm MULTI_IGNITION_TRAINING_SCENARIO actually
+    starts multiple independent fire fronts that grow, and that resource
+    dispatch/target-selection (which operates per-zone, see
+    inferno_env._effect_target_point) still works normally with more than
+    one active cluster on the grid at once."""
+    print("\n=== Multi-ignition scenario check (scenario='multi') ===")
+    print(f"MULTI_IGNITION_TRAINING_SCENARIO points: {MULTI_IGNITION_TRAINING_SCENARIO}")
+
+    obs = env.reset(seed=777, scenario="multi")
+    n_clusters_at_reset = _n_active_fire_clusters(env.sim)
+    print(f"Active fire clusters immediately after reset: {n_clusters_at_reset} "
+          f"(expected {len(MULTI_IGNITION_TRAINING_SCENARIO)}, one per ignition point)")
+    if n_clusters_at_reset != len(MULTI_IGNITION_TRAINING_SCENARIO):
+        issues.append(f"scenario='multi' reset produced {n_clusters_at_reset} fire clusters, "
+                       f"expected {len(MULTI_IGNITION_TRAINING_SCENARIO)} (one per ignition point)")
+
+    rng = np.random.default_rng(777)
+    cluster_counts_over_time = [n_clusters_at_reset]
+    active_cell_counts_over_time = [int(np.isin(env.sim.state, (THREAT, BLAZE)).sum())]
+    for t in range(1, 11):
+        action = random_action(rng, env.n_zones)
+        obs, reward, done, info = env.step(action)
+        cluster_counts_over_time.append(_n_active_fire_clusters(env.sim))
+        active_cell_counts_over_time.append(info["state_counts"]["Threat"] + info["state_counts"]["Blaze"])
+        if done:
+            break
+    print(f"Active fire clusters, tick 0->{len(cluster_counts_over_time) - 1}: {cluster_counts_over_time}")
+    print(f"Active fire cell count, tick 0->{len(active_cell_counts_over_time) - 1}: {active_cell_counts_over_time}")
+    if max(cluster_counts_over_time[1:], default=0) < 2:
+        issues.append("scenario='multi': fewer than 2 independent fire clusters ever seen after tick 0 -- "
+                       "fronts may have merged immediately or failed to grow independently")
+    if active_cell_counts_over_time[-1] <= active_cell_counts_over_time[0]:
+        issues.append("scenario='multi': active fire cell count did not grow over the first "
+                       f"{len(active_cell_counts_over_time) - 1} ticks")
+
+    # Run a full random-policy episode on the multi scenario (same harness as
+    # run_episode()) to confirm dispatch/target-selection -- which is
+    # per-zone (inferno_env._effect_target_point), not global -- still finds
+    # and suppresses fire normally with 3 simultaneous fronts on the grid.
+    result = run_episode(env, episode_seed=778, scenario="multi")
+    print(f"\nFull scenario='multi' random-policy episode: {result['ticks']} ticks, "
+          f"contained={result['contained']}, timeout={result['timeout']}, "
+          f"total_reward={result['total_reward']:.1f}")
+    print(f"  dispatch attempts={result['dispatch_attempts']} (ok={result['dispatch_ok']})")
+    print(f"  resource arrival effects: success={result['resource_effect_success']} "
+          f"wasted={result['resource_effect_wasted']}")
+    print(f"  buildings destroyed: {result['buildings_destroyed']}")
+    if result["dispatch_ok"] == 0:
+        issues.append("scenario='multi': no dispatch ever succeeded over a full random-policy episode")
+    if result["resource_effect_success"] == 0:
+        issues.append("scenario='multi': no resource arrival ever had an effect over a full "
+                       "random-policy episode -- target-selection may be broken with multiple fronts")
+
+    # scenario='single' (the original default) must still work exactly as
+    # before -- multi is additive, not a replacement.
+    single_obs = env.reset(seed=779, scenario="single")
+    single_clusters = _n_active_fire_clusters(env.sim)
+    print(f"\nscenario='single' (default) still produces exactly one fire cluster: {single_clusters}")
+    if single_clusters != 1:
+        issues.append(f"scenario='single' produced {single_clusters} fire clusters at reset, expected 1 -- "
+                       "the original single-ignition curriculum stage may have regressed")
 
 
 if __name__ == "__main__":

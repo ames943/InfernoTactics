@@ -1,0 +1,12 @@
+{
+  "target_utc": "2025-01-11T00:00:00+00:00",
+  "n_ticks": 2325,
+  "real_burned_cells": 72216,
+  "real_burned_acres": 16060.46600522953,
+  "sim_burned_cells": 102653,
+  "sim_burned_acres": 22829.497851374028,
+  "iou": 0.5930491026692175,
+  "precision": 0.6341655869774873,
+  "recall": 0.9014484324803368,
+  "area_ratio": 1.421471696023042
+}

@@ -32,21 +32,25 @@ from models.mlp_branch import MLPBranch  # noqa: E402
 
 class InfernoModel(nn.Module):
     def __init__(self, n_grid_channels, n_scalars=len(SCALAR_KEYS),
-                 n_resource_types=N_RESOURCE_TYPES, n_zones=N_ZONES):
+                 n_resource_types=N_RESOURCE_TYPES, n_zones=N_ZONES, n_value_heads=1):
         super().__init__()
         self.cnn = CNNBranch(in_channels=n_grid_channels)
         self.mlp = MLPBranch(in_features=n_scalars)
         fused_dim = POOLED_DIM + MLP_OUTPUT_DIM
-        self.actor_critic = ActorCritic(in_features=fused_dim, n_resource_types=n_resource_types, n_zones=n_zones)
+        self.actor_critic = ActorCritic(in_features=fused_dim, n_resource_types=n_resource_types, n_zones=n_zones,
+                                         n_value_heads=n_value_heads)
         self.classifier = ClassificationHead(in_channels=PER_CELL_CHANNELS)
 
-    def forward(self, grid, scalars):
+    def forward(self, grid, scalars, value_head_idx=0):
         """grid: (B, n_grid_channels, H, W), scalars: (B, n_scalars) ->
-        (action_logits dict, value (B, 1), classification_logits (B, 4, H, W))"""
+        (action_logits dict, value (B, 1), classification_logits (B, 4, H, W))
+        value_head_idx: see ActorCritic -- ignored unless the model was built
+        with n_value_heads>1 (train_actor_critic_multi_v3.py's separate-
+        value-head-per-scenario experiment)."""
         per_cell_features, pooled_cnn = self.cnn(grid)
         mlp_features = self.mlp(scalars)
         fused = torch.cat([pooled_cnn, mlp_features], dim=1)
-        action_logits, value = self.actor_critic(fused)
+        action_logits, value = self.actor_critic(fused, value_head_idx=value_head_idx)
         classification_logits = self.classifier(per_cell_features)
         return action_logits, value, classification_logits
 

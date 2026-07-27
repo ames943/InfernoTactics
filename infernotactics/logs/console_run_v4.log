@@ -1,0 +1,11 @@
+[train-multi-v4] REAL TRAINING RUN: 500 episodes, initial device=mps, reward_shaping=off (SHAPING_COEFF=0.02), GAE(lambda=0.95, gamma=0.99), PPO(epochs=4, minibatch=16, clip_eps=0.2)
+[train-multi-v4] Building InfernoEnv...
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches there will always be wasted for water_team).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches there will always be wasted for trench_crew).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches there will always be wasted for rescue_vehicle).
+[train-multi-v4] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints/best.pt (original single-scenario best.pt, ep 260) -- all layers loaded unchanged except mlp.net.0.weight, which gained one zero-initialized column for the anchor-identity flag (N_SCALARS=9, was 8) -- see ANCHOR_FLAG_DIM docstring for why.
+    [ppo-kl] ep 20: approx_KL before epoch 1 = 0.00000  final = 0.05997  entropy=0.32231  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(177,511)  n_ticks=150  timeout=True  other_grad_norm=56303.5
+[status @ ep    20/500] episodes/min(last20)=  5.13  avg_reward(last20)=  -82210.5  entropy=0.322  policy_loss=   0.020  value_loss=  35.590  class_loss=0.045  reward_scale_std=835.08  value_grad_norm=19510.0  other_grad_norm=56303.5  device=mps
+    [anchor-flag probe] resource_logits(flag=0)=[0.311, 1.279, 0.837, 0.328]  resource_logits(flag=1)=[0.311, 1.279, 0.837, 0.328]  max_abs_diff=0.0001
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/episode_0020.pt (and latest.pt, resume_state.pt)

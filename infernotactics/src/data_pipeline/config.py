@@ -40,3 +40,14 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 ROADS_GRAPHML_PATH = os.path.join(DATA_DIR, "roads.graphml")
 BUILDINGS_PATH = os.path.join(DATA_DIR, "buildings.geojson")
 ELEVATION_PATH = os.path.join(DATA_DIR, "elevation.tif")
+POPULATION_PATH = os.path.join(DATA_DIR, "population.tif")
+
+# Real LAFD depot locations (one per RL resource type) -- see the file itself
+# for sourcing notes. Lives alongside this config rather than under DATA_DIR
+# since it's small, hand-curated, and version-controlled, not a pipeline output.
+REAL_DEPOTS_PATH = os.path.join(_THIS_DIR, "real_depots.json")
+
+# Real Jan 7-8 2025 wind/humidity time series (NOAA ASOS, Santa Monica Airport
+# station KSMO) -- see fetch_weather.py for sourcing/cleaning details.
+WEATHER_STATION = "SMO"
+WEATHER_CSV_PATH = os.path.join(DATA_DIR, "palisades_weather_jan2025.csv")

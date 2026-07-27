@@ -1,7 +1,7 @@
 """
 Forward-pass shape/perf check for InfernoModel against a REAL InfernoEnv
 observation -- NOT training. Confirms the CNN/MLP/classification/actor-
-critic branches all line up (32 zones, 3 resource types, 4 classes, and the
+critic branches all line up (32 zones, 4 resource types, 4 classes, and the
 grid's actual (H, W)) before any training-loop code gets written.
 
     python -m src.models.test_model_forward
@@ -55,7 +55,7 @@ def main():
 
     print("\n=== Output shapes ===")
     print(f"action_logits['resource_type']: {tuple(action_logits['resource_type'].shape)}  "
-          f"(expected (1, 3))")
+          f"(expected (1, 4))")
     print(f"action_logits['zone']:          {tuple(action_logits['zone'].shape)}  "
           f"(expected (1, {env.n_zones}))")
     print(f"value:                          {tuple(value.shape)}  (expected (1, 1))")

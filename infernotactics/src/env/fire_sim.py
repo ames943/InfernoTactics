@@ -9,6 +9,11 @@ direction (downwind spreads faster, upwind slower), humidity (suppresses
 spread), and whether the cell is a road (fuel break -- much harder to ignite,
 not impossible).
 
+On top of that adjacent-neighbor spread, each Blaze cell also has a small,
+wind-scaled chance of directly igniting a Fuel cell well downwind (ember
+spotting -- see the EMBER_* constants and FireSim._ember_spot_fires), which
+can jump over a road cell that would otherwise block adjacent spread.
+
 This module has no ML/training in it -- wind_speed/wind_direction/humidity
 are passed into step() each tick so this can later be driven by real weather
 data (e.g. the Jan 7-8 2025 Palisades Fire Santa Ana event) or by an RL
@@ -52,6 +57,24 @@ SLOPE_FACTOR_CLIP = (0.15, 4.0)
 WIND_FACTOR_CLIP = (0.15, 4.0)
 
 BURN_DURATION_TICKS = 4        # ticks a cell stays Blaze before becoming Burned Out
+
+# --- Ember spotting (long-distance spot fires) --------------------------
+# A separate mechanism from the per-neighbor spread loop above: instead of
+# only being able to catch an immediately-adjacent Fuel cell, a Blaze cell
+# has a small chance each tick of directly igniting a Fuel cell well
+# downwind, regardless of what's physically in between -- including a road
+# cell that would otherwise act as a fuel break for adjacent spread (see
+# ROAD_RESISTANCE_FACTOR above, which only applies to that per-neighbor
+# loop, not here). This models real wind-carried embers, the documented
+# mechanism behind the actual Palisades Fire jumping containment lines.
+# Both launch frequency and jump distance scale with wind_speed_norm (see
+# step()) -- calm wind means rare, short jumps; a strong Santa Ana means
+# frequent, long-range ones.
+EMBER_BASE_PROB = 0.02          # per-Blaze-cell, per-tick launch chance at wind_speed_norm == 1.0 (REFERENCE_WIND_MPH)
+EMBER_MAX_LAUNCH_PROB = 0.5     # hard cap on the per-cell launch probability regardless of wind
+EMBER_MIN_DISTANCE_CELLS = 4    # jump floor, comfortably past adjacent-spread range -- always "a jump", not a graze
+EMBER_MAX_DISTANCE_CELLS = 12   # jump ceiling at wind_speed_norm == 1.0 (~360m at this grid's 30m cells)
+EMBER_LATERAL_JITTER_CELLS = 2  # perpendicular randomness so embers don't all land on one exact downwind ray
 
 
 def _shift(arr, dy, dx, fill):
@@ -132,6 +155,53 @@ class FireSim:
         counts = np.bincount(self.state.ravel(), minlength=len(STATE_NAMES))
         return {name: int(c) for name, c in zip(STATE_NAMES, counts)}
 
+    def _ember_spot_fires(self, blaze_mask, fuel_mask, wind_to_east, wind_to_north, wind_speed_norm):
+        """Probabilistic long-distance spot fires -- see the EMBER_* constants'
+        module-level comment. Returns a boolean mask, same shape as
+        self.state, of Fuel cells newly ember-ignited this tick (to be OR'd
+        into the adjacency-spread `newly_threat` mask by the caller)."""
+        ignited = np.zeros((self.height, self.width), dtype=bool)
+        if wind_speed_norm <= 0:
+            return ignited
+
+        blaze_rows, blaze_cols = np.where(blaze_mask)
+        if len(blaze_rows) == 0:
+            return ignited
+
+        launch_prob = min(EMBER_BASE_PROB * wind_speed_norm, EMBER_MAX_LAUNCH_PROB)
+        launched = self.rng.random(len(blaze_rows)) < launch_prob
+        if not launched.any():
+            return ignited
+
+        src_rows, src_cols = blaze_rows[launched], blaze_cols[launched]
+        n = len(src_rows)
+
+        max_dist = EMBER_MIN_DISTANCE_CELLS + wind_speed_norm * (EMBER_MAX_DISTANCE_CELLS - EMBER_MIN_DISTANCE_CELLS)
+        distances = self.rng.uniform(EMBER_MIN_DISTANCE_CELLS, max(max_dist, EMBER_MIN_DISTANCE_CELLS), size=n)
+        lateral = self.rng.uniform(-EMBER_LATERAL_JITTER_CELLS, EMBER_LATERAL_JITTER_CELLS, size=n)
+
+        # Perpendicular (90 deg CCW) to the downwind (wind_to_east,
+        # wind_to_north) vector, for lateral jitter around the downwind ray.
+        perp_east, perp_north = -wind_to_north, wind_to_east
+        # row+ is south, so a +north offset subtracts from row (same
+        # convention as the per-neighbor spread loop above).
+        target_rows = np.round(src_rows - distances * wind_to_north + lateral * perp_north).astype(int)
+        target_cols = np.round(src_cols + distances * wind_to_east + lateral * perp_east).astype(int)
+
+        in_bounds = (
+            (target_rows >= 0) & (target_rows < self.height)
+            & (target_cols >= 0) & (target_cols < self.width)
+        )
+        target_rows, target_cols = target_rows[in_bounds], target_cols[in_bounds]
+        if len(target_rows) == 0:
+            return ignited
+
+        lands_on_fuel = fuel_mask[target_rows, target_cols]
+        target_rows, target_cols = target_rows[lands_on_fuel], target_cols[lands_on_fuel]
+
+        ignited[target_rows, target_cols] = True
+        return ignited
+
     def step(self, wind_speed_mph=0.0, wind_direction_deg=0.0, humidity_pct=30.0):
         """Advance the simulation by one tick.
 
@@ -182,10 +252,18 @@ class FireSim:
         draws = self.rng.random((self.height, self.width))
         newly_threat = fuel_mask & (draws < p_ignite)
 
+        # Long-distance ember spotting (see EMBER_* constants): OR'd into
+        # the same newly_threat mask as adjacency spread -- an ember-caught
+        # cell becomes Threat this tick and Blaze next tick exactly like an
+        # adjacency-caught one, just reached by a different mechanism.
+        ember_ignited = self._ember_spot_fires(blaze_mask, fuel_mask, wind_to_east, wind_to_north, wind_speed_norm)
+        newly_threat = newly_threat | ember_ignited
+
         new_state = self.state.copy()
 
-        # 1. Fuel cells that catch this tick become Threat (an ignition front
-        #    that becomes Blaze next tick), based on last tick's Blaze cells.
+        # 1. Fuel cells that catch this tick (adjacency spread OR ember
+        #    spotting) become Threat (an ignition front that becomes Blaze
+        #    next tick), based on last tick's Blaze cells.
         new_state[newly_threat] = THREAT
 
         # 2. Cells that were Threat last tick fully ignite this tick.

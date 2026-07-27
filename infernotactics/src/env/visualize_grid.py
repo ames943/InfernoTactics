@@ -30,6 +30,7 @@ LAYER_STYLE = {
     "road_mask": ("Greys", "Road mask"),
     "fuel_density": ("YlGn", "Fuel density (placeholder, 0-1)"),
     "water_mask": ("Blues", "Water mask (heuristic, 0-1)"),
+    "population_density": ("magma", "Population density (0-1, log-scaled, WorldPop 2020)"),
 }
 
 
@@ -86,6 +87,27 @@ def visualize():
     overlay_path = os.path.join(DATA_DIR, "grid_overlay_check.png")
     fig2.savefig(overlay_path, dpi=150)
     print(f"Saved overlay check -> {overlay_path}")
+
+    # Population overlay check: dense residential/commercial areas (e.g.
+    # Westwood Village, in the grid's east) should show visibly higher
+    # population_density than sparse hillside/wilderness areas (e.g. the
+    # Topanga core, in the west) -- and buildings/roads should sit inside
+    # the populated areas, not scattered over the empty hillsides.
+    population_density = stacked[LAYER_NAMES.index("population_density")]
+    fig3, ax3 = plt.subplots(figsize=(10, 6))
+    im3 = ax3.imshow(population_density, cmap="magma", origin="upper", vmin=0, vmax=1)
+    building_overlay = np.ma.masked_where(building_density <= 0, building_density)
+    ax3.imshow(building_overlay, cmap="Blues", origin="upper", alpha=0.5, vmin=0, vmax=1)
+    road_overlay = np.ma.masked_where(road_mask <= 0, road_mask)
+    ax3.imshow(road_overlay, cmap="Greys_r", origin="upper", alpha=0.4, vmin=0, vmax=1)
+    fig3.colorbar(im3, ax=ax3, fraction=0.046, pad=0.04, label="Population density (0-1)")
+    ax3.set_title("Population density (magma) + buildings (blue) + roads (white)")
+    ax3.set_xticks([])
+    ax3.set_yticks([])
+    fig3.tight_layout()
+    population_overlay_path = os.path.join(DATA_DIR, "population_overlay_check.png")
+    fig3.savefig(population_overlay_path, dpi=150)
+    print(f"Saved population overlay check -> {population_overlay_path}")
 
 
 if __name__ == "__main__":

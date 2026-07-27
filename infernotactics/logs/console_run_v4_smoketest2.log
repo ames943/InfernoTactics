@@ -1,0 +1,39 @@
+[train-multi-v4] dry run / smoke test: 50 episodes, initial device=mps, reward_shaping=off (SHAPING_COEFF=0.02), GAE(lambda=0.95, gamma=0.99), PPO(epochs=4, minibatch=16, clip_eps=0.2)
+[train-multi-v4] Building InfernoEnv...
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches there will always be wasted for water_team).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches there will always be wasted for trench_crew).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches there will always be wasted for rescue_vehicle).
+[train-multi-v4] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints/best.pt (original single-scenario best.pt, ep 260) -- direct state_dict load, no key surgery (v4 uses the plain original architecture: single value head, no scenario one-hot -- see module docstring for why v2/v3's machinery isn't carried forward).
+    [ppo-kl] ep 1: approx_KL before epoch 1 = 0.00000  after epoch 1 = 2.71081  EARLY-STOPPED after epoch 1  ignition=(165,455)  n_ticks=150  timeout=True
+    [ppo-kl] ep 2: approx_KL before epoch 1 = 0.00000  after epoch 1 = -0.08798  EARLY-STOPPED after epoch 1  ignition=(289,332)  n_ticks=5  timeout=False
+    [ppo-kl] ep 3: approx_KL before epoch 1 = 0.00000  after epoch 1 = 0.16635  EARLY-STOPPED after epoch 1  ignition=(118,388)  n_ticks=150  timeout=True
+    [ppo-kl] ep 4: approx_KL before epoch 1 = 0.00000  after epoch 1 = 0.24451  EARLY-STOPPED after epoch 1  ignition=(224,433)  n_ticks=139  timeout=False
+    [ppo-kl] ep 5: approx_KL before epoch 1 = 0.00000  after epoch 2 = 0.09798  EARLY-STOPPED after epoch 2  ignition=(247,478)  n_ticks=51  timeout=False
+    [ppo-kl] ep 6: approx_KL before epoch 1 = 0.00000  after epoch 1 = -0.10447  EARLY-STOPPED after epoch 1  ignition=(285,419)  n_ticks=7  timeout=False
+    [ppo-kl] ep 7: approx_KL before epoch 1 = 0.00000  after epoch 1 = 0.07363  EARLY-STOPPED after epoch 1  ignition=(259,524)  n_ticks=150  timeout=True
+    [ppo-kl] ep 8: approx_KL before epoch 1 = 0.00000  after epoch 1 = 0.67516  EARLY-STOPPED after epoch 1  ignition=(290,529)  n_ticks=150  timeout=True
+    [ppo-kl] ep 9: approx_KL before epoch 1 = 0.00000  after epoch 1 = 0.35160  EARLY-STOPPED after epoch 1  ignition=(87,502)  n_ticks=150  timeout=True
+    [ppo-kl] ep 10: approx_KL before epoch 1 = 0.00000  after epoch 1 = 0.03229  EARLY-STOPPED after epoch 1  ignition=(99,470)  n_ticks=150  timeout=True
+    [eval @ ep 10] (train     ) single_training: avg_reward=-119821.1  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -90410.2 (heuristic: -29410.9)
+    [eval @ ep 10] (train     ) topanga_ridge: avg_reward=-9797.2  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -4766.7 (heuristic: -5030.5)
+
+[train-multi-v4] Caught interrupt (Ctrl+C or SIGTERM) after episode 10/50 -- saving checkpoint + resume state before exit.
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/latest.pt and /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/resume_state.pt
+
+=== Multi-ignition v4 (GAE + multi-epoch PPO + continuous ignition) summary (INTERRUPTED at episode 10/50) ===
+Total wall time: 77.5s  Overall episodes/min: 7.75
+Policy loss: moved (range 0 to 0.248)
+Value loss: moved (range 14.3 to 4.66e+03)
+Classification loss: moved (range 0.00297 to 0.138)
+Entropy: moved (range 0.976 to 4.2)
+Final reward_scale_normalizer: mean=-819.63 std=974.39 n=1102
+KL early-stopping: triggered in 10/10 episodes (100%), average stop at epoch 1.1/4  (threshold=0.03)
+Ignition variety check: 10 unique points sampled out of 10 episodes; distance-to-nearest-named-point (grid cells): min=28.6 mean=90.9 max=141.3
+Stochastic rollout reward (raw, unshaped), first->last episode: -162562.3 -> -115986.0
+Stochastic rollout reward, mean first 10 vs last 10: -90323.0 vs -90323.0
+No eval completed yet (fewer than EVAL_EVERY episodes ran).
+No best.pt saved yet (fewer than EVAL_EVERY episodes ran).
+MPS errors encountered: none
+Final device: mps
+Latest checkpoint: /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/latest.pt

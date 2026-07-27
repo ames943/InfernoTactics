@@ -11,17 +11,32 @@ Action space
 ------------
 action = (resource_type, target_zone) where:
   - resource_type: one of RESOURCE_TYPES ("water_team", "trench_crew",
-    "rescue_vehicle"), or None/"noop" to dispatch nothing this tick.
+    "rescue_vehicle", "helicopter"), or None/"noop" to dispatch nothing this
+    tick.
   - target_zone: int zone id in [0, n_zones); ignored if resource_type is
     None/"noop". Zones are a coarse rectangular partition of the grid (see
     _build_zones) used ONLY to give the action space a manageable size and a
-    real road-network travel time -- it does not change what the CNN branch
-    sees, which is still the full-resolution grid.
+    real travel time -- it does not change what the CNN branch sees, which
+    is still the full-resolution grid.
+
+Each resource type dispatches from its own real, fixed LAFD depot (see
+data_pipeline/real_depots.json) rather than one shared depot. The three
+ground types (water_team, trench_crew, rescue_vehicle) travel via the real
+road graph, exactly as before. helicopter is the odd one out: it has no
+road route at all -- travel time is straight-line distance from LAFD Air
+Operations (Van Nuys Airport) to the target divided by a fixed cruise
+speed (HELICOPTER_SPEED_MPS). That is its real advantage (it can reach
+zones the road graph can't, e.g. the 1 zone flagged unreachable for ground
+units), traded off against a small fixed roster and a long reload period
+after each drop (HELICOPTER_RELOAD_TICKS, a round trip back to Van Nuys to
+refill retardant/water -- longer than the ground units' post-arrival
+DEPLOYED_BUSY_TICKS) -- a helicopter is not simply a strictly-better ground
+unit, matching how limited/weather-constrained real LAFD air support is.
 
 Observation space
 -----------------
 obs = {
-    "grid": float32 array (n_static_layers + 1, height, width) -- the 7
+    "grid": float32 array (n_static_layers + 1, height, width) -- the 8
         static layers from grid_static.npy (see STATIC_LAYER_NAMES) stacked
         with the current per-cell fire state (fire_sim.FireSim.state, raw
         ordinal 0-4: Safe/Fuel/Threat/Blaze/Burned Out) as the last channel.
@@ -35,28 +50,40 @@ obs = {
 
 Reward (see the project reward-formula spec)
 ---------------------------------------------
-  +50  a dispatched water_team's arrival extinguishes >=1 active fire cell
- -100  a building cell is consumed by fire this tick (BUILDING_DESTROYED_PENALTY)
-  -20  same, but the building was in a zone a rescue_vehicle had reached
-       first (RESCUE_PENALTY_REDUCTION cuts the penalty, doesn't zero it)
+  +50  a dispatched water_team OR helicopter's arrival extinguishes >=1
+       active fire cell -- a retardant/water drop is the same suppression
+       action as a ground water_team, just delivered from the air, so it
+       earns the same explicit positive reward term
+ -100 to -400  a building cell is consumed by fire this tick
+       (BUILDING_DESTROYED_PENALTY * a population-density-based multiplier,
+       1x-4x -- see POPULATION_PENALTY_SCALE/_CAP -- a building lost in
+       dense Westwood costs more than an identical loss on an empty
+       hillside)
+  10%-50% of that (population-scaled) penalty, if the building was in a
+       zone a rescue_vehicle had reached first -- the waived FRACTION itself
+       scales with population_density too (RESCUE_PENALTY_REDUCTION_MIN/MAX),
+       so evacuating a dense area is worth more than evacuating a sparse one
   -10  a resource action has no effect: no unit of that type was available,
        OR the unit arrives but its effect can't apply (trench_crew targets a
-       cell that's already on fire; water_team/rescue_vehicle target a zone
-       with nothing to put out / no one threatened) (RESOURCE_WASTED_PENALTY)
+       cell that's already on fire; water_team/rescue_vehicle/helicopter
+       target a zone with nothing to put out / no one threatened)
+       (RESOURCE_WASTED_PENALTY)
   -lambda * travel_time_seconds, charged once per successful dispatch
        (LAMBDA_TRAVEL_TIME)
 Congestion term intentionally omitted (Tier 3, per project plan).
-Only water_team has an explicit positive reward term -- trench_crew and
-rescue_vehicle create value indirectly, by preventing future -100/-10
-events, matching the reward terms specified in the project plan (no extra
-terms invented here).
+Only water_team and helicopter have an explicit positive reward term --
+trench_crew and rescue_vehicle create value indirectly, by preventing future
+-100/-10 events, matching the reward terms specified in the project plan (no
+extra terms invented here).
 """
 
+import csv
 import json
 import math
 import os
 import sys
 from collections import OrderedDict
+from datetime import datetime, timezone
 
 import networkx as nx
 import numpy as np
@@ -65,7 +92,7 @@ from pyproj import Transformer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data_pipeline.config import DATA_DIR, ROADS_GRAPHML_PATH  # noqa: E402
+from data_pipeline.config import DATA_DIR, REAL_DEPOTS_PATH, ROADS_GRAPHML_PATH, WEATHER_CSV_PATH  # noqa: E402
 from env.fire_sim import (  # noqa: E402
     BLAZE,
     BURNED_OUT,
@@ -83,7 +110,7 @@ GRID_META_PATH = os.path.join(DATA_DIR, "grid_meta.json")
 # fire_sim.py duplicates the layer index convention.
 STATIC_LAYER_NAMES = [
     "elevation", "slope", "building_density", "building_height",
-    "road_mask", "fuel_density", "water_mask",
+    "road_mask", "fuel_density", "water_mask", "population_density",
 ]
 LAYER_INDEX = {name: i for i, name in enumerate(STATIC_LAYER_NAMES)}
 
@@ -105,28 +132,135 @@ WUI_PROXIMITY_RADIUS_CELLS = 15
 
 BUILDING_PRESENCE_THRESHOLD = 0.10  # building_density above which a cell "is a building"
 
+# --- Fixed real-world ignition points -----------------------------------------
+# TRAINING_IGNITION_POINT: the Palisades Fire's actual documented origin, near
+# the Skull Rock trailhead in the Palisades Highlands, reported ~10:30am PST
+# Jan 7 2025 (34.0725 N, 118.5425 W -- Wikipedia's Palisades Fire article).
+# Converted to grid row/col via the grid's affine transform; confirmed a real
+# fuel cell (not water/building) within WUI_PROXIMITY_RADIUS_CELLS of a
+# building, same as _sample_ignition_point()'s general criterion. Used as the
+# default/main training scenario (a fixed real point, not a random draw) so
+# the RL agent's primary episode matches the actual event this project is
+# grounded in.
+TRAINING_IGNITION_POINT = (207, 222)
+
+# VALIDATION_IGNITION_POINTS: held-out start locations elsewhere in the same
+# grid, for testing whether a policy trained on TRAINING_IGNITION_POINT
+# generalizes to unseen ignitions rather than memorizing one fire. Both are
+# real, named chaparral hillsides at the wildland-urban interface (fuel,
+# not water, within WUI_PROXIMITY_RADIUS_CELLS of a building -- confirmed the
+# same way), well clear of the Palisades Highlands and the roadless
+# mid-Topanga wilderness core:
+#   - "mandeville_canyon": Brentwood, one grid cell (~30m) upslope from the
+#     real Mandeville Canyon trailhead (34.1212 N, 118.5067 W) -- nudged off
+#     the trailhead/parking footprint itself (fuel_density there is only
+#     ~0.05) and into the canyon chaparral (fuel_density ~0.82).
+#   - "getty_view_park": Bel-Air, next to the Getty Center (34.0987 N,
+#     118.4732 W) -- a chaparral fire-road hillside that trail guides
+#     describe as showing burn scarring from a past brush fire, i.e. a real,
+#     precedented wildfire-prone WUI slope, not an arbitrary point.
+VALIDATION_IGNITION_POINTS = {
+    "mandeville_canyon": (57, 371),
+    "getty_view_park": (162, 451),
+}
+
+# MULTI_IGNITION_TRAINING_SCENARIO: an ADDITIONAL, selectable curriculum
+# stage (reset(scenario='multi')) -- it does not replace the single-fire
+# TRAINING_IGNITION_POINT stage, which stays the default (reset(scenario=
+# 'single'), or just reset()). Three real, named chaparral/WUI hillsides
+# spread across the same Santa-Ana wind corridor this project is grounded
+# in (Topanga -> Brentwood -> Bel-Air), modeling a severe offshore-wind
+# event igniting multiple fronts near-simultaneously rather than the single
+# documented Palisades Fire origin -- plausible because the real Jan 2025
+# windstorm that produced the Palisades Fire also produced the Eaton Fire
+# the same night, a separate simultaneous ignition elsewhere in the same
+# event; a severe Santa Ana event commonly drives multiple concurrent
+# ignitions across a region's exposed WUI slopes, not just one. All three
+# are, like TRAINING_IGNITION_POINT/VALIDATION_IGNITION_POINTS, confirmed
+# real fuel cells (not water/building) within WUI_PROXIMITY_RADIUS_CELLS of
+# a building (see scratch verification: fuel_density > 0, water_mask False,
+# a building cell within 15 cells):
+#   - "topanga_ridge": Topanga State Park, near the real Trippet Ranch
+#     trailhead (34.0958 N, 118.5844 W) -- the westernmost, highest-
+#     elevation point of the corridor.
+#   - "sullivan_canyon": Sullivan Canyon, Brentwood (34.0965 N, 118.5075 W)
+#     -- a distinct canyon system from the mandeville_canyon validation
+#     point, ~7km east of topanga_ridge.
+#   - "stone_canyon": Stone Canyon Reservoir hillside, Bel-Air (34.1013 N,
+#     118.4632 W) -- a distinct drainage from the getty_view_park
+#     validation point (~1km away but a different canyon), ~4km east of
+#     sullivan_canyon.
+# The three land in three different macro-zones (see _build_zones) at
+# reset, so each fire front gets its own independent nearest-fire targeting
+# via _effect_target_point -- confirmed in test_inferno_env.py.
+MULTI_IGNITION_TRAINING_SCENARIO = [
+    (92, 118),   # topanga_ridge
+    (145, 347),  # sullivan_canyon
+    (159, 483),  # stone_canyon
+]
+
 # --- Resources ---------------------------------------------------------------
-RESOURCE_COUNTS = {"water_team": 3, "trench_crew": 3, "rescue_vehicle": 3}
+RESOURCE_COUNTS = {"water_team": 3, "trench_crew": 3, "rescue_vehicle": 3, "helicopter": 2}
 RESOURCE_TYPES = tuple(RESOURCE_COUNTS)
-DEPLOYED_BUSY_TICKS = 5  # ticks a unit stays tied up at the incident after arriving, before it can be redispatched
+GROUND_RESOURCE_TYPES = ("water_team", "trench_crew", "rescue_vehicle")  # dispatch via road-graph routing
+AIR_RESOURCE_TYPES = ("helicopter",)  # dispatch via straight-line distance, no road graph
+
+DEPLOYED_BUSY_TICKS = 5  # ground units: ticks tied up on-scene after arriving, before redispatchable
+# Helicopter: after a drop it must fly back to Van Nuys and reload retardant/water before
+# it's available again -- a real round trip, not just an on-scene task, hence longer than
+# DEPLOYED_BUSY_TICKS even though the helicopter's outbound leg is much faster than driving.
+HELICOPTER_RELOAD_TICKS = 12
+HELICOPTER_SPEED_MPS = 60.0  # ~135 mph cruise, plausible for a firefighting helicopter transiting to an incident
 
 # --- Time / weather -----------------------------------------------------------
-# PLACEHOLDER: maps sim ticks <-> wall-clock minutes so road travel times
-# (real seconds) and fire_sim ticks share a consistent clock. Replace with a
-# derivation from the real Jan 7-8 2025 timeline once that data is wired in.
+# Maps sim ticks <-> wall-clock minutes so road travel times (real seconds)
+# and fire_sim ticks share a consistent clock.
 TICK_DURATION_MINUTES = 2.0
-MAX_TICKS = 150  # episode cap (~5 sim-hours at the placeholder tick duration)
+MAX_TICKS = 150  # episode cap (~5 sim-hours at TICK_DURATION_MINUTES)
 
-# --- Depot (fixed resource staging point for travel-time routing) -----------
-# Approximate real-world location: LAFD Fire Station 69, Pacific Palisades.
-DEPOT_LONLAT = (-118.5253, 34.0489)
+# Real-world anchor for tick 0: the Palisades Fire's documented ignition time,
+# ~10:30am PST Jan 7 2025 near the Skull Rock trailhead in the Palisades
+# Highlands (18:30 UTC = PST + 8h, no DST in January). An episode's elapsed
+# sim time (tick * TICK_DURATION_MINUTES minutes) is added to this to look up
+# real weather -- see _real_weather_at(). MAX_TICKS * TICK_DURATION_MINUTES =
+# 300 min = 5h, so a full episode never runs past 15:30 UTC / 3:30pm PST
+# Jan 7, comfortably inside the pulled Jan 7 00:00 - Jan 9 00:00 UTC window
+# (see fetch_weather.py).
+FIRE_START_UTC = datetime(2025, 1, 7, 18, 30, tzinfo=timezone.utc)
 
 # --- Reward constants (see module docstring) ---------------------------------
 FIRE_EXTINGUISHED_REWARD = 50.0
 BUILDING_DESTROYED_PENALTY = 100.0
 RESOURCE_WASTED_PENALTY = 10.0
-RESCUE_PENALTY_REDUCTION = 0.8  # fraction of BUILDING_DESTROYED_PENALTY waived if evacuated first
 LAMBDA_TRAVEL_TIME = 0.02  # reward penalty per second of dispatch travel time
+
+# --- Population-aware building-loss penalty (population_density layer is
+# 0-1, log1p+min-max normalized -- see grid_builder.py) -----------------------
+# A building lost in a dense area (e.g. Westwood Village) should cost more
+# than an identical loss on an empty hillside. multiplier = 1 +
+# population_density * POPULATION_PENALTY_SCALE, hard-capped so a single
+# building's loss can never become absurdly disproportionate even at the
+# single densest cell in the whole grid.
+POPULATION_PENALTY_SCALE = 3.0  # extra weight at population_density == 1.0
+POPULATION_PENALTY_MULTIPLIER_CAP = 4.0  # ceiling: 1x (empty) to 4x (max density)
+
+# RESCUE_PENALTY_REDUCTION is population-dependent rather than one flat
+# fraction: dispatching a rescue_vehicle to a dense area should waive MORE of
+# the (now larger) penalty than dispatching it to a sparse one, since
+# rescue's whole purpose is protecting people, not property -- this is the
+# most direct place population data should matter (see module docstring).
+RESCUE_PENALTY_REDUCTION_MIN = 0.5  # waived fraction at population_density == 0
+RESCUE_PENALTY_REDUCTION_MAX = 0.9  # waived fraction at population_density == 1
+
+
+def _population_penalty_multiplier(population_density):
+    return min(1.0 + population_density * POPULATION_PENALTY_SCALE, POPULATION_PENALTY_MULTIPLIER_CAP)
+
+
+def _rescue_penalty_reduction(population_density):
+    return RESCUE_PENALTY_REDUCTION_MIN + population_density * (
+        RESCUE_PENALTY_REDUCTION_MAX - RESCUE_PENALTY_REDUCTION_MIN
+    )
 
 SCALAR_KEYS = (
     "wind_speed_mph",
@@ -135,6 +269,7 @@ SCALAR_KEYS = (
     "water_team_available",
     "trench_crew_available",
     "rescue_vehicle_available",
+    "helicopter_available",
     "time_elapsed_ticks",
 )
 
@@ -145,16 +280,52 @@ def flatten_scalars(scalars):
     return np.array([scalars[k] for k in SCALAR_KEYS], dtype=np.float32)
 
 
-def _weather_schedule(tick):
-    """PLACEHOLDER synthetic weather, standing in for real Jan 7-8 2025
-    Palisades Fire hourly observations until that data is wired in. Ramps a
-    Santa-Ana-style offshore wind up over the first 10 ticks then holds it,
-    with humidity held low and constant -- deliberately simple/fixed per the
-    current stage of the project, NOT meant to be realistic yet."""
+def _placeholder_weather_schedule(tick):
+    """Fixed synthetic weather used before real data was wired in, kept
+    around (opt in via InfernoEnv.reset(use_real_weather=False)) purely so
+    the earlier hand-validated test_fire_sim.py scenario (uphill/downhill
+    spread ratio, road/water containment) stays exactly reproducible for
+    debugging. Ramps a Santa-Ana-style offshore wind up over the first 10
+    ticks then holds it, with humidity held low and constant -- deliberately
+    simple/fixed, NOT meant to be realistic."""
     wind_speed_mph = min(10.0 + 3.5 * tick, 45.0)
     wind_direction_deg = 45.0  # from the NE, consistent with the validated test_fire_sim.py scenario
     humidity_pct = 8.0
     return wind_speed_mph, wind_direction_deg, humidity_pct
+
+
+def _load_real_weather(path=WEATHER_CSV_PATH):
+    """Load the real Jan 7-8 2025 ASOS time series (see fetch_weather.py)
+    into parallel arrays: epoch seconds (sorted, for searchsorted) and
+    (wind_speed_mph, wind_direction_deg, humidity_pct) rows."""
+    epochs, values = [], []
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            ts = datetime.strptime(row["timestamp"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            epochs.append(ts.timestamp())
+            values.append((float(row["wind_speed_mph"]), float(row["wind_direction_deg"]), float(row["humidity_pct"])))
+    order = np.argsort(epochs)
+    epochs = np.array(epochs, dtype=np.float64)[order]
+    values = np.array(values, dtype=np.float64)[order]
+    return epochs, values
+
+
+def _real_weather_at(elapsed_seconds, weather_epochs, weather_values):
+    """Step-function lookup: the most recent real observation at or before
+    FIRE_START_UTC + elapsed_seconds (real METAR obs update hourly, so a
+    dispatcher would be working off the latest known reading, not a smoothed
+    interpolation). Holds the LAST row if elapsed_seconds runs past the end
+    of the loaded series (rather than looping -- weather doesn't repeat, and
+    a stale-but-real last reading is a more honest fallback than an
+    arbitrary wrap-around); this is expected to never actually trigger for a
+    standard MAX_TICKS episode anchored at FIRE_START_UTC (see that
+    constant's comment), but protects against out-of-range access if either
+    changes later."""
+    target_epoch = FIRE_START_UTC.timestamp() + elapsed_seconds
+    idx = np.searchsorted(weather_epochs, target_epoch, side="right") - 1
+    idx = int(np.clip(idx, 0, len(weather_epochs) - 1))
+    wind_speed_mph, wind_direction_deg, humidity_pct = weather_values[idx]
+    return float(wind_speed_mph), float(wind_direction_deg), float(humidity_pct)
 
 
 def _disk_slice(center_row, center_col, radius, height, width):
@@ -201,8 +372,9 @@ def _apply_trench(sim, row, col):
 def _apply_rescue(sim, row, col, evacuated_cells):
     """Mark threatened building cells in a small disk around (row, col) as
     evacuated: they still burn per fire_sim's normal physics, but the
-    building-destroyed penalty is reduced later (see RESCUE_PENALTY_REDUCTION)
-    instead of the reward branch changing fire_sim's state directly."""
+    building-destroyed penalty is reduced later (see
+    _rescue_penalty_reduction(), population-dependent) instead of the reward
+    branch changing fire_sim's state directly."""
     r0, r1, c0, c1, disk = _disk_slice(row, col, EFFECT_RADIUS_CELLS, sim.height, sim.width)
     building_region = sim.building_density[r0:r1, c0:c1]
     state_region = sim.state[r0:r1, c0:c1]
@@ -295,10 +467,22 @@ def _load_routing_graph(grid_crs):
     return graph
 
 
+def _load_real_depots(path=REAL_DEPOTS_PATH):
+    """Load the real per-resource-type LAFD depot locations (see
+    real_depots.json for sourcing notes) into {resource_type: depot_dict}."""
+    with open(path) as f:
+        depots = json.load(f)["depots"]
+    by_type = {d["resource_type"]: d for d in depots}
+    missing = set(RESOURCE_TYPES) - set(by_type)
+    assert not missing, f"real_depots.json is missing depot(s) for {missing}"
+    return by_type
+
+
 class InfernoEnv:
-    """Gym-style environment: reset(ignition_point=None) -> obs;
-    step(action) -> (obs, reward, done, info). See the module docstring for
-    the observation/action/reward formats."""
+    """Gym-style environment: reset(ignition_point=None, ignition_points=None,
+    scenario='single') -> obs; step(action) -> (obs, reward, done, info). See
+    the module docstring for the observation/action/reward formats, and
+    reset()'s own docstring for the ignition-point selection rules."""
 
     def __init__(self, grid_static_path=GRID_STATIC_PATH, grid_meta_path=GRID_META_PATH, seed=None):
         self.grid_static = np.load(grid_static_path).astype(np.float32)
@@ -325,14 +509,25 @@ class InfernoEnv:
         self.road_graph = _load_routing_graph(self.meta["crs"])
         self._prepare_routing()
 
+        self._weather_epochs, self._weather_values = _load_real_weather()
+        self.use_real_weather = True  # overridable per-episode via reset(use_real_weather=...)
+
         self.sim = None
         self.tick_count = 0
         self.resources = None
         self.evacuated_cells = set()
         self._last_weather = None
         self.ignition_point = None
+        self.ignition_points = None
 
     def _prepare_routing(self):
+        """Compute, for every resource type, a per-zone travel time in
+        seconds from that type's real depot (see real_depots.json) to each
+        zone's centroid. Ground types (GROUND_RESOURCE_TYPES) get a real
+        road-graph Dijkstra ETA per depot; helicopter (AIR_RESOURCE_TYPES)
+        gets straight-line distance / HELICOPTER_SPEED_MPS instead -- no
+        road graph involved, so it is never math.inf the way an
+        unreachable-by-road zone is for ground units."""
         transform_coeffs = self.meta["transform"]  # (a, b, c, d, e, f), (col,row)->(x,y)
         a, b, c, d, e, f = transform_coeffs
 
@@ -345,26 +540,38 @@ class InfernoEnv:
         xs = [xy[0] for xy in zone_xy]
         ys = [xy[1] for xy in zone_xy]
         zone_nodes = ox.distance.nearest_nodes(self.road_graph, X=xs, Y=ys)
-
-        transformer = Transformer.from_crs("EPSG:4326", self.meta["crs"], always_xy=True)
-        depot_x, depot_y = transformer.transform(*DEPOT_LONLAT)
-        self.depot_node = ox.distance.nearest_nodes(self.road_graph, X=depot_x, Y=depot_y)
-
-        travel_times_from_depot = nx.single_source_dijkstra_path_length(
-            self.road_graph, self.depot_node, weight="travel_time"
-        )
-
-        self.zone_travel_time_s = []
         for zone, node in zip(self.zones, zone_nodes):
             zone["road_node"] = int(node)
-            travel_s = travel_times_from_depot.get(node, math.inf)
-            zone["travel_time_s"] = travel_s
-            self.zone_travel_time_s.append(travel_s)
 
-        n_unreachable = sum(1 for t in self.zone_travel_time_s if not math.isfinite(t))
-        if n_unreachable:
-            print(f"[InfernoEnv] Warning: {n_unreachable}/{self.n_zones} zones unreachable "
-                  f"from depot via the road graph (dispatches there will always be wasted).")
+        transformer = Transformer.from_crs("EPSG:4326", self.meta["crs"], always_xy=True)
+        self.depots = _load_real_depots()
+
+        self.zone_travel_time_s = {}
+
+        for rtype in GROUND_RESOURCE_TYPES:
+            depot = self.depots[rtype]
+            depot_x, depot_y = transformer.transform(depot["lon"], depot["lat"])
+            depot_node = ox.distance.nearest_nodes(self.road_graph, X=depot_x, Y=depot_y)
+            depot["road_node"] = int(depot_node)
+
+            travel_times_from_depot = nx.single_source_dijkstra_path_length(
+                self.road_graph, depot_node, weight="travel_time"
+            )
+            self.zone_travel_time_s[rtype] = [
+                travel_times_from_depot.get(int(node), math.inf) for node in zone_nodes
+            ]
+
+            n_unreachable = sum(1 for t in self.zone_travel_time_s[rtype] if not math.isfinite(t))
+            if n_unreachable:
+                print(f"[InfernoEnv] Warning: {n_unreachable}/{self.n_zones} zones unreachable "
+                      f"from {depot['station_name']} via the road graph "
+                      f"(dispatches there will always be wasted for {rtype}).")
+
+        heli_depot = self.depots["helicopter"]
+        heli_x, heli_y = transformer.transform(heli_depot["lon"], heli_depot["lat"])
+        self.zone_travel_time_s["helicopter"] = [
+            math.hypot(x - heli_x, y - heli_y) / HELICOPTER_SPEED_MPS for x, y in zone_xy
+        ]
 
     # --- Episode lifecycle ---------------------------------------------------
 
@@ -373,18 +580,49 @@ class InfernoEnv:
         row, col = self._ignition_candidates[idx]
         return int(row), int(col)
 
-    def reset(self, ignition_point=None, seed=None):
+    def reset(self, ignition_point=None, ignition_points=None, scenario="single",
+              seed=None, use_real_weather=True):
+        """use_real_weather=True (default): wind/humidity come from the real
+        Jan 7-8 2025 ASOS series (see _real_weather_at()). Set False to fall
+        back to the old fixed Santa-Ana-ramp placeholder, e.g. to reproduce
+        the originally-validated test_fire_sim.py scenario exactly.
+
+        Ignition points -- three ways to specify them, checked in this order:
+          1. ignition_points=[(row, col), ...] -- an explicit list, ignites
+             all of them. Takes precedence over `scenario`.
+          2. scenario='multi' (with ignition_points left as None) -- ignites
+             MULTI_IGNITION_TRAINING_SCENARIO's three fixed real points.
+          3. scenario='single' (the default) -- the original single-fire
+             behavior, unchanged: ignites `ignition_point` if given, else
+             samples one random WUI-adjacent fuel cell via
+             _sample_ignition_point(). This is the default curriculum stage;
+             'multi' is an additional stage on top of it, not a replacement.
+        ignition_point and ignition_points are mutually exclusive.
+        """
+        if ignition_point is not None and ignition_points is not None:
+            raise ValueError("Pass either ignition_point or ignition_points, not both")
+
         if seed is not None:
             self.rng = np.random.default_rng(seed)
+
+        self.use_real_weather = use_real_weather
 
         sim_seed = int(self.rng.integers(0, 2 ** 31 - 1))
         self.sim = FireSim(self.grid_static, self.meta, seed=sim_seed)
 
-        if ignition_point is None:
-            ignition_point = self._sample_ignition_point()
-        row, col = ignition_point
-        self.sim.ignite(row, col, radius=1)
-        self.ignition_point = (row, col)
+        if ignition_points is not None:
+            points = [(int(r), int(c)) for r, c in ignition_points]
+        elif scenario == "multi":
+            points = list(MULTI_IGNITION_TRAINING_SCENARIO)
+        elif scenario == "single":
+            points = [ignition_point if ignition_point is not None else self._sample_ignition_point()]
+        else:
+            raise ValueError(f"Unknown scenario {scenario!r}; expected 'single' or 'multi'")
+
+        for row, col in points:
+            self.sim.ignite(row, col, radius=1)
+        self.ignition_point = points[0]  # backward-compat: first/primary ignition point
+        self.ignition_points = points
 
         self.tick_count = 0
         self.resources = {
@@ -392,9 +630,15 @@ class InfernoEnv:
             for rtype in RESOURCE_TYPES
         }
         self.evacuated_cells = set()
-        self._last_weather = _weather_schedule(0)
+        self._last_weather = self._weather_schedule(0)
 
         return self._build_observation()
+
+    def _weather_schedule(self, tick):
+        if self.use_real_weather:
+            elapsed_seconds = tick * TICK_DURATION_MINUTES * 60.0
+            return _real_weather_at(elapsed_seconds, self._weather_epochs, self._weather_values)
+        return _placeholder_weather_schedule(tick)
 
     def _parse_action(self, action):
         if action is None:
@@ -410,7 +654,7 @@ class InfernoEnv:
         return resource_type, target_zone
 
     def _try_dispatch(self, resource_type, target_zone_id):
-        travel_s = self.zone_travel_time_s[target_zone_id]
+        travel_s = self.zone_travel_time_s[resource_type][target_zone_id]
         if not math.isfinite(travel_s):
             return {"resource_type": resource_type, "target_zone": target_zone_id,
                     "status": "zone_unreachable", "reward_delta": -RESOURCE_WASTED_PENALTY}
@@ -446,7 +690,10 @@ class InfernoEnv:
                 if unit["state"] == "traveling":
                     zone = self.zones[unit["target_zone"]]
                     row, col = _effect_target_point(self.sim, zone)
-                    if rtype == "water_team":
+                    if rtype == "water_team" or rtype == "helicopter":
+                        # Same suppression physics for a ground water_team and a
+                        # helicopter's retardant/water drop -- only how they got
+                        # there (and how long they're tied up after) differs.
                         n_affected = _apply_water(self.sim, row, col)
                     elif rtype == "trench_crew":
                         n_affected = _apply_trench(self.sim, row, col)
@@ -454,32 +701,50 @@ class InfernoEnv:
                         n_affected = _apply_rescue(self.sim, row, col, self.evacuated_cells)
 
                     success = n_affected > 0
-                    if success and rtype == "water_team":
+                    if success and (rtype == "water_team" or rtype == "helicopter"):
                         reward += FIRE_EXTINGUISHED_REWARD
                     elif not success:
                         reward -= RESOURCE_WASTED_PENALTY
                     events.append({"resource_type": rtype, "zone": unit["target_zone"],
                                    "cells_affected": n_affected, "success": success})
                     unit["state"] = "deployed"
-                    unit["remaining_ticks"] = DEPLOYED_BUSY_TICKS
+                    unit["remaining_ticks"] = (
+                        HELICOPTER_RELOAD_TICKS if rtype == "helicopter" else DEPLOYED_BUSY_TICKS
+                    )
                 elif unit["state"] == "deployed":
                     unit["state"] = "available"
                     unit["target_zone"] = None
         return reward, events
 
     def _score_building_destruction(self, before_state):
+        """Population-aware building-loss penalty -- see
+        POPULATION_PENALTY_SCALE/_CAP and RESCUE_PENALTY_REDUCTION_MIN/MAX in
+        the module constants. Returns per-event detail (not just aggregates)
+        so callers can verify the scaling is actually doing something
+        (see test_inferno_env.py)."""
         newly_burned = self._building_mask & (before_state != BURNED_OUT) & (self.sim.state == BURNED_OUT)
         rows, cols = np.where(newly_burned)
         reward = 0.0
         n_evacuated = 0
+        events = []
         for r, c in zip(rows, cols):
-            if (r, c) in self.evacuated_cells:
-                reward -= BUILDING_DESTROYED_PENALTY * (1.0 - RESCUE_PENALTY_REDUCTION)
+            density = float(self.grid_static[LAYER_INDEX["population_density"], r, c])
+            multiplier = _population_penalty_multiplier(density)
+            penalty = BUILDING_DESTROYED_PENALTY * multiplier
+            evacuated = (r, c) in self.evacuated_cells
+            if evacuated:
+                reduction = _rescue_penalty_reduction(density)
+                applied_penalty = penalty * (1.0 - reduction)
                 n_evacuated += 1
                 self.evacuated_cells.discard((r, c))
             else:
-                reward -= BUILDING_DESTROYED_PENALTY
-        return reward, int(len(rows)), n_evacuated
+                applied_penalty = penalty
+            reward -= applied_penalty
+            events.append({
+                "row": int(r), "col": int(c), "population_density": density,
+                "multiplier": multiplier, "evacuated": evacuated, "penalty_applied": applied_penalty,
+            })
+        return reward, int(len(rows)), n_evacuated, events
 
     def step(self, action):
         resource_type, target_zone = self._parse_action(action)
@@ -494,12 +759,13 @@ class InfernoEnv:
             dispatch_info = self._try_dispatch(resource_type, target_zone)
             reward += dispatch_info["reward_delta"]
 
-        wind_speed, wind_direction, humidity = _weather_schedule(self.tick_count)
+        wind_speed, wind_direction, humidity = self._weather_schedule(self.tick_count)
         self._last_weather = (wind_speed, wind_direction, humidity)
 
         before_state = self.sim.state.copy()
         self.sim.step(wind_speed_mph=wind_speed, wind_direction_deg=wind_direction, humidity_pct=humidity)
-        destroy_reward, n_destroyed, n_destroyed_evacuated = self._score_building_destruction(before_state)
+        destroy_reward, n_destroyed, n_destroyed_evacuated, destruction_events = \
+            self._score_building_destruction(before_state)
         reward += destroy_reward
 
         self.tick_count += 1
@@ -515,6 +781,7 @@ class InfernoEnv:
             "state_counts": counts,
             "buildings_destroyed": n_destroyed,
             "buildings_destroyed_evacuated": n_destroyed_evacuated,
+            "building_destruction_events": destruction_events,
             "contained": contained,
             "timeout": timed_out and not contained,
             "tick": self.tick_count,
@@ -539,6 +806,7 @@ class InfernoEnv:
             ("water_team_available", available["water_team"]),
             ("trench_crew_available", available["trench_crew"]),
             ("rescue_vehicle_available", available["rescue_vehicle"]),
+            ("helicopter_available", available["helicopter"]),
             ("time_elapsed_ticks", float(self.tick_count)),
         ])
         return {"grid": grid, "scalars": scalars}

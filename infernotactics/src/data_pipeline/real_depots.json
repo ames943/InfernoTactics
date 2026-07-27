@@ -1,0 +1,58 @@
+{
+  "_comment": [
+    "Real LAFD facility locations used as fixed dispatch depots in InfernoEnv,",
+    "one per resource type -- replaces the single made-up DEPOT_LONLAT used",
+    "before the helicopter/multi-depot upgrade. Coordinates were geocoded from",
+    "each station's official street address (LA County fire station locator /",
+    "lafd.org) via OSMnx/Nominatim, not estimated by eye.",
+    "",
+    "Which station handles which resource type is OUR simplification for the",
+    "sim (one depot per resource type, matching the existing fixed-roster",
+    "'Clash Royale' mechanic) -- it is not a claim about that station's actual",
+    "apparatus roster, which we did not verify. What IS real: each station",
+    "name/address/coordinates, that it is an active LAFD facility, and that",
+    "its location plausibly covers the role assigned (e.g. Station 23 sits at",
+    "the immediate wildland-urban interface next to Topanga State Park, a",
+    "sensible staging point for a hand/trench crew cutting line ahead of a",
+    "wildfire; LAFD Air Operations is genuinely the department's one and only",
+    "helicopter base, at Van Nuys Airport)."
+  ],
+  "depots": [
+    {
+      "resource_type": "water_team",
+      "station_name": "LAFD Station 69 (Pacific Palisades)",
+      "address": "15045 Sunset Blvd, Pacific Palisades, CA 90272",
+      "lat": 34.045058,
+      "lon": -118.5224764,
+      "travel_mode": "road",
+      "notes": "Existing depot from the single-depot version of the env; kept as the water/engine depot. Coordinates re-geocoded from the station's official address (the prior DEPOT_LONLAT constant was an eyeballed approximation of this same station)."
+    },
+    {
+      "resource_type": "trench_crew",
+      "station_name": "LAFD Station 19 (Brentwood)",
+      "address": "12229 W Sunset Blvd, Los Angeles (Brentwood), CA 90049",
+      "lat": 34.0585488,
+      "lon": -118.4795689,
+      "travel_mode": "road",
+      "notes": "Covers the Brentwood/Bel-Air corridor along Sunset Blvd, east of the Palisades along the fire's likely spread direction."
+    },
+    {
+      "resource_type": "rescue_vehicle",
+      "station_name": "LAFD Station 23 (Palisades Highlands)",
+      "address": "17281 Sunset Blvd, Pacific Palisades, CA 90272",
+      "lat": 34.042272,
+      "lon": -118.5543896,
+      "travel_mode": "road",
+      "notes": "Furthest station up-canyon toward Topanga State Park, closest to the wildland-urban interface where evacuation/rescue response is most needed."
+    },
+    {
+      "resource_type": "helicopter",
+      "station_name": "LAFD Station 114 / Air Operations (Van Nuys Airport)",
+      "address": "16617 Arminta St, Los Angeles (Van Nuys), CA 91406",
+      "lat": 34.2159749,
+      "lon": -118.4941915,
+      "travel_mode": "air_straight_line",
+      "notes": "LAFD's actual sole helicopter base, on the grounds of Van Nuys Airport (KVNY) -- real fleet is 5 medium + 2 light helicopters shared department-wide. Deliberately outside the sim's bounding box (~19km north of the study area); travel time for this depot is straight-line distance / cruise speed, not road-graph routing, since it dispatches by air."
+    }
+  ]
+}

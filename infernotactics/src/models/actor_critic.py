@@ -25,13 +25,29 @@ matches the factorization specified in the project plan as-is.
 
 import torch.nn as nn
 
-N_RESOURCE_TYPES = 3
+N_RESOURCE_TYPES = 4  # water_team, trench_crew, rescue_vehicle, helicopter
 N_ZONES = 32
 HIDDEN_DIM = 128
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, in_features, n_resource_types=N_RESOURCE_TYPES, n_zones=N_ZONES, hidden_dim=HIDDEN_DIM):
+    """n_value_heads=1 (default) is byte-for-byte the original architecture --
+    a single self.value_head attribute, forward()'s value_head_idx argument
+    unused -- so every existing caller (train_actor_critic.py,
+    train_actor_critic_multi.py/v2, heuristic_policy.py, eval.py) is
+    completely unaffected. n_value_heads>1 (added for
+    train_actor_critic_multi_v3.py's separate-value-head-per-scenario
+    experiment) instead builds self.value_heads, an nn.ModuleList, and
+    forward()'s value_head_idx selects which one to use for a given
+    call -- the shared trunk/actor heads are untouched either way, only the
+    final value projection becomes scenario-specific. See
+    train_actor_critic_multi_v3.py's module docstring for why (per-scenario
+    return normalization alone, in v2, wasn't sufficient -- the shared value
+    head's LAST layer was still one set of weights receiving gradient from
+    every scenario's wildly different-scale value loss every episode)."""
+
+    def __init__(self, in_features, n_resource_types=N_RESOURCE_TYPES, n_zones=N_ZONES, hidden_dim=HIDDEN_DIM,
+                 n_value_heads=1):
         super().__init__()
         self.trunk = nn.Sequential(
             nn.Linear(in_features, hidden_dim),
@@ -39,17 +55,23 @@ class ActorCritic(nn.Module):
         )
         self.resource_type_head = nn.Linear(hidden_dim, n_resource_types)
         self.zone_head = nn.Linear(hidden_dim, n_zones)
-        self.value_head = nn.Linear(hidden_dim, 1)
+        self.n_value_heads = n_value_heads
+        if n_value_heads == 1:
+            self.value_head = nn.Linear(hidden_dim, 1)
+        else:
+            self.value_heads = nn.ModuleList([nn.Linear(hidden_dim, 1) for _ in range(n_value_heads)])
 
-    def forward(self, fused):
+    def forward(self, fused, value_head_idx=0):
         """fused: (B, in_features) -> (
             {'resource_type': (B, n_resource_types) logits, 'zone': (B, n_zones) logits},
             value: (B, 1)
-        )"""
+        )
+        value_head_idx is ignored when n_value_heads==1 (the original,
+        single-shared-head behavior)."""
         h = self.trunk(fused)
         action_logits = {
             "resource_type": self.resource_type_head(h),
             "zone": self.zone_head(h),
         }
-        value = self.value_head(h)
+        value = self.value_head(h) if self.n_value_heads == 1 else self.value_heads[value_head_idx](h)
         return action_logits, value

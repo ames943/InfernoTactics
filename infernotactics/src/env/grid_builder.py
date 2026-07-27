@@ -1,9 +1,10 @@
 """
 Builds the unified static spatial grid that the CNN branch consumes.
 
-Rasterizes elevation, slope, buildings, roads, and a placeholder fuel layer
-into a single stack of aligned numpy arrays (same shape, same affine
-transform), all in EPSG:5070 (USA Contiguous Albers Equal Area, meters) so
+Rasterizes elevation, slope, buildings, roads, a placeholder fuel layer, and
+real gridded population density into a single stack of aligned numpy arrays
+(same shape, same affine transform), all in EPSG:5070 (USA Contiguous Albers
+Equal Area, meters) so
 that grid cells are approximately uniform physical size across the study
 area. Elevation.tif is already in this CRS; buildings/roads (EPSG:4326) are
 reprojected into it before rasterizing, which guarantees every layer lines
@@ -32,6 +33,7 @@ from data_pipeline.config import (  # noqa: E402
     BUILDINGS_PATH,
     DATA_DIR,
     ELEVATION_PATH,
+    POPULATION_PATH,
     ROADS_GRAPHML_PATH,
 )
 
@@ -60,6 +62,7 @@ LAYER_NAMES = [
     "road_mask",
     "fuel_density",
     "water_mask",
+    "population_density",
 ]
 
 # HEURISTIC coastline threshold, not real hydrology/coastline vector data. The
@@ -178,6 +181,53 @@ def _heuristic_water_mask(elevation, threshold_m=WATER_ELEVATION_THRESHOLD_M):
     return elevation <= threshold_m
 
 
+def _rasterize_population_density(transform, width, height, dst_crs):
+    """Reproject/resample the WorldPop population-count raster (see
+    fetch_population.py -- 2020 gridded population, ~1km cells, EPSG:4326)
+    onto this grid's (30m, EPSG:5070) pixel grid, then compress to [0, 1].
+
+    Resampling direction here is UPSAMPLING (1km source -> 30m destination,
+    the opposite of elevation's 10m -> 30m downsampling), so bilinear
+    (smooth interpolation between neighboring source cells) is the
+    appropriate choice, vs. elevation's Resampling.average (appropriate for
+    downsampling/aggregating finer source pixels into a coarser destination).
+
+    Normalization: raw population counts are extremely right-skewed (near-
+    zero across most of the Topanga hillside, spiking in dense pockets near
+    Westwood/UCLA), so a straight min-max scale would crush every
+    mid-density neighborhood down near 0 just because one small area is
+    ~100x denser. log1p(count) compresses that skew before min-max scaling
+    to [0, 1] over this grid's own actual range -- makes the layer usable
+    directly as a CNN input channel and as the reward multiplier's
+    population_weight (see inferno_env.py).
+    """
+    with rasterio.open(POPULATION_PATH) as src:
+        src_arr = src.read(1).astype(np.float32)
+        src_transform = src.transform
+        src_crs = src.crs
+        nodata = src.nodata
+
+    if nodata is not None:
+        src_arr = np.where(src_arr == nodata, 0.0, src_arr)
+    src_arr = np.clip(src_arr, 0.0, None)  # floor any stray negative/nodata artifacts to 0
+
+    dst_arr = np.zeros((height, width), dtype=np.float32)
+    reproject(
+        source=src_arr,
+        destination=dst_arr,
+        src_transform=src_transform,
+        src_crs=src_crs,
+        dst_transform=transform,
+        dst_crs=dst_crs,
+        resampling=Resampling.bilinear,
+    )
+    dst_arr = np.clip(dst_arr, 0.0, None)  # bilinear can ring slightly negative near steep edges
+
+    log_density = np.log1p(dst_arr)
+    log_range = max(log_density.max() - log_density.min(), 1e-6)
+    return ((log_density - log_density.min()) / log_range).astype(np.float32)
+
+
 def _placeholder_fuel_density(building_density, road_mask, elevation, water_mask):
     # PLACEHOLDER FUEL MODEL. We don't have real LANDFIRE fuel data
     # (FBFM40 fuel model / fuel load rasters) yet. Until that's integrated,
@@ -228,6 +278,9 @@ def build_grid(cell_size_m=CELL_SIZE_M):
 
     fuel_density = _placeholder_fuel_density(building_density, road_mask, elevation, water_mask)
 
+    print("Loading + reprojecting population...")
+    population_density = _rasterize_population_density(transform, width, height, crs)
+
     stacked = np.stack(
         [
             elevation,
@@ -237,6 +290,7 @@ def build_grid(cell_size_m=CELL_SIZE_M):
             road_mask.astype(np.float32),
             fuel_density,
             water_mask.astype(np.float32),
+            population_density,
         ],
         axis=0,
     )
