@@ -90,3 +90,55 @@
     [eval @ ep 40] combined avg reward across all 6 scenarios: -66426.0
     [ppo-kl] ep 41: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00000  epochs_run=1 minibatches_run=10  ignition=(207,170)  n_ticks=150  timeout=True  other_grad_norm=9561.5
     [ppo-kl] ep 42: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00000  epochs_run=1 minibatches_run=10  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=47036.9
+    [ppo-kl] ep 43: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00001  epochs_run=1 minibatches_run=10  ignition=(278,171)  n_ticks=150  timeout=True  other_grad_norm=24374.4
+    [grad-norm SPIKE] ep 44: other_grad_norm=601422.8 vs recent median=67145.7 (9.0x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 44: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00000  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=entropy_floor+grad_spike)  ignition=(174,165)  n_ticks=34  timeout=False  other_grad_norm=601422.8
+    [grad-norm SPIKE] ep 45: other_grad_norm=596690.7 vs recent median=67145.7 (8.9x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 45: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00000  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=entropy_floor+grad_spike)  ignition=(295,420)  n_ticks=38  timeout=False  other_grad_norm=596690.7
+    [ppo-kl] ep 46: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00002  epochs_run=1 minibatches_run=10  ignition=(165,371)  n_ticks=150  timeout=True  other_grad_norm=43262.4
+    [ppo-kl] ep 47: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00000  epochs_run=1 minibatches_run=10  ignition=(182,400)  n_ticks=150  timeout=True  other_grad_norm=7671.8
+    [ppo-kl] ep 48: approx_KL before epoch 1 = 0.00000  final = 0.00000  entropy=0.00003  epochs_run=1 minibatches_run=10  ignition=(264,331)  n_ticks=150  timeout=True  other_grad_norm=45443.9
+    [ppo-kl] ep 49: approx_KL before epoch 1 = 0.00000  final = -0.00000  entropy=0.00005  epochs_run=1 minibatches_run=10  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=29145.1
+    [ppo-kl] ep 50: approx_KL before epoch 1 = 0.00000  final = -0.00000  entropy=0.00001  epochs_run=1 minibatches_run=10  ignition=(279,545)  n_ticks=150  timeout=True  other_grad_norm=83882.7
+    [eval @ ep 50] (train     ) single_training: avg_reward=-119980.9  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -100898.9 (heuristic: -19082.0)
+    [eval @ ep 50] (train     ) topanga_ridge: avg_reward=-9956.9  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -6510.6 (heuristic: -3446.3)
+    [eval @ ep 50] (train     ) sullivan_canyon: avg_reward=-47736.2  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -39914.7 (heuristic: -7821.5)
+    [eval @ ep 50] (train     ) stone_canyon: avg_reward=-120972.6  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -75592.7 (heuristic: -45379.9)
+    [eval @ ep 50] (VALIDATION) mandeville_canyon: avg_reward=-18010.9  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18059.9 (heuristic: 49.0)
+    [eval @ ep 50] (VALIDATION) getty_view_park: avg_reward=-81898.2  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81971.8 (heuristic: 73.6)
+    [eval @ ep 50] combined avg reward across all 6 scenarios: -66426.0
+
+=== Multi-ignition v4 (GAE + multi-epoch PPO + continuous ignition) summary (completed all 50 episodes) ===
+Total wall time: 703.1s  Overall episodes/min: 4.27
+Policy loss: moved (range -0.291 to 0.302)
+Value loss: moved (range 1.21 to 5.77e+03)
+Classification loss: moved (range 0.00161 to 0.347)
+Entropy: moved (range 1.1e-06 to 4.42)
+Final reward_scale_normalizer: mean=-728.23 std=861.10 n=5641
+Early-stopping: triggered in 25/50 episodes (50%), average stop after 2.3 minibatch(es)  -- by reason: {'kl': 19, 'entropy_floor+grad_spike': 6}  (KL_threshold=0.03, ENTROPY_FLOOR=0.005)
+single_training eval-reward trajectory across the run (watch for mid-run collapse, not just the final number -- warm-started value was +32.1, 100% containment):
+  ep    10: avg_reward=-119907.1
+  ep    20: avg_reward=-119980.9
+  ep    30: avg_reward=-119980.9
+  ep    40: avg_reward=-119980.9
+  ep    50: avg_reward=-119980.9
+Ignition variety check: 44 unique points sampled out of 50 episodes; distance-to-nearest-named-point (grid cells): min=0.0 mean=76.6 max=172.2
+Stochastic rollout reward (raw, unshaped), first->last episode: -152529.0 -> -159669.5
+Stochastic rollout reward, mean first 20 vs last 20: -83605.7 vs -83565.1
+Final deterministic eval (all 6 scenarios) vs heuristic baseline:
+  (train     ) single_training: avg_reward=-119980.9  avg_buildings_destroyed=391.3  containment_rate=0%
+    heuristic:   avg_reward=-19082.0  avg_buildings_destroyed=65.2  containment_rate=80%  (delta: -100898.9)
+  (train     ) topanga_ridge: avg_reward=-9956.9  avg_buildings_destroyed=31.7  containment_rate=0%
+    heuristic:   avg_reward=-3446.3  avg_buildings_destroyed=12.8  containment_rate=80%  (delta: -6510.6)
+  (train     ) sullivan_canyon: avg_reward=-47736.2  avg_buildings_destroyed=175.0  containment_rate=0%
+    heuristic:   avg_reward=-7821.5  avg_buildings_destroyed=31.6  containment_rate=80%  (delta: -39914.7)
+  (train     ) stone_canyon: avg_reward=-120972.6  avg_buildings_destroyed=417.3  containment_rate=0%
+    heuristic:   avg_reward=-45379.9  avg_buildings_destroyed=167.0  containment_rate=60%  (delta: -75592.7)
+  (VALIDATION) mandeville_canyon: avg_reward=-18010.9  avg_buildings_destroyed=67.3  containment_rate=0%
+    heuristic:   avg_reward=49.0  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -18059.9)
+  (VALIDATION) getty_view_park: avg_reward=-81898.2  avg_buildings_destroyed=276.0  containment_rate=0%
+    heuristic:   avg_reward=73.6  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -81971.8)
+Best checkpoint: ep 10, combined avg eval reward = -66222.1 -> /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v5_advcliptest/best.pt
+MPS errors encountered: none
+Final device: mps
+Latest checkpoint: /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v5_advcliptest/latest.pt
