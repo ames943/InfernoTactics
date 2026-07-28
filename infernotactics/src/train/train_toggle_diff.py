@@ -81,6 +81,14 @@ TOGGLE_B = os.environ.get("INFERNO_TOGGLE_B", "0") == "1"
 TOGGLE_G = os.environ.get("INFERNO_TOGGLE_G", "0") == "1"
 TOGGLE_F = os.environ.get("INFERNO_TOGGLE_F", "0") == "1"
 
+# FRESH_ADV: fix candidate for the GAE x minibatching staleness interaction
+# that fully collapsed Run 3 (E+D+A) by ep20. Instead of computing GAE
+# advantages ONCE per episode (from the pre-update rollout policy) and
+# reusing them unchanged across every minibatch, recompute them from the
+# CURRENT value head immediately before each minibatch's gradient step. Only
+# meaningful with TOGGLE_D+TOGGLE_A both on; a no-op otherwise.
+FRESH_ADV = os.environ.get("INFERNO_FRESH_ADV", "0") == "1"
+
 if TOGGLE_C and not TOGGLE_D:
     print("[toggle-diff] WARNING: TOGGLE_C without TOGGLE_D is a no-op (no minibatch loop to stop mid-way).")
 if TOGGLE_B and not TOGGLE_D:
@@ -134,7 +142,9 @@ TRAIN_LOG_FIELDS = [
     "episode", "device", "n_ticks", "reward", "buildings_destroyed", "contained",
     "policy_loss", "value_loss", "classification_loss", "entropy",
     "resource_entropy", "zone_entropy", "value_grad_norm", "other_grad_norm",
-    "epochs_run", "minibatches_run", "early_stopped", "stop_reason", "wall_time_s",
+    "epochs_run", "minibatches_run", "early_stopped", "stop_reason",
+    "adv_mean", "adv_std", "adv_mean_last", "adv_std_last",
+    "adv_mc_mean", "adv_mc_std", "sign_agreement_first", "sign_agreement_last", "wall_time_s",
 ]
 EVAL_LOG_FIELDS = [
     "episode", "ignition_point_name", "avg_reward", "avg_buildings_destroyed",
@@ -363,11 +373,46 @@ def single_batch_update(model, optimizer, steps, advantages, returns, device):
     }
 
 
-def minibatch_ppo_update(model, optimizer, steps, advantages, returns, device, seed, grad_norm_baseline):
+def _recompute_gae_advantages(model, steps, scaled_rewards, bootstrap_value_raw, device):
+    """Fresh values from the CURRENT model weights (no_grad), then GAE over
+    the whole episode -- the fix candidate for the staleness interaction:
+    called before EVERY minibatch's gradient step when FRESH_ADV is on,
+    instead of once at episode start."""
+    values = []
+    with torch.no_grad():
+        for step in steps:
+            grid_t = torch.from_numpy(step["grid"]).unsqueeze(0).to(device)
+            scalars_t = torch.from_numpy(step["scalars"]).unsqueeze(0).to(device)
+            _logits, value, _cls = model(grid_t, scalars_t)
+            values.append(float(value.squeeze().item()))
+    return compute_gae(scaled_rewards, values, bootstrap_value_raw, GAMMA, GAE_LAMBDA)
+
+
+def _zscore(advantages_raw):
+    n = len(advantages_raw)
+    mean = sum(advantages_raw) / n
+    var = sum((a - mean) ** 2 for a in advantages_raw) / n
+    std = math.sqrt(var) + 1e-8
+    return [(a - mean) / std for a in advantages_raw]
+
+
+def _sign_agreement(a, b):
+    n = len(a)
+    matches = sum(1 for x, y in zip(a, b) if (x > 0) == (y > 0))
+    return matches / n
+
+
+def minibatch_ppo_update(model, optimizer, steps, advantages, returns, device, seed, grad_norm_baseline,
+                          scaled_rewards=None, bootstrap_value_raw=None, mc_advantages=None):
     """v4-style: PPO_EPOCHS epochs of shuffled MINIBATCH_SIZE-tick minibatches,
-    each its own zero_grad/backward/step. advantages/returns are fixed for the
-    whole episode (computed once, outside this loop); only new_log_prob/value
-    are recomputed fresh at every minibatch pass as the model changes.
+    each its own zero_grad/backward/step. Normally (FRESH_ADV off) advantages/
+    returns are fixed for the whole episode (computed once, outside this
+    loop); only new_log_prob/value are recomputed fresh at every minibatch
+    pass as the model changes -- this is the staleness Run 3's collapse was
+    traced to. When FRESH_ADV is on (requires scaled_rewards/bootstrap_value_raw),
+    advantages/returns are instead recomputed from the CURRENT value head via
+    _recompute_gae_advantages() immediately before EVERY minibatch's gradient
+    step, re-applying TOGGLE_E's z-score fresh each time too.
     TOGGLE_C gates the per-minibatch KL check; TOGGLE_G gates the combined
     entropy-floor+grad-norm-spike check. Used when TOGGLE_D is on."""
     n = len(steps)
@@ -393,6 +438,11 @@ def minibatch_ppo_update(model, optimizer, steps, advantages, returns, device, s
     stop_reason = None
     saw_grad_norm_spike = False
 
+    adv_mean_first, adv_std_first = _mean_std(advantages)
+    adv_mean_last, adv_std_last = adv_mean_first, adv_std_first
+    sign_agreement_first = _sign_agreement(advantages, mc_advantages) if mc_advantages is not None else None
+    sign_agreement_last = sign_agreement_first
+
     shuffle_rng = random.Random(seed)
     indices = list(range(n))
     stop = False
@@ -402,6 +452,16 @@ def minibatch_ppo_update(model, optimizer, steps, advantages, returns, device, s
         shuffle_rng.shuffle(indices)
         for mb_start in range(0, n, MINIBATCH_SIZE):
             mb_idx = indices[mb_start:mb_start + MINIBATCH_SIZE]
+
+            if FRESH_ADV and scaled_rewards is not None:
+                advantages_raw, returns = _recompute_gae_advantages(
+                    model, steps, scaled_rewards, bootstrap_value_raw, device
+                )
+                advantages = _zscore(advantages_raw) if TOGGLE_E else advantages_raw
+                adv_mean_last, adv_std_last = _mean_std(advantages)
+                if mc_advantages is not None:
+                    sign_agreement_last = _sign_agreement(advantages, mc_advantages)
+
             optimizer.zero_grad()
             for idx in mb_idx:
                 step = steps[idx]
@@ -474,17 +534,41 @@ def minibatch_ppo_update(model, optimizer, steps, advantages, returns, device, s
         "value_grad_norm": value_grad_norm_last, "other_grad_norm": other_grad_norm_last,
         "epochs_run": epochs_run, "minibatches_run": minibatches_run,
         "early_stopped": early_stopped, "stop_reason": stop_reason,
+        "adv_mean_first": adv_mean_first, "adv_std_first": adv_std_first,
+        "adv_mean_last": adv_mean_last, "adv_std_last": adv_std_last,
+        "sign_agreement_first": sign_agreement_first, "sign_agreement_last": sign_agreement_last,
     }
 
 
+def _mean_std(values):
+    n = len(values)
+    mean = sum(values) / n
+    var = sum((v - mean) ** 2 for v in values) / n
+    return mean, math.sqrt(var)
+
+
 def run_training_episode(env, model, optimizer, device, seed, return_normalizer, reward_scale_normalizer,
-                          grad_norm_baseline):
+                          grad_norm_baseline, diagnostic_return_normalizer=None):
     steps, total_reward, buildings_destroyed, contained, bootstrap_value_raw = collect_rollout(
         env, model, device, seed
     )
     raw_rewards = [s["reward"] for s in steps]
     raw_values = [s["raw_value"] for s in steps]
 
+    # Shadow old-loop-style advantage (normalized_return - V(s)), computed on
+    # the SAME rollout purely for magnitude/sign comparison logging -- tracked
+    # with its own running normalizer so it stays meaningful across the whole
+    # run regardless of which path actually drives the gradient update.
+    adv_mc_mean = adv_mc_std = None
+    advantages_mc = None
+    if diagnostic_return_normalizer is not None:
+        raw_returns_mc = compute_returns(raw_rewards, GAMMA)
+        returns_mc = diagnostic_return_normalizer.normalize(raw_returns_mc)
+        advantages_mc = [ret - val for ret, val in zip(returns_mc, raw_values)]
+        diagnostic_return_normalizer.update(raw_returns_mc)
+        adv_mc_mean, adv_mc_std = _mean_std(advantages_mc)
+
+    scaled_rewards = None
     if TOGGLE_A:
         scale = reward_scale_normalizer.std()
         scaled_rewards = [max(-SCALED_REWARD_CLIP, min(SCALED_REWARD_CLIP, r / scale)) for r in raw_rewards]
@@ -496,24 +580,34 @@ def run_training_episode(env, model, optimizer, device, seed, return_normalizer,
         advantages_raw = [ret - val for ret, val in zip(returns, raw_values)]
         return_normalizer.update(raw_returns)
 
+    adv_mean, adv_std = _mean_std(advantages_raw)
+
     if TOGGLE_E:
-        n = len(advantages_raw)
-        adv_mean = sum(advantages_raw) / n
-        adv_var = sum((a - adv_mean) ** 2 for a in advantages_raw) / n
-        adv_std = math.sqrt(adv_var) + 1e-8
-        advantages_final = [(a - adv_mean) / adv_std for a in advantages_raw]
+        advantages_final = _zscore(advantages_raw)
     else:
         advantages_final = advantages_raw
 
     if TOGGLE_D:
         result = minibatch_ppo_update(model, optimizer, steps, advantages_final, returns, device, seed,
-                                       grad_norm_baseline)
+                                       grad_norm_baseline, scaled_rewards=scaled_rewards,
+                                       bootstrap_value_raw=bootstrap_value_raw, mc_advantages=advantages_mc)
+        # minibatch_ppo_update tracks its OWN first/last stats internally (which,
+        # under FRESH_ADV, diverge from the pre-loop adv_mean/std above); prefer
+        # those when present so "last" reflects what the FINAL minibatch actually used.
+        adv_mean = result.pop("adv_mean_first", adv_mean)
+        adv_std = result.pop("adv_std_first", adv_std)
     else:
         result = single_batch_update(model, optimizer, steps, advantages_final, returns, device)
+        result["adv_mean_last"] = adv_mean
+        result["adv_std_last"] = adv_std
+        result["sign_agreement_first"] = _sign_agreement(advantages_raw, advantages_mc) if advantages_mc else None
+        result["sign_agreement_last"] = result["sign_agreement_first"]
 
     result.update({
         "n_ticks": len(steps), "reward": total_reward,
         "buildings_destroyed": buildings_destroyed, "contained": contained,
+        "adv_mean": adv_mean, "adv_std": adv_std,
+        "adv_mc_mean": adv_mc_mean, "adv_mc_std": adv_mc_std,
     })
     return result
 
@@ -595,6 +689,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     return_normalizer = RunningMeanStd()
     reward_scale_normalizer = RunningMeanStd()
+    diagnostic_return_normalizer = RunningMeanStd()
     grad_norm_history = deque(maxlen=GRAD_NORM_SPIKE_WINDOW)
 
     episode_wall_times, episode_rewards = [], []
@@ -617,7 +712,8 @@ def main():
 
                 try:
                     result = run_training_episode(env, model, optimizer, device, seed, return_normalizer,
-                                                   reward_scale_normalizer, grad_norm_baseline)
+                                                   reward_scale_normalizer, grad_norm_baseline,
+                                                   diagnostic_return_normalizer)
                 except Exception as e:
                     if not _is_mps_unimplemented_error(e):
                         raise
@@ -625,7 +721,8 @@ def main():
                     device = torch.device("cpu")
                     model = model.to(device)
                     result = run_training_episode(env, model, optimizer, device, seed, return_normalizer,
-                                                   reward_scale_normalizer, grad_norm_baseline)
+                                                   reward_scale_normalizer, grad_norm_baseline,
+                                                   diagnostic_return_normalizer)
 
                 grad_norm_history.append(result["other_grad_norm"])
                 wall_s = time.perf_counter() - ep_t0
@@ -642,7 +739,12 @@ def main():
                     "zone_entropy": result["zone_entropy"], "value_grad_norm": result["value_grad_norm"],
                     "other_grad_norm": result["other_grad_norm"], "epochs_run": result["epochs_run"],
                     "minibatches_run": result["minibatches_run"], "early_stopped": result["early_stopped"],
-                    "stop_reason": result["stop_reason"], "wall_time_s": wall_s,
+                    "stop_reason": result["stop_reason"], "adv_mean": result["adv_mean"],
+                    "adv_std": result["adv_std"], "adv_mean_last": result["adv_mean_last"],
+                    "adv_std_last": result["adv_std_last"], "adv_mc_mean": result["adv_mc_mean"],
+                    "adv_mc_std": result["adv_mc_std"],
+                    "sign_agreement_first": result["sign_agreement_first"],
+                    "sign_agreement_last": result["sign_agreement_last"], "wall_time_s": wall_s,
                 })
                 train_file.flush()
 
@@ -653,6 +755,14 @@ def main():
                           f"resource_entropy={result['resource_entropy']:.3f}/{RESOURCE_ENTROPY_MAX:.3f}  "
                           f"zone_entropy={result['zone_entropy']:.3f}/{ZONE_ENTROPY_MAX:.3f}  "
                           f"early_stopped={result['early_stopped']} ({result['stop_reason']})  device={device}",
+                          flush=True)
+                    sa_first = result['sign_agreement_first']
+                    sa_last = result['sign_agreement_last']
+                    sa_str = f"{sa_first:.1%}->{sa_last:.1%}" if sa_first is not None else "n/a"
+                    print(f"        adv(used) first={result['adv_mean']:+.4f}+/-{result['adv_std']:.4f}  "
+                          f"last={result['adv_mean_last']:+.4f}+/-{result['adv_std_last']:.4f}  "
+                          f"adv(shadow)={result['adv_mc_mean']:+.4f}+/-{result['adv_mc_std']:.4f}  "
+                          f"sign_agreement={sa_str}",
                           flush=True)
 
                 if ep % CHECKPOINT_EVERY == 0:

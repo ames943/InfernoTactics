@@ -1,0 +1,16 @@
+[diag_valuehead_v1] 200 episodes, device=mps  (old loop's exact rollout/update mechanism, value-head instrumentation only)
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[diag_valuehead_v1] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0260.pt (plain load, old-loop architecture).
+[status @ ep    5/200] reward=  -82813.0  value_loss=   0.482  corr(V,G)=+0.947  explained_var=+0.896  V=-0.521+/-0.749  G=+0.125+/-0.789  device=mps
+[status @ ep   10/200] reward=  -85455.8  value_loss=   0.359  corr(V,G)=+0.792  explained_var=+0.319  V=+0.194+/-0.978  G=+0.171+/-0.725  device=mps
+[status @ ep   15/200] reward= -153271.7  value_loss=   1.537  corr(V,G)=+0.786  explained_var=+0.574  V=-0.163+/-0.783  G=-1.032+/-1.355  device=mps
+[status @ ep   20/200] reward=     -75.1  value_loss=   1.514  corr(V,G)=-0.983  explained_var=-3943.727  V=+0.928+/-0.122  G=+2.152+/-0.002  device=mps
+[status @ ep   25/200] reward= -125780.7  value_loss=   0.216  corr(V,G)=+0.938  explained_var=+0.880  V=-0.140+/-0.830  G=-0.496+/-0.862  device=mps
+[status @ ep   30/200] reward=     -13.0  value_loss=   0.907  corr(V,G)=-0.739  explained_var=-10783.243  V=+1.188+/-0.105  G=+2.134+/-0.001  device=mps

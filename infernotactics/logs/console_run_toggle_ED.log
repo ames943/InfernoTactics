@@ -33,3 +33,30 @@
     [eval @ ep 50] single_training: avg_reward=-120022.0  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100940.0 (heuristic: -19082.0)
         action_lock: ('trench_crew', 14) on 50.7% of ticks
         probe: resource=trench_crew (avg max_prob=0.350)  zone=14/22 (avg max_prob=0.063)
+[status @ ep   55/100] avg_reward(last5)= -108367.7  entropy=4.131  resource_entropy=1.028/1.386  zone_entropy=3.150/3.466  early_stopped=False (None)  device=mps
+[status @ ep   60/100] avg_reward(last5)= -127331.5  entropy=4.256  resource_entropy=0.998/1.386  zone_entropy=3.223/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 60] single_training: avg_reward=-120055.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100973.9 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 14) on 48.7% of ticks
+        probe: resource=trench_crew/water_team (avg max_prob=0.322)  zone=14/22 (avg max_prob=0.055)
+[status @ ep   65/100] avg_reward(last5)=  -85838.4  entropy=4.352  resource_entropy=1.132/1.386  zone_entropy=3.203/3.466  early_stopped=False (None)  device=mps
+[status @ ep   70/100] avg_reward(last5)= -118195.7  entropy=4.337  resource_entropy=1.078/1.386  zone_entropy=3.248/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 70] single_training: avg_reward=-119989.8  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100907.8 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 22) on 30.0% of ticks
+        probe: resource=trench_crew/water_team (avg max_prob=0.316)  zone=14/22 (avg max_prob=0.050)
+[status @ ep   75/100] avg_reward(last5)=  -95751.2  entropy=4.178  resource_entropy=0.996/1.386  zone_entropy=3.215/3.466  early_stopped=False (None)  device=mps
+[status @ ep   80/100] avg_reward(last5)= -111949.9  entropy=3.977  resource_entropy=0.852/1.386  zone_entropy=3.155/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 80] single_training: avg_reward=-119869.6  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100787.6 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 29) on 90.0% of ticks
+        probe: resource=trench_crew/water_team (avg max_prob=0.360)  zone=14/29 (avg max_prob=0.055)
+[status @ ep   85/100] avg_reward(last5)= -115988.3  entropy=3.973  resource_entropy=0.864/1.386  zone_entropy=3.127/3.466  early_stopped=False (None)  device=mps
+[status @ ep   90/100] avg_reward(last5)= -108696.4  entropy=3.959  resource_entropy=0.838/1.386  zone_entropy=3.121/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 90] single_training: avg_reward=-119983.2  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100901.2 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 21) on 30.7% of ticks
+        probe: resource=trench_crew (avg max_prob=0.372)  zone=14/29 (avg max_prob=0.054)
+[status @ ep   95/100] avg_reward(last5)=  -80135.8  entropy=4.083  resource_entropy=0.938/1.386  zone_entropy=3.140/3.466  early_stopped=False (None)  device=mps
+[status @ ep  100/100] avg_reward(last5)= -125377.7  entropy=3.980  resource_entropy=0.791/1.386  zone_entropy=3.136/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 100] single_training: avg_reward=-119912.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100830.9 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 29) on 40.7% of ticks
+        probe: resource=trench_crew/water_team (avg max_prob=0.356)  zone=14/29 (avg max_prob=0.053)
+
+[toggle-diff:toggle_ED] COMPLETE: 100/100 episodes, 8.33 episodes/min

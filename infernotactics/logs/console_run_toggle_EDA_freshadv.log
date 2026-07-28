@@ -1,0 +1,54 @@
+[toggle-diff:toggle_EDA_freshadv] 100 episodes, device=mps  toggles: E=True D=True A=True C=False B=False G=False F=False
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[toggle-diff] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0260.pt (plain load, N_SCALARS=8).
+[status @ ep    5/100] avg_reward(last5)=  -86948.0  entropy=0.014  resource_entropy=0.003/1.386  zone_entropy=0.114/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=-0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+64.8733+/-4.8091  sign_agreement=54.0%->57.3%
+[status @ ep   10/100] avg_reward(last5)= -118091.8  entropy=0.003  resource_entropy=0.002/1.386  zone_entropy=0.002/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+88.0702+/-11.6334  sign_agreement=50.7%->50.7%
+    [eval @ ep 10] single_training: avg_reward=-119537.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100455.9 (heuristic: -19082.0)
+        action_lock: ('helicopter', 10) on 100.0% of ticks
+        probe: resource=helicopter (avg max_prob=1.000)  zone=10 (avg max_prob=1.000)
+[status @ ep   15/100] avg_reward(last5)= -108863.3  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=+0.0000+/-1.0000  adv(shadow)=+111.6792+/-15.8843  sign_agreement=63.3%->61.3%
+[status @ ep   20/100] avg_reward(last5)= -118012.5  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=-0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+151.9361+/-26.7583  sign_agreement=51.3%->55.3%
+    [eval @ ep 20] single_training: avg_reward=-119537.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100455.9 (heuristic: -19082.0)
+        action_lock: ('helicopter', 10) on 100.0% of ticks
+        probe: resource=helicopter (avg max_prob=1.000)  zone=10 (avg max_prob=1.000)
+[status @ ep   25/100] avg_reward(last5)= -128225.9  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+168.4311+/-36.3335  sign_agreement=45.3%->55.3%
+[status @ ep   30/100] avg_reward(last5)=  -78840.2  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=-0.0000+/-1.0000  last=+0.0000+/-1.0000  adv(shadow)=+142.7668+/-33.1760  sign_agreement=49.3%->47.3%
+    [eval @ ep 30] single_training: avg_reward=-119537.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100455.9 (heuristic: -19082.0)
+        action_lock: ('helicopter', 10) on 100.0% of ticks
+        probe: resource=helicopter (avg max_prob=1.000)  zone=10 (avg max_prob=1.000)
+[status @ ep   35/100] avg_reward(last5)= -109240.0  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=+0.0000+/-1.0000  adv(shadow)=+152.5211+/-33.6389  sign_agreement=64.7%->57.3%
+[status @ ep   40/100] avg_reward(last5)= -105534.2  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=+0.0000+/-1.0000  adv(shadow)=+184.1653+/-32.4086  sign_agreement=57.3%->60.0%
+    [eval @ ep 40] single_training: avg_reward=-119537.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100455.9 (heuristic: -19082.0)
+        action_lock: ('helicopter', 10) on 100.0% of ticks
+        probe: resource=helicopter (avg max_prob=1.000)  zone=10 (avg max_prob=1.000)
+[status @ ep   45/100] avg_reward(last5)= -123158.3  entropy=0.008  resource_entropy=0.021/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+187.9119+/-55.2587  sign_agreement=57.3%->48.7%
+[status @ ep   50/100] avg_reward(last5)= -130765.2  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=+0.0000+/-1.0000  adv(shadow)=+205.9719+/-46.4302  sign_agreement=60.7%->54.7%
+    [eval @ ep 50] single_training: avg_reward=-119537.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100455.9 (heuristic: -19082.0)
+        action_lock: ('helicopter', 10) on 100.0% of ticks
+        probe: resource=helicopter (avg max_prob=1.000)  zone=10 (avg max_prob=1.000)
+[status @ ep   55/100] avg_reward(last5)= -124523.8  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+234.2819+/-60.2271  sign_agreement=36.0%->60.0%
+[status @ ep   60/100] avg_reward(last5)= -129021.7  entropy=0.000  resource_entropy=0.000/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+225.3739+/-63.7217  sign_agreement=36.0%->52.7%
+    [eval @ ep 60] single_training: avg_reward=-119537.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100455.9 (heuristic: -19082.0)
+        action_lock: ('helicopter', 10) on 100.0% of ticks
+        probe: resource=helicopter (avg max_prob=1.000)  zone=10 (avg max_prob=1.000)
+[status @ ep   65/100] avg_reward(last5)=  -93396.6  entropy=0.003  resource_entropy=0.006/1.386  zone_entropy=0.000/3.466  early_stopped=False (None)  device=mps
+        adv(used) first=+0.0000+/-1.0000  last=-0.0000+/-1.0000  adv(shadow)=+195.0394+/-48.8731  sign_agreement=60.0%->70.0%
