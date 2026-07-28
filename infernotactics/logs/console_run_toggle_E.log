@@ -1,0 +1,62 @@
+[toggle-diff:toggle_E] 100 episodes, device=mps  toggles: E=True D=False A=False C=False B=False G=False F=False
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[toggle-diff] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0260.pt (plain load, N_SCALARS=8).
+[status @ ep    5/100] avg_reward(last5)=  -81791.6  entropy=4.480  resource_entropy=1.300/1.386  zone_entropy=3.180/3.466  early_stopped=False (None)  device=mps
+[status @ ep   10/100] avg_reward(last5)= -118895.4  entropy=4.462  resource_entropy=1.291/1.386  zone_entropy=3.171/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 10] single_training: avg_reward=-119968.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100886.9 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 19) on 34.7% of ticks
+        probe: resource=helicopter/rescue_vehicle (avg max_prob=0.303)  zone=14 (avg max_prob=0.062)
+[status @ ep   15/100] avg_reward(last5)=  -86506.6  entropy=4.473  resource_entropy=1.292/1.386  zone_entropy=3.181/3.466  early_stopped=False (None)  device=mps
+[status @ ep   20/100] avg_reward(last5)= -111302.2  entropy=4.478  resource_entropy=1.278/1.386  zone_entropy=3.199/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 20] single_training: avg_reward=-120936.8  avg_buildings_destroyed=395.7  containment_rate=0%  vs heuristic: -101854.8 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 36.7% of ticks
+        probe: resource=helicopter/rescue_vehicle (avg max_prob=0.311)  zone=14 (avg max_prob=0.070)
+[status @ ep   25/100] avg_reward(last5)= -106917.7  entropy=4.440  resource_entropy=1.255/1.386  zone_entropy=3.186/3.466  early_stopped=False (None)  device=mps
+[status @ ep   30/100] avg_reward(last5)=  -72876.7  entropy=4.744  resource_entropy=1.374/1.386  zone_entropy=3.370/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 30] single_training: avg_reward=-119775.5  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100693.5 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 40.7% of ticks
+        probe: resource=helicopter/rescue_vehicle (avg max_prob=0.318)  zone=14 (avg max_prob=0.088)
+[status @ ep   35/100] avg_reward(last5)=  -65463.4  entropy=4.346  resource_entropy=1.235/1.386  zone_entropy=3.111/3.466  early_stopped=False (None)  device=mps
+[status @ ep   40/100] avg_reward(last5)= -131817.2  entropy=4.311  resource_entropy=1.230/1.386  zone_entropy=3.081/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 40] single_training: avg_reward=-119845.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100763.9 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 67.3% of ticks
+        probe: resource=helicopter/rescue_vehicle (avg max_prob=0.289)  zone=14 (avg max_prob=0.107)
+[status @ ep   45/100] avg_reward(last5)=  -73379.5  entropy=4.714  resource_entropy=1.383/1.386  zone_entropy=3.331/3.466  early_stopped=False (None)  device=mps
+[status @ ep   50/100] avg_reward(last5)= -120825.1  entropy=4.331  resource_entropy=1.172/1.386  zone_entropy=3.159/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 50] single_training: avg_reward=-119938.2  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100856.2 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 53.3% of ticks
+        probe: resource=rescue_vehicle/water_team (avg max_prob=0.310)  zone=14 (avg max_prob=0.104)
+[status @ ep   55/100] avg_reward(last5)= -111210.2  entropy=4.340  resource_entropy=1.158/1.386  zone_entropy=3.182/3.466  early_stopped=False (None)  device=mps
+[status @ ep   60/100] avg_reward(last5)=  -96396.1  entropy=4.368  resource_entropy=1.162/1.386  zone_entropy=3.206/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 60] single_training: avg_reward=-119934.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100852.9 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 48.0% of ticks
+        probe: resource=rescue_vehicle/water_team (avg max_prob=0.314)  zone=14 (avg max_prob=0.089)
+[status @ ep   65/100] avg_reward(last5)=  -82537.4  entropy=4.393  resource_entropy=1.162/1.386  zone_entropy=3.232/3.466  early_stopped=False (None)  device=mps
+[status @ ep   70/100] avg_reward(last5)= -105210.6  entropy=4.409  resource_entropy=1.166/1.386  zone_entropy=3.243/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 70] single_training: avg_reward=-119947.9  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100865.9 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 46.7% of ticks
+        probe: resource=rescue_vehicle/water_team (avg max_prob=0.313)  zone=14 (avg max_prob=0.076)
+[status @ ep   75/100] avg_reward(last5)=  -96858.0  entropy=4.427  resource_entropy=1.181/1.386  zone_entropy=3.246/3.466  early_stopped=False (None)  device=mps
+[status @ ep   80/100] avg_reward(last5)= -111028.6  entropy=4.489  resource_entropy=1.213/1.386  zone_entropy=3.276/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 80] single_training: avg_reward=-119938.1  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100856.1 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 14) on 46.0% of ticks
+        probe: resource=rescue_vehicle/water_team (avg max_prob=0.320)  zone=14 (avg max_prob=0.076)
+[status @ ep   85/100] avg_reward(last5)= -110671.4  entropy=4.542  resource_entropy=1.260/1.386  zone_entropy=3.283/3.466  early_stopped=False (None)  device=mps
+[status @ ep   90/100] avg_reward(last5)= -107356.8  entropy=4.558  resource_entropy=1.289/1.386  zone_entropy=3.270/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 90] single_training: avg_reward=-119974.0  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100892.0 (heuristic: -19082.0)
+        action_lock: ('rescue_vehicle', 19) on 30.7% of ticks
+        probe: resource=rescue_vehicle/water_team (avg max_prob=0.293)  zone=14/27 (avg max_prob=0.059)
+[status @ ep   95/100] avg_reward(last5)=  -66534.4  entropy=4.790  resource_entropy=1.381/1.386  zone_entropy=3.410/3.466  early_stopped=False (None)  device=mps
+[status @ ep  100/100] avg_reward(last5)= -133710.0  entropy=4.579  resource_entropy=1.295/1.386  zone_entropy=3.284/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 100] single_training: avg_reward=-121395.4  avg_buildings_destroyed=395.7  containment_rate=0%  vs heuristic: -102313.4 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 19) on 43.3% of ticks
+        probe: resource=rescue_vehicle/water_team (avg max_prob=0.313)  zone=14/19 (avg max_prob=0.066)
+
+[toggle-diff:toggle_E] COMPLETE: 100/100 episodes, 10.29 episodes/min

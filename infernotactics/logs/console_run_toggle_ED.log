@@ -1,0 +1,35 @@
+[toggle-diff:toggle_ED] 100 episodes, device=mps  toggles: E=True D=True A=False C=False B=False G=False F=False
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[toggle-diff] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0260.pt (plain load, N_SCALARS=8).
+[status @ ep    5/100] avg_reward(last5)=  -97249.1  entropy=4.562  resource_entropy=1.230/1.386  zone_entropy=3.186/3.466  early_stopped=False (None)  device=mps
+[status @ ep   10/100] avg_reward(last5)= -113667.9  entropy=4.663  resource_entropy=1.334/1.386  zone_entropy=3.338/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 10] single_training: avg_reward=-119977.8  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100895.8 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 14) on 45.3% of ticks
+        probe: resource=helicopter/trench_crew (avg max_prob=0.293)  zone=14/17 (avg max_prob=0.055)
+[status @ ep   15/100] avg_reward(last5)=  -87328.0  entropy=4.611  resource_entropy=1.267/1.386  zone_entropy=3.344/3.466  early_stopped=False (None)  device=mps
+[status @ ep   20/100] avg_reward(last5)= -119514.0  entropy=4.509  resource_entropy=1.164/1.386  zone_entropy=3.352/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 20] single_training: avg_reward=-120024.3  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100942.3 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 14) on 44.7% of ticks
+        probe: resource=trench_crew (avg max_prob=0.314)  zone=14/17 (avg max_prob=0.049)
+[status @ ep   25/100] avg_reward(last5)= -122837.3  entropy=4.378  resource_entropy=1.086/1.386  zone_entropy=3.276/3.466  early_stopped=False (None)  device=mps
+[status @ ep   30/100] avg_reward(last5)=  -93579.4  entropy=4.308  resource_entropy=1.055/1.386  zone_entropy=3.265/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 30] single_training: avg_reward=-120028.1  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100946.1 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 14) on 49.3% of ticks
+        probe: resource=trench_crew (avg max_prob=0.332)  zone=14/22 (avg max_prob=0.049)
+[status @ ep   35/100] avg_reward(last5)=  -65263.5  entropy=4.807  resource_entropy=1.371/1.386  zone_entropy=3.436/3.466  early_stopped=False (None)  device=mps
+[status @ ep   40/100] avg_reward(last5)= -105315.4  entropy=4.296  resource_entropy=1.042/1.386  zone_entropy=3.248/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 40] single_training: avg_reward=-119988.4  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100906.4 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 14) on 56.7% of ticks
+        probe: resource=trench_crew (avg max_prob=0.345)  zone=14 (avg max_prob=0.058)
+[status @ ep   45/100] avg_reward(last5)=  -67351.0  entropy=4.794  resource_entropy=1.365/1.386  zone_entropy=3.429/3.466  early_stopped=False (None)  device=mps
+[status @ ep   50/100] avg_reward(last5)= -123744.3  entropy=4.182  resource_entropy=1.045/1.386  zone_entropy=3.157/3.466  early_stopped=False (None)  device=mps
+    [eval @ ep 50] single_training: avg_reward=-120022.0  avg_buildings_destroyed=391.3  containment_rate=0%  vs heuristic: -100940.0 (heuristic: -19082.0)
+        action_lock: ('trench_crew', 14) on 50.7% of ticks
+        probe: resource=trench_crew (avg max_prob=0.350)  zone=14/22 (avg max_prob=0.063)

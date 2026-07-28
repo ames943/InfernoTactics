@@ -86,3 +86,36 @@
         action_lock: ('helicopter', 18) taken on 100.0% of all ticks (1 distinct action(s) used across all 3 eval episodes)
     [eval @ ep 260] mandeville_canyon: avg_reward=-17896.9  avg_buildings_destroyed=67.3  containment_rate=0%  |  reward vs heuristic: -17927.4 (heuristic: 30.5)
     [eval @ ep 260] getty_view_park: avg_reward=-81784.2  avg_buildings_destroyed=276.0  containment_rate=0%  |  reward vs heuristic: -81830.3 (heuristic: 46.1)
+[status @ ep   280/300] episodes/min(last20)=  9.53  avg_reward(last20)= -113433.1  entropy=4.712  resource_entropy=1.353/1.386  zone_entropy=3.359/3.466  policy_loss=   8.757  value_loss=   3.685  class_loss=0.015  device=mps
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0280.pt (and latest.pt)
+    [eval @ ep 280] single_training: avg_reward=42.4  avg_buildings_destroyed=0.0  containment_rate=100%  |  reward vs heuristic: +29453.3 (heuristic: -29410.9)
+        action_lock: ('helicopter', 18) taken on 100.0% of all ticks (1 distinct action(s) used across all 3 eval episodes)
+    [eval @ ep 280] mandeville_canyon: avg_reward=-17714.2  avg_buildings_destroyed=67.3  containment_rate=0%  |  reward vs heuristic: -17744.7 (heuristic: 30.5)
+    [eval @ ep 280] getty_view_park: avg_reward=-81601.5  avg_buildings_destroyed=276.0  containment_rate=0%  |  reward vs heuristic: -81647.6 (heuristic: 46.1)
+[status @ ep   300/300] episodes/min(last20)= 10.03  avg_reward(last20)= -102792.9  entropy=4.652  resource_entropy=1.343/1.386  zone_entropy=3.309/3.466  policy_loss=   6.327  value_loss=   1.961  class_loss=0.015  device=mps
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0300.pt (and latest.pt)
+    [eval @ ep 300] single_training: avg_reward=42.4  avg_buildings_destroyed=0.0  containment_rate=100%  |  reward vs heuristic: +29453.3 (heuristic: -29410.9)
+        action_lock: ('helicopter', 18) taken on 100.0% of all ticks (1 distinct action(s) used across all 3 eval episodes)
+    [eval @ ep 300] mandeville_canyon: avg_reward=-17734.1  avg_buildings_destroyed=67.3  containment_rate=0%  |  reward vs heuristic: -17764.6 (heuristic: 30.5)
+    [eval @ ep 300] getty_view_park: avg_reward=-81621.4  avg_buildings_destroyed=276.0  containment_rate=0%  |  reward vs heuristic: -81667.5 (heuristic: 46.1)
+
+=== Training run summary (completed all 300 episodes) ===
+Total wall time: 1778.2s  Overall episodes/min: 10.12
+Policy loss: moved (range -1.32e+05 to 13.5)
+Value loss: moved (range 0.0328 to 1.02e+09)
+Classification loss: moved (range 0.0122 to 18.4)
+Entropy: moved (range 4.31 to 4.81)
+Resource-type entropy (max ln(4)=1.386): moved (range 1.05 to 1.38)
+Zone entropy (max ln(32)=3.466): moved (range 3.13 to 3.45)
+Training-point reward, first->last episode: -68101.7 -> -12.4
+Training-point reward, mean first 20 vs last 20: -107705.4 vs -102792.9
+Final deterministic eval (all 3 scenarios) vs heuristic baseline:
+  single_training: avg_reward=42.4  avg_buildings_destroyed=0.0  containment_rate=100%
+    heuristic:   avg_reward=-29410.9  avg_buildings_destroyed=98.4  containment_rate=80%  (delta: +29453.3)
+  mandeville_canyon: avg_reward=-17734.1  avg_buildings_destroyed=67.3  containment_rate=0%
+    heuristic:   avg_reward=30.5  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -17764.6)
+  getty_view_park: avg_reward=-81621.4  avg_buildings_destroyed=276.0  containment_rate=0%
+    heuristic:   avg_reward=46.1  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -81667.5)
+MPS errors encountered: none
+Final device: mps
+Latest checkpoint: /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/latest.pt
