@@ -11,6 +11,7 @@ one it trained on.
 
 import os
 import sys
+from collections import Counter
 
 import torch
 
@@ -38,7 +39,7 @@ def _select_action(action_logits, deterministic):
 
 
 def eval_policy(model, env, ignition_point=None, ignition_points=None, n_episodes=5, use_real_weather=True,
-                 deterministic=False, seed=0, device=None, scalars_fn=None):
+                 deterministic=False, seed=0, device=None, scalars_fn=None, track_actions=False):
     """Run `model` against `env` for n_episodes, every episode starting from
     the same fixed ignition point(s) (e.g. env.inferno_env.TRAINING_IGNITION_POINT
     or one of VALIDATION_IGNITION_POINTS, via `ignition_point`; or
@@ -70,6 +71,16 @@ def eval_policy(model, env, ignition_point=None, ignition_points=None, n_episode
     file) without changing this function's behavior for any existing caller
     that omits it (heuristic_policy.py, train_actor_critic.py, this module's
     own main()).
+
+    track_actions: optional, default False (no change to return shape/behavior
+    for any existing caller). When True, records every tick's chosen
+    (resource_idx, zone_idx) pair across all n_episodes and adds
+    "action_counts" (a Counter over those pairs) and "most_common_action"
+    (that Counter's single most frequent pair, plus its fraction of all
+    ticks seen) to the returned dict -- added during the v4-vs-old-loop
+    bisect investigation to answer "if this policy has collapsed to a
+    near-deterministic distribution, WHICH action did it lock onto," not to
+    change eval_policy's core behavior for any other caller.
     """
     was_training = model.training
     model.eval()
@@ -78,6 +89,7 @@ def eval_policy(model, env, ignition_point=None, ignition_points=None, n_episode
     episode_rewards = []
     episode_buildings_destroyed = []
     episode_contained = []
+    action_counts = Counter() if track_actions else None
 
     with torch.no_grad():
         for ep in range(n_episodes):
@@ -95,6 +107,8 @@ def eval_policy(model, env, ignition_point=None, ignition_points=None, n_episode
                         scalars = scalars.to(device)
                 action_logits, value, _classification_logits = model(grid, scalars)
                 resource_idx, zone_idx = _select_action(action_logits, deterministic)
+                if track_actions:
+                    action_counts[(RESOURCE_TYPES[resource_idx], zone_idx)] += 1
                 action = (RESOURCE_TYPES[resource_idx], zone_idx)
                 obs, reward, done, info = env.step(action)
                 total_reward += reward
@@ -110,7 +124,7 @@ def eval_policy(model, env, ignition_point=None, ignition_points=None, n_episode
 
     n_building_cells = int(env._building_mask.sum())
     avg_destroyed = sum(episode_buildings_destroyed) / n_episodes
-    return {
+    result = {
         "n_episodes": n_episodes,
         "ignition_point": ignition_point,
         "avg_reward": sum(episode_rewards) / n_episodes,
@@ -119,6 +133,15 @@ def eval_policy(model, env, ignition_point=None, ignition_points=None, n_episode
         "containment_rate": sum(episode_contained) / n_episodes,
         "episode_rewards": episode_rewards,
     }
+    if track_actions:
+        total_ticks = sum(action_counts.values())
+        most_common_action, most_common_count = action_counts.most_common(1)[0] if total_ticks else (None, 0)
+        result["action_counts"] = action_counts
+        result["most_common_action"] = {
+            "action": most_common_action,
+            "fraction_of_ticks": (most_common_count / total_ticks) if total_ticks else float("nan"),
+        }
+    return result
 
 
 def main():

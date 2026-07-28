@@ -1,0 +1,102 @@
+[train-multi-v6] dry run / smoke test: 50 episodes in batches of 4, initial device=mps, reward_shaping=off (SHAPING_COEFF=0.02), GAE(lambda=0.95, gamma=0.99), PPO(epochs=1, minibatch=16, clip_eps=0.2), LEARNING_RATE=0.0003, GRAD_CLIP_NORM=0.5, adv_clip=off, SAFETY_CHECK_TARGET_COUNT=15
+[train-multi-v6] Building InfernoEnv...
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[train-multi-v6] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints/best.pt (original single-scenario best.pt, ep 260) -- all layers loaded unchanged except mlp.net.0.weight, which gained one zero-initialized column for the anchor-identity flag (N_SCALARS=9, was 8) -- see ANCHOR_FLAG_DIM docstring for why.
+    [ppo-kl] batch 1 (episodes 1-4, 4 eps, 298 ticks): approx_KL before epoch 1 = 0.00000  final = 0.06690  entropy=4.34319  epochs_run=0 minibatches_run=3  EARLY-STOPPED after 3 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=2.67  other_grad_norm=7233.3
+    [ppo-kl] batch 2 (episodes 5-8, 4 eps, 210 ticks): approx_KL before epoch 1 = 0.00000  final = 0.03708  entropy=4.44526  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=3.00  [ANCHOR IN BATCH]  other_grad_norm=9316.8
+    [ppo-kl] batch 3 (episodes 9-12, 4 eps, 458 ticks): approx_KL before epoch 1 = 0.00000  final = 0.05448  entropy=4.28923  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=3.50  other_grad_norm=10201.0
+    [eval @ ep 12] (train     ) single_training: avg_reward=-119909.1  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -100827.1 (heuristic: -19082.0)
+    [eval @ ep 12] (train     ) topanga_ridge: avg_reward=-9885.1  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -6438.8 (heuristic: -3446.3)
+    [eval @ ep 12] (train     ) sullivan_canyon: avg_reward=-47667.8  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -39846.3 (heuristic: -7821.5)
+    [eval @ ep 12] (train     ) stone_canyon: avg_reward=-121265.2  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -75885.3 (heuristic: -45379.9)
+    [eval @ ep 12] (VALIDATION) mandeville_canyon: avg_reward=-19703.4  avg_buildings_destroyed=75.0  containment_rate=0%  |  vs heuristic: -19752.4 (heuristic: 49.0)
+    [eval @ ep 12] (VALIDATION) getty_view_park: avg_reward=-81826.4  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81900.0 (heuristic: 73.6)
+    [eval @ episode 12] combined avg reward across all 6 scenarios: -66709.5
+  [checkpoint] new best combined-avg eval reward (-66709.5) at episode 12 -- saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v6/best.pt
+    [ppo-kl] batch 4 (episodes 13-16, 4 eps, 311 ticks): approx_KL before epoch 1 = 0.00000  final = 0.04682  entropy=4.07256  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=2.00  [ANCHOR IN BATCH]  other_grad_norm=14944.2
+    [ppo-kl] batch 5 (episodes 17-20, 4 eps, 487 ticks): approx_KL before epoch 1 = 0.00000  final = 0.12553  entropy=3.61817  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=3.00  other_grad_norm=16818.1
+[status @ episode    20/50 (batch 5)] batches/min(last5)=  2.72  (~10.90 episodes/min)  avg_batch_mean_reward(last5)=  -63998.8  entropy=3.618  policy_loss=   0.127  value_loss= 281.534  class_loss=0.049  reward_scale_std=782.72  value_grad_norm=6499.1  other_grad_norm=16818.1  device=mps
+    [anchor-flag probe] resource_logits(flag=0)=[0.071, 0.221, 0.201, 0.133]  resource_logits(flag=1)=[0.071, 0.221, 0.201, 0.133]  max_abs_diff=0.0000
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v6/episode_0020.pt (and latest.pt, resume_state.pt)
+    [eval @ ep 20] (train     ) single_training: avg_reward=-119943.4  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -100861.4 (heuristic: -19082.0)
+    [eval @ ep 20] (train     ) topanga_ridge: avg_reward=-9919.4  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -6473.1 (heuristic: -3446.3)
+    [eval @ ep 20] (train     ) sullivan_canyon: avg_reward=-47698.7  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -39877.2 (heuristic: -7821.5)
+    [eval @ ep 20] (train     ) stone_canyon: avg_reward=-120514.1  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -75134.2 (heuristic: -45379.9)
+    [eval @ ep 20] (VALIDATION) mandeville_canyon: avg_reward=-17973.4  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18022.4 (heuristic: 49.0)
+    [eval @ ep 20] (VALIDATION) getty_view_park: avg_reward=-81860.7  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81934.3 (heuristic: 73.6)
+    [eval @ episode 20] combined avg reward across all 6 scenarios: -66318.3
+  [checkpoint] new best combined-avg eval reward (-66318.3) at episode 20 -- saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v6/best.pt
+    [ppo-kl] batch 6 (episodes 21-24, 4 eps, 600 ticks): approx_KL before epoch 1 = 0.00000  final = 0.17485  entropy=3.06386  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=4.00  [ANCHOR IN BATCH]  other_grad_norm=20474.8
+    [ppo-kl] batch 7 (episodes 25-28, 4 eps, 337 ticks): approx_KL before epoch 1 = 0.00000  final = 0.04988  entropy=2.65009  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=2.00  [ANCHOR IN BATCH]  other_grad_norm=33314.7
+    [ppo-kl] batch 8 (episodes 29-32, 4 eps, 483 ticks): approx_KL before epoch 1 = 0.00000  final = 0.47398  entropy=2.01841  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=3.00  other_grad_norm=24627.5
+    [eval @ ep 32] (train     ) single_training: avg_reward=-119981.4  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -100899.4 (heuristic: -19082.0)
+    [eval @ ep 32] (train     ) topanga_ridge: avg_reward=-9957.4  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -6511.1 (heuristic: -3446.3)
+    [eval @ ep 32] (train     ) sullivan_canyon: avg_reward=-47736.7  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -39915.2 (heuristic: -7821.5)
+    [eval @ ep 32] (train     ) stone_canyon: avg_reward=-121761.0  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -76381.1 (heuristic: -45379.9)
+    [eval @ ep 32] (VALIDATION) mandeville_canyon: avg_reward=-18011.3  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18060.3 (heuristic: 49.0)
+    [eval @ ep 32] (VALIDATION) getty_view_park: avg_reward=-81898.6  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81972.2 (heuristic: 73.6)
+    [eval @ episode 32] combined avg reward across all 6 scenarios: -66557.7
+    [ppo-kl] batch 9 (episodes 33-36, 4 eps, 320 ticks): approx_KL before epoch 1 = 0.00000  final = 0.10296  entropy=1.53938  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=3.00  [ANCHOR IN BATCH]  other_grad_norm=28788.5
+    [ppo-kl] batch 10 (episodes 37-40, 4 eps, 429 ticks): approx_KL before epoch 1 = 0.00000  final = 0.10533  entropy=0.84113  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=4.00  other_grad_norm=91666.8
+[status @ episode    40/50 (batch 10)] batches/min(last5)=  2.77  (~11.09 episodes/min)  avg_batch_mean_reward(last5)=  -71036.5  entropy=0.841  policy_loss=   0.098  value_loss= 247.519  class_loss=0.088  reward_scale_std=802.48  value_grad_norm=24391.8  other_grad_norm=91666.8  device=mps
+    [anchor-flag probe] resource_logits(flag=0)=[0.144, 1.047, 0.895, 0.262]  resource_logits(flag=1)=[0.144, 1.047, 0.895, 0.262]  max_abs_diff=0.0000
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v6/episode_0040.pt (and latest.pt, resume_state.pt)
+    [eval @ ep 40] (train     ) single_training: avg_reward=-119981.4  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -100899.4 (heuristic: -19082.0)
+    [eval @ ep 40] (train     ) topanga_ridge: avg_reward=-9957.4  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -6511.1 (heuristic: -3446.3)
+    [eval @ ep 40] (train     ) sullivan_canyon: avg_reward=-47736.7  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -39915.2 (heuristic: -7821.5)
+    [eval @ ep 40] (train     ) stone_canyon: avg_reward=-121761.0  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -76381.1 (heuristic: -45379.9)
+    [eval @ ep 40] (VALIDATION) mandeville_canyon: avg_reward=-18011.3  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18060.3 (heuristic: 49.0)
+    [eval @ ep 40] (VALIDATION) getty_view_park: avg_reward=-81898.6  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81972.2 (heuristic: 73.6)
+    [eval @ episode 40] combined avg reward across all 6 scenarios: -66557.7
+    [ppo-kl] batch 11 (episodes 41-44, 4 eps, 484 ticks): approx_KL before epoch 1 = 0.00000  final = 0.19679  entropy=0.38094  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=4.00  [ANCHOR IN BATCH]  other_grad_norm=103326.5
+    [ppo-kl] batch 12 (episodes 45-48, 4 eps, 488 ticks): approx_KL before epoch 1 = 0.00000  final = 0.03396  entropy=0.06328  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  mean_unique_eps/checked_mb=3.00  other_grad_norm=150669.3
+    [ppo-kl] batch 13 (episodes 49-50, 2 eps, 300 ticks): approx_KL before epoch 1 = 0.00000  final = 0.01991  entropy=0.04203  epochs_run=1 minibatches_run=19  mean_unique_eps/checked_mb=2.00  [ANCHOR IN BATCH]  other_grad_norm=109051.0
+    [eval @ ep 50] (train     ) single_training: avg_reward=-119981.4  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -100899.4 (heuristic: -19082.0)
+    [eval @ ep 50] (train     ) topanga_ridge: avg_reward=-9957.4  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -6511.1 (heuristic: -3446.3)
+    [eval @ ep 50] (train     ) sullivan_canyon: avg_reward=-47736.7  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -39915.2 (heuristic: -7821.5)
+    [eval @ ep 50] (train     ) stone_canyon: avg_reward=-121761.0  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -76381.1 (heuristic: -45379.9)
+    [eval @ ep 50] (VALIDATION) mandeville_canyon: avg_reward=-18011.3  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18060.3 (heuristic: 49.0)
+    [eval @ ep 50] (VALIDATION) getty_view_park: avg_reward=-81898.6  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81972.2 (heuristic: 73.6)
+    [eval @ episode 50] combined avg reward across all 6 scenarios: -66557.7
+
+=== Multi-ignition v6 (multi-trajectory batched PPO, BATCH_SIZE_EPISODES=4) summary (completed all 50 episodes in 13 batches) ===
+Total wall time: 358.2s  Overall episodes/min: 8.38  (batches/min: 2.18)
+Policy loss: moved (range -0.205 to 0.431)
+Value loss: moved (range 159 to 1.04e+03)
+Classification loss: moved (range 0.0485 to 0.212)
+Entropy: moved (range 0.042 to 4.45)
+Final reward_scale_normalizer: mean=-715.17 std=845.93 n=5205
+Early-stopping: triggered in 12/13 batches (92%), average stop after 1.8 minibatch(es)  -- by reason: {'kl': 12}  (KL_threshold=0.03, ENTROPY_FLOOR=0.005, SAFETY_CHECK_TARGET_COUNT=15)
+single_training eval-reward trajectory across the run (watch for mid-run collapse, not just the final number -- warm-started value was +32.1, 100% containment):
+  ep    12: avg_reward=-119909.1
+  ep    20: avg_reward=-119943.4
+  ep    32: avg_reward=-119981.4
+  ep    40: avg_reward=-119981.4
+  ep    50: avg_reward=-119981.4
+Ignition variety check: 44 unique points sampled out of 50 episodes; distance-to-nearest-named-point (grid cells): min=0.0 mean=76.6 max=172.2
+Stochastic rollout reward (raw, unshaped, per-batch MEAN across that batch's episodes), first->last batch: -32898.9 -> -151634.1
+Stochastic rollout reward, mean of first 13 vs last 13 batches: -77417.9 vs -77417.9
+Final deterministic eval (all 6 scenarios) vs heuristic baseline:
+  (train     ) single_training: avg_reward=-119981.4  avg_buildings_destroyed=391.3  containment_rate=0%
+    heuristic:   avg_reward=-19082.0  avg_buildings_destroyed=65.2  containment_rate=80%  (delta: -100899.4)
+  (train     ) topanga_ridge: avg_reward=-9957.4  avg_buildings_destroyed=31.7  containment_rate=0%
+    heuristic:   avg_reward=-3446.3  avg_buildings_destroyed=12.8  containment_rate=80%  (delta: -6511.1)
+  (train     ) sullivan_canyon: avg_reward=-47736.7  avg_buildings_destroyed=175.0  containment_rate=0%
+    heuristic:   avg_reward=-7821.5  avg_buildings_destroyed=31.6  containment_rate=80%  (delta: -39915.2)
+  (train     ) stone_canyon: avg_reward=-121761.0  avg_buildings_destroyed=417.3  containment_rate=0%
+    heuristic:   avg_reward=-45379.9  avg_buildings_destroyed=167.0  containment_rate=60%  (delta: -76381.1)
+  (VALIDATION) mandeville_canyon: avg_reward=-18011.3  avg_buildings_destroyed=67.3  containment_rate=0%
+    heuristic:   avg_reward=49.0  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -18060.3)
+  (VALIDATION) getty_view_park: avg_reward=-81898.6  avg_buildings_destroyed=276.0  containment_rate=0%
+    heuristic:   avg_reward=73.6  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -81972.2)
+Best checkpoint: ep 20, combined avg eval reward = -66318.3 -> /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v6/best.pt
+MPS errors encountered: none
+Final device: mps
+Latest checkpoint: /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v6/latest.pt

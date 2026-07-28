@@ -1,0 +1,142 @@
+{
+  "water_team": {
+    "avg_reward": -115608.01144445557,
+    "avg_buildings_destroyed": 390.2,
+    "containment_rate": 0.0,
+    "dispatch_attempts": 135,
+    "dispatch_ok": 135,
+    "dispatch_wasted_no_unit": 0,
+    "dispatch_wasted_unreachable": 0,
+    "effect_success_by_type": {
+      "water_team": 85,
+      "trench_crew": 0,
+      "rescue_vehicle": 0,
+      "helicopter": 0
+    },
+    "effect_wasted_by_type": {
+      "water_team": 43,
+      "trench_crew": 0,
+      "rescue_vehicle": 0,
+      "helicopter": 0
+    },
+    "episode_rewards": [
+      -113984.25005637824,
+      -91510.12705365727,
+      -95127.3511585158,
+      -147880.70712677675,
+      -129537.62182694979
+    ]
+  },
+  "trench_crew": {
+    "avg_reward": -133195.96495360843,
+    "avg_buildings_destroyed": 443.0,
+    "containment_rate": 0.0,
+    "dispatch_attempts": 26,
+    "dispatch_ok": 26,
+    "dispatch_wasted_no_unit": 0,
+    "dispatch_wasted_unreachable": 0,
+    "effect_success_by_type": {
+      "water_team": 0,
+      "trench_crew": 2,
+      "rescue_vehicle": 0,
+      "helicopter": 0
+    },
+    "effect_wasted_by_type": {
+      "water_team": 0,
+      "trench_crew": 24,
+      "rescue_vehicle": 0,
+      "helicopter": 0
+    },
+    "episode_rewards": [
+      -133753.389582614,
+      -132164.34311125905,
+      -127801.00600544823,
+      -142917.28106345725,
+      -129343.80500526368
+    ]
+  },
+  "rescue_vehicle": {
+    "avg_reward": -129988.54323534318,
+    "avg_buildings_destroyed": 442.6,
+    "containment_rate": 0.0,
+    "dispatch_attempts": 121,
+    "dispatch_ok": 121,
+    "dispatch_wasted_no_unit": 0,
+    "dispatch_wasted_unreachable": 0,
+    "effect_success_by_type": {
+      "water_team": 0,
+      "trench_crew": 0,
+      "rescue_vehicle": 48,
+      "helicopter": 0
+    },
+    "effect_wasted_by_type": {
+      "water_team": 0,
+      "trench_crew": 0,
+      "rescue_vehicle": 67,
+      "helicopter": 0
+    },
+    "episode_rewards": [
+      -127974.61433095744,
+      -129350.11829795566,
+      -124720.54153035278,
+      -141884.3583792805,
+      -126013.08363816948
+    ]
+  },
+  "helicopter": {
+    "avg_reward": -24068.75514733017,
+    "avg_buildings_destroyed": 82.0,
+    "containment_rate": 0.8,
+    "dispatch_attempts": 67,
+    "dispatch_ok": 67,
+    "dispatch_wasted_no_unit": 0,
+    "dispatch_wasted_unreachable": 0,
+    "effect_success_by_type": {
+      "water_team": 0,
+      "trench_crew": 0,
+      "rescue_vehicle": 0,
+      "helicopter": 28
+    },
+    "effect_wasted_by_type": {
+      "water_team": 0,
+      "trench_crew": 0,
+      "rescue_vehicle": 0,
+      "helicopter": 26
+    },
+    "episode_rewards": [
+      27.607807418963407,
+      -120548.60891818145,
+      27.607807418963407,
+      27.607807418963407,
+      122.00975927370426
+    ]
+  },
+  "random": {
+    "avg_reward": -70904.30375925938,
+    "avg_buildings_destroyed": 240.6,
+    "containment_rate": 0.4,
+    "dispatch_attempts": 211,
+    "dispatch_ok": 211,
+    "dispatch_wasted_no_unit": 0,
+    "dispatch_wasted_unreachable": 0,
+    "effect_success_by_type": {
+      "water_team": 40,
+      "trench_crew": 0,
+      "rescue_vehicle": 14,
+      "helicopter": 40
+    },
+    "effect_wasted_by_type": {
+      "water_team": 12,
+      "trench_crew": 6,
+      "rescue_vehicle": 37,
+      "helicopter": 53
+    },
+    "episode_rewards": [
+      44.40195185474085,
+      -98554.18015300784,
+      -136576.82327316172,
+      33.20585556422255,
+      -119468.1231775463
+    ]
+  }
+}

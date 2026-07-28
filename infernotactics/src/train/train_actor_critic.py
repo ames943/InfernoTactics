@@ -159,16 +159,29 @@ CHECKPOINT_EVERY = 20
 EVAL_EVERY = 20
 EVAL_EPISODES = 3
 
-CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", "checkpoints")
+# INFERNO_RUN_TAG: purely an output-path suffix, NOT an algorithm change -- default ""
+# preserves the exact original checkpoints/checkpoints, logs/train_log.csv,
+# logs/eval_log.csv paths for anyone running this script normally. Added specifically so
+# the v4-vs-old-loop bisect run (see task) writes to its own tagged paths instead of
+# overwriting the original 2000-episode run's train_log.csv/eval_log.csv/checkpoints --
+# those are the historical run this whole investigation keeps comparing against, and
+# models/checkpoints/best.pt (ep 260) is what every v4/v5/v6 script warm-starts from.
+_RUN_TAG = os.environ.get("INFERNO_RUN_TAG", "")
+_TAG_SUFFIX = f"_{_RUN_TAG}" if _RUN_TAG else ""
+
+CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", f"checkpoints{_TAG_SUFFIX}")
 LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
-TRAIN_LOG_PATH = os.path.join(LOG_DIR, "train_log.csv")
-EVAL_LOG_PATH = os.path.join(LOG_DIR, "eval_log.csv")
+TRAIN_LOG_PATH = os.path.join(LOG_DIR, f"train_log{_TAG_SUFFIX}.csv")
+EVAL_LOG_PATH = os.path.join(LOG_DIR, f"eval_log{_TAG_SUFFIX}.csv")
 
 TRAIN_LOG_FIELDS = [
     "episode", "device", "n_ticks", "reward", "buildings_destroyed", "contained",
     "policy_loss", "value_loss", "classification_loss", "entropy",
+    "resource_entropy", "zone_entropy",  # per-head split -- see update_policy()'s docstring
     "value_grad_norm", "other_grad_norm", "wall_time_s",
 ]
+RESOURCE_ENTROPY_MAX = math.log(4)   # ln(4), theoretical max for the 4-way resource_type head
+ZONE_ENTROPY_MAX = math.log(32)      # ln(32), theoretical max for the 32-way zone head
 EVAL_LOG_FIELDS = [
     "episode", "ignition_point_name", "avg_reward", "avg_buildings_destroyed",
     "avg_buildings_saved", "containment_rate",
@@ -294,8 +307,19 @@ def compute_returns(rewards, gamma):
 def update_policy(model, optimizer, steps, device, return_normalizer):
     """Re-run each stored tick WITH gradients, one at a time, accumulating
     .backward() before a single optimizer.step() -- see module docstring for
-    why. Returns mean policy/value/classification loss, mean entropy, and
-    the two clip groups' pre-clip gradient norms, all over the episode."""
+    why. Returns mean policy/value/classification loss, mean COMBINED entropy
+    (unchanged -- still what feeds the loss's -ENTROPY_COEFF * entropy term),
+    mean PER-HEAD entropy (resource_type, zone -- tracked separately purely
+    for diagnostic logging, added during the v4-vs-old-loop bisect
+    investigation; does not change the loss or any training dynamics), and
+    the two clip groups' pre-clip gradient norms, all over the episode.
+
+    Per-head split rationale: a single combined entropy number can't
+    distinguish "the 4-way resource head collapsed" from "the 32-way zone
+    head collapsed" from "both collapsed together" -- and since the two
+    heads have very different theoretical maxima (ln(4)=1.386 vs
+    ln(32)=3.466), a combined number is also hard to read as a fraction of
+    max entropy without doing that split mentally every time."""
     raw_returns = compute_returns([s["reward"] for s in steps], GAMMA)
     returns = return_normalizer.normalize(raw_returns)
     return_normalizer.update(raw_returns)
@@ -306,6 +330,7 @@ def update_policy(model, optimizer, steps, device, return_normalizer):
 
     optimizer.zero_grad()
     policy_loss_sum = value_loss_sum = classification_loss_sum = entropy_sum = 0.0
+    resource_entropy_sum = zone_entropy_sum = 0.0
 
     for step, g_t in zip(steps, returns):
         grid_t = torch.from_numpy(step["grid"]).unsqueeze(0).to(device)
@@ -318,7 +343,9 @@ def update_policy(model, optimizer, steps, device, return_normalizer):
             resource_dist.log_prob(torch.tensor(step["resource_idx"], device=device))
             + zone_dist.log_prob(torch.tensor(step["zone_idx"], device=device))
         )
-        entropy = resource_dist.entropy() + zone_dist.entropy()
+        resource_entropy = resource_dist.entropy()
+        zone_entropy = zone_dist.entropy()
+        entropy = resource_entropy + zone_entropy
 
         value_scalar = value.squeeze()
         g_t_tensor = torch.tensor(g_t, dtype=value_scalar.dtype, device=device)
@@ -342,6 +369,8 @@ def update_policy(model, optimizer, steps, device, return_normalizer):
         value_loss_sum += value_loss.item()
         classification_loss_sum += classification_loss.item()
         entropy_sum += entropy.item()
+        resource_entropy_sum += resource_entropy.item()
+        zone_entropy_sum += zone_entropy.item()
 
     # Two disjoint parameter groups clipped separately -- see module docstring.
     value_grad_norm = torch.nn.utils.clip_grad_norm_(value_head_params, GRAD_CLIP_NORM)
@@ -351,6 +380,7 @@ def update_policy(model, optimizer, steps, device, return_normalizer):
     n = len(steps)
     return (
         policy_loss_sum / n, value_loss_sum / n, classification_loss_sum / n, entropy_sum / n,
+        resource_entropy_sum / n, zone_entropy_sum / n,
         float(value_grad_norm), float(other_grad_norm),
     )
 
@@ -361,7 +391,8 @@ def run_training_episode(env, model, optimizer, device, seed, return_normalizer)
     steps, total_reward, buildings_destroyed, contained = collect_rollout(
         env, model, TRAINING_IGNITION_POINT, device, seed
     )
-    policy_loss, value_loss, classification_loss, entropy, value_grad_norm, other_grad_norm = update_policy(
+    (policy_loss, value_loss, classification_loss, entropy,
+     resource_entropy, zone_entropy, value_grad_norm, other_grad_norm) = update_policy(
         model, optimizer, steps, device, return_normalizer
     )
     return {
@@ -373,6 +404,8 @@ def run_training_episode(env, model, optimizer, device, seed, return_normalizer)
         "value_loss": value_loss,
         "classification_loss": classification_loss,
         "entropy": entropy,
+        "resource_entropy": resource_entropy,
+        "zone_entropy": zone_entropy,
         "value_grad_norm": value_grad_norm,
         "other_grad_norm": other_grad_norm,
     }
@@ -386,14 +419,20 @@ def run_eval_suite(model, env, episode_num, eval_writer, eval_file, device):
     TRAIN_LOG_PATH: it isolates "how good is the CURRENT greedy policy" from
     the exploration noise baked into the rollout used to compute gradients.
     Every scenario with a HEURISTIC_BASELINE entry also gets its delta vs
-    that baseline printed inline. Returns {name: result} for the caller to
-    keep as "last known" eval numbers, e.g. for the final/interrupted-run
-    summary."""
+    that baseline printed inline. "single_training" additionally runs with
+    track_actions=True (see eval_policy's docstring) and prints the argmax
+    action combination the deterministic policy locks onto most often, plus
+    what fraction of all ticks it took that exact action -- added during the
+    v4-vs-old-loop bisect investigation to see WHICH action a collapsed
+    policy commits to, not just that entropy went to zero. Returns {name:
+    result} for the caller to keep as "last known" eval numbers, e.g. for the
+    final/interrupted-run summary."""
     scenarios = [("single_training", TRAINING_IGNITION_POINT)] + list(VALIDATION_IGNITION_POINTS.items())
     results = {}
     for name, point in scenarios:
         result = eval_policy(model, env, ignition_point=point, n_episodes=EVAL_EPISODES,
-                              use_real_weather=True, deterministic=True, seed=BASE_SEED, device=device)
+                              use_real_weather=True, deterministic=True, seed=BASE_SEED, device=device,
+                              track_actions=(name == "single_training"))
         results[name] = result
         eval_writer.writerow({
             "episode": episode_num,
@@ -412,6 +451,11 @@ def run_eval_suite(model, env, episode_num, eval_writer, eval_file, device):
             delta = result["avg_reward"] - baseline["avg_reward"]
             line += f"  |  reward vs heuristic: {delta:+.1f} (heuristic: {baseline['avg_reward']:.1f})"
         print(line, flush=True)
+        if name == "single_training":
+            mc = result["most_common_action"]
+            n_distinct = len(result["action_counts"])
+            print(f"        action_lock: {mc['action']} taken on {mc['fraction_of_ticks']:.1%} of all ticks "
+                  f"({n_distinct} distinct action(s) used across all {EVAL_EPISODES} eval episodes)", flush=True)
     return results
 
 
@@ -435,7 +479,7 @@ def main():
     mps_errors = []
     episode_wall_times = []
     episode_rewards = []
-    episode_losses = []  # (policy, value, classification, entropy)
+    episode_losses = []  # (policy, value, classification, entropy, resource_entropy, zone_entropy)
     recent_wall_times = deque(maxlen=STATUS_EVERY)
     recent_rewards = deque(maxlen=STATUS_EVERY)
     last_eval_results = None
@@ -471,7 +515,8 @@ def main():
                 episode_wall_times.append(wall_s)
                 episode_rewards.append(result["reward"])
                 episode_losses.append((result["policy_loss"], result["value_loss"],
-                                        result["classification_loss"], result["entropy"]))
+                                        result["classification_loss"], result["entropy"],
+                                        result["resource_entropy"], result["zone_entropy"]))
                 recent_wall_times.append(wall_s)
                 recent_rewards.append(result["reward"])
                 completed_episodes = ep
@@ -481,7 +526,9 @@ def main():
                     "reward": result["reward"], "buildings_destroyed": result["buildings_destroyed"],
                     "contained": result["contained"], "policy_loss": result["policy_loss"],
                     "value_loss": result["value_loss"], "classification_loss": result["classification_loss"],
-                    "entropy": result["entropy"], "value_grad_norm": result["value_grad_norm"],
+                    "entropy": result["entropy"],
+                    "resource_entropy": result["resource_entropy"], "zone_entropy": result["zone_entropy"],
+                    "value_grad_norm": result["value_grad_norm"],
                     "other_grad_norm": result["other_grad_norm"], "wall_time_s": wall_s,
                 })
                 train_file.flush()
@@ -493,6 +540,8 @@ def main():
                           f"episodes/min(last{STATUS_EVERY})={window_eps_per_min:6.2f}  "
                           f"avg_reward(last{STATUS_EVERY})={window_avg_reward:10.1f}  "
                           f"entropy={result['entropy']:.3f}  "
+                          f"resource_entropy={result['resource_entropy']:.3f}/{RESOURCE_ENTROPY_MAX:.3f}  "
+                          f"zone_entropy={result['zone_entropy']:.3f}/{ZONE_ENTROPY_MAX:.3f}  "
                           f"policy_loss={result['policy_loss']:8.3f}  "
                           f"value_loss={result['value_loss']:8.3f}  "
                           f"class_loss={result['classification_loss']:.3f}  device={device}",
@@ -523,10 +572,12 @@ def main():
     # --- Summary (natural completion or Ctrl+C -- same block either way) ------
     total_wall = sum(episode_wall_times)
     episodes_per_min = completed_episodes / (total_wall / 60.0) if total_wall > 0 else float("nan")
-    policy_losses = [p for p, v, c, e in episode_losses]
-    value_losses = [v for p, v, c, e in episode_losses]
-    class_losses = [c for p, v, c, e in episode_losses]
-    entropies = [e for p, v, c, e in episode_losses]
+    policy_losses = [p for p, v, c, e, re, ze in episode_losses]
+    value_losses = [v for p, v, c, e, re, ze in episode_losses]
+    class_losses = [c for p, v, c, e, re, ze in episode_losses]
+    entropies = [e for p, v, c, e, re, ze in episode_losses]
+    resource_entropies = [re for p, v, c, e, re, ze in episode_losses]
+    zone_entropies = [ze for p, v, c, e, re, ze in episode_losses]
 
     def _nan_or_frozen(values):
         if not values:
@@ -545,6 +596,8 @@ def main():
     print(f"Value loss: {_nan_or_frozen(value_losses)}")
     print(f"Classification loss: {_nan_or_frozen(class_losses)}")
     print(f"Entropy: {_nan_or_frozen(entropies)}")
+    print(f"Resource-type entropy (max ln(4)={RESOURCE_ENTROPY_MAX:.3f}): {_nan_or_frozen(resource_entropies)}")
+    print(f"Zone entropy (max ln(32)={ZONE_ENTROPY_MAX:.3f}): {_nan_or_frozen(zone_entropies)}")
     if episode_rewards:
         n_tail = min(20, len(episode_rewards))
         print(f"Training-point reward, first->last episode: {episode_rewards[0]:.1f} -> {episode_rewards[-1]:.1f}")
