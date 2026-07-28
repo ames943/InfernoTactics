@@ -20,7 +20,8 @@
 </head>
 <body>
   <div id="ui-panel">
-    <h3>Palisades Fire Sim (8x4 Grid)</h3>
+    <h3>Palisades Fire Sim</h3>
+    <p>Grid: <b>8x4 Sectors</b></p>
     <p>Status: <span id="sim-status" style="color: #00ff00;">Waiting for RL Model...</span></p>
     <button onclick="testAction()">Simulate RL Helicopter Drop (Sector 10)</button>
   </div>
@@ -33,7 +34,6 @@
 
     // 2. Initialize Cesium Globe Asynchronously
     async function initSim() {
-      // Load 3D Terrain
       const terrain = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
       
       const viewer = new Cesium.Viewer('cesiumContainer', {
@@ -42,6 +42,9 @@
         animation: false,
         baseLayerPicker: false
       });
+
+      // Enable realistic lighting & shadows for depth on facades and roofs
+      viewer.scene.globe.enableLighting = true;
 
       // Enable trackpad Ctrl + Drag tilting
       viewer.scene.screenSpaceCameraController.tiltEventTypes = [
@@ -53,25 +56,49 @@
         }
       ];
 
-      // Load 3D Buildings
-      const buildings = await Cesium.createOsmBuildingsAsync();
-      viewer.scene.primitives.add(buildings);
-
       // 3. Define Pacific Palisades Coordinates
       const south = 34.030, north = 34.070;
       const west = -118.550, east = -118.500;
 
-      // Fly Camera Low & Tilted to Show 3D Height
+      // 4. Load ALL 3D OSM Buildings with Realistic Varied Architectural Colors
+      const buildings = await Cesium.createOsmBuildingsAsync();
+      
+      buildings.style = new Cesium.Cesium3DTileStyle({
+        color: {
+          conditions: [
+            // Material-specific color matching
+            ['${feature["building:material"]} === "brick"', 'color("#ab4e3f")'],
+            ['${feature["building:material"]} === "wood"', 'color("#8c5a2b")'],
+            ['${feature["building:material"]} === "glass"', 'color("#6b9ac4")'],
+            ['${feature["building:material"]} === "concrete"', 'color("#cbd5e1")'],
+            
+            // Varied architectural tones by building classification
+            ['${feature["building"]} === "house"', 'color("#d5bdaf")'],
+            ['${feature["building"]} === "residential"', 'color("#e3d5ca")'],
+            ['${feature["building"]} === "detached"', 'color("#f5ebe0")'],
+            ['${feature["building"]} === "apartments"', 'color("#edede9")'],
+            ['${feature["building"]} === "commercial"', 'color("#d6ccc2")'],
+            ['${feature["building"]} === "retail"', 'color("#e2e2e2")'],
+
+            // Safe fallback tones for remaining unclassified structures
+            ['true', 'color("#ebdccb")']
+          ]
+        }
+      });
+
+      viewer.scene.primitives.add(buildings);
+
+      // Fly Camera Low & Tilted to View 3D Heights
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(-118.525, 34.025, 1200.0), // Low altitude
+        destination: Cesium.Cartesian3.fromDegrees(-118.525, 34.025, 1200.0),
         orientation: {
-          heading: Cesium.Math.toRadians(0.0),   // Pointing North
-          pitch: Cesium.Math.toRadians(-20.0),   // Low side-angle view
+          heading: Cesium.Math.toRadians(0.0),
+          pitch: Cesium.Math.toRadians(-20.0),
           roll: 0.0
         }
       });
 
-      // 4. Create 8x4 Grid Overlay
+      // 5. CREATE MACRO GRID (8 x 4 Sectors)
       const gridEntities = {};
       const latStep = (north - south) / 4;
       const lonStep = (east - west) / 8;
@@ -91,7 +118,7 @@
               material: Cesium.Color.GREEN.withAlpha(0.25),
               outline: true,
               outlineColor: Cesium.Color.WHITE,
-              height: 0 // Fits to terrain base
+              height: 2
             }
           });
         }
@@ -99,7 +126,7 @@
 
       // Set Sector 10 on Fire initially
       if (gridEntities[10]) {
-        gridEntities[10].rectangle.material = Cesium.Color.RED.withAlpha(0.6);
+        gridEntities[10].rectangle.material = Cesium.Color.RED.withAlpha(0.5);
       }
 
       // Action Handler
@@ -116,7 +143,7 @@
         }
       };
 
-      // Poll Python Server for Incoming RL Model Decisions
+      // Poll Python Server for Incoming RL Actions
       setInterval(async () => {
         try {
           const res = await fetch('/get_latest_action');
