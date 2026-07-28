@@ -126,6 +126,92 @@ def run_episode(env, episode_seed, scenario="single"):
     }
 
 
+def check_multi_station_dispatch(env):
+    """Validates the v2 multi-station roster/routing/dispatch restructure
+    (real_depots.json expanded from 4 flat depots to 6 per-station
+    rosters; _prepare_routing()/_try_dispatch() rewritten for per-station
+    Dijkstra trees + nearest-available-unit-across-stations). Three checks:
+    (a) a station whose roster doesn't carry a given type never contributes
+        a unit of that type; (b) nearest-available-across-stations
+        genuinely picks the closer station's unit, not just the first one
+        found; (c) total available units per type at reset() matches the
+        real roster totals from real_depots.json. Returns a list of issue
+        strings (empty if everything checks out)."""
+    issues = []
+    obs = env.reset(seed=999)  # noqa: F841 -- reset() call is the point, not its return value
+
+    # (a) roster/unit-construction correctness: every unit of type rtype must
+    # belong to a station whose real roster actually lists rtype.
+    for rtype in RESOURCE_TYPES:
+        carriers = set(env._stations_by_type.get(rtype, []))
+        for unit in env.resources[rtype]:
+            if unit["station_id"] not in carriers:
+                issues.append(
+                    f"(a) FAIL: a {rtype} unit is attributed to station {unit['station_id']!r}, "
+                    f"which does not carry {rtype} in its real_depots.json roster"
+                )
+    if not any(i.startswith("(a)") for i in issues):
+        print("(a) PASS: every resource unit belongs to a station whose real roster carries that type "
+              "(no phantom units at stations lacking the type).")
+
+    # (b) nearest-available-across-stations: find a type carried by 2+ stations
+    # and a zone where those stations' travel times genuinely differ, then
+    # confirm _try_dispatch() picks the closer one, not just the first in list order.
+    checked_b = False
+    for rtype in RESOURCE_TYPES:
+        station_ids = env._stations_by_type.get(rtype, [])
+        if len(station_ids) < 2:
+            continue
+        for zone_id in range(env.n_zones):
+            per_station = {
+                sid: env._station_travel_time_s[sid][zone_id]
+                for sid in station_ids
+                if math.isfinite(env._station_travel_time_s[sid][zone_id])
+            }
+            if len(per_station) < 2 or len(set(per_station.values())) < 2:
+                continue  # need >=2 reachable stations with genuinely different travel times
+            expected_station, expected_travel_s = min(per_station.items(), key=lambda kv: kv[1])
+
+            env.reset(seed=999)  # fresh, all units idle
+            result = env._try_dispatch(rtype, zone_id)
+            checked_b = True
+            if result["status"] != "dispatched":
+                issues.append(f"(b) FAIL: expected a dispatch for {rtype}->zone {zone_id}, got {result['status']}")
+            elif result["station_id"] != expected_station:
+                issues.append(
+                    f"(b) FAIL: {rtype}->zone {zone_id} dispatched from station {result['station_id']!r} "
+                    f"(travel={result['travel_time_s']:.0f}s) but station {expected_station!r} "
+                    f"(travel={expected_travel_s:.0f}s) was genuinely closer and had an idle unit"
+                )
+            else:
+                print(f"(b) PASS: {rtype}->zone {zone_id} correctly dispatched from the nearer station "
+                      f"{expected_station!r} ({expected_travel_s:.0f}s) over {len(per_station) - 1} "
+                      f"farther alternative(s).")
+            break
+        if checked_b:
+            break
+    if not checked_b:
+        issues.append("(b) INCONCLUSIVE: no (multi-station type, zone) pair with genuinely differing "
+                       "reachable travel times was found -- could not exercise nearest-station selection.")
+
+    # (c) total available units per type at reset() matches real_depots.json's roster totals.
+    env.reset(seed=999)
+    expected_totals = {"water_team": 3, "trench_crew": 4, "rescue_vehicle": 3, "helicopter": 5}
+    for rtype in RESOURCE_TYPES:
+        n_available = sum(1 for u in env.resources[rtype] if u["state"] == "available")
+        if n_available != RESOURCE_COUNTS[rtype]:
+            issues.append(f"(c) FAIL: {rtype} has {n_available} available units at reset, "
+                           f"expected RESOURCE_COUNTS[{rtype!r}]={RESOURCE_COUNTS[rtype]}")
+        if n_available != expected_totals[rtype]:
+            issues.append(f"(c) FAIL: {rtype} has {n_available} available units at reset, "
+                           f"expected the sanity-checked real total {expected_totals[rtype]}")
+    if not any(i.startswith("(c)") for i in issues):
+        print(f"(c) PASS: available units at reset() match real_depots.json roster totals: "
+              f"{ {rtype: RESOURCE_COUNTS[rtype] for rtype in RESOURCE_TYPES} }")
+
+    return issues
+
+
 def check_resources_recover(availability_snapshots):
     """Did every resource type return to full availability at least once
     after having been reduced below full?"""
@@ -148,12 +234,18 @@ def main():
     env_init_s = time.perf_counter() - t0
     print(f"Env init time: {env_init_s:.2f}s")
     print(f"Zones: {env.n_zones}")
+    stations_by_name = {s["station_id"]: s["station_name"] for s in env.stations}
     for rtype in RESOURCE_TYPES:
         times = env.zone_travel_time_s[rtype]
         finite = [t for t in times if math.isfinite(t)]
-        print(f"  {rtype:15s} depot={env.depots[rtype]['station_name']:45s} "
-              f"travel times (s): min={min(finite):.0f}  max={max(finite):.0f}  "
+        station_names = ", ".join(stations_by_name[sid] for sid in env._stations_by_type.get(rtype, []))
+        print(f"  {rtype:15s} stations=[{station_names}]")
+        print(f"      best-case travel times (s): min={min(finite):.0f}  max={max(finite):.0f}  "
               f"unreachable={sum(1 for t in times if not math.isfinite(t))}")
+    print()
+
+    print("=== Multi-station roster/routing/dispatch checks ===")
+    multi_station_issues = check_multi_station_dispatch(env)
     print()
 
     all_results = []
@@ -202,7 +294,7 @@ def main():
 
     # --- Sanity / anomaly checks ----------------------------------------------
     print("=== Sanity checks ===")
-    issues = []
+    issues = list(multi_station_issues)
 
     n_contained = sum(1 for r in all_results if r["contained"])
     print(f"Episodes fully contained by random luck: {n_contained}/{N_EPISODES}")

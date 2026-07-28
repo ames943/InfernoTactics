@@ -1,0 +1,127 @@
+[train-multi-v4] dry run / smoke test: 40 episodes, initial device=mps, reward_shaping=off (SHAPING_COEFF=0.02), GAE(lambda=0.95, gamma=0.99), PPO(epochs=1, minibatch=16, clip_eps=0.2)
+[train-multi-v4] Building InfernoEnv...
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[train-multi-v4] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints/best.pt (original single-scenario best.pt, ep 260) -- all layers loaded unchanged except mlp.net.0.weight, which gained one zero-initialized column for the anchor-identity flag (N_SCALARS=9, was 8) -- see ANCHOR_FLAG_DIM docstring for why.
+    [ppo-kl] ep 1: approx_KL before epoch 1 = 0.00000  final = 0.05446  entropy=4.45988  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(165,455)  n_ticks=150  timeout=True  other_grad_norm=22187.5
+    [ppo-kl] ep 2: approx_KL before epoch 1 = 0.00000  final = 0.00214  entropy=4.26181  epochs_run=1 minibatches_run=1  ignition=(289,332)  n_ticks=5  timeout=False  other_grad_norm=112.6
+    [ppo-kl] ep 3: approx_KL before epoch 1 = 0.00000  final = 0.04380  entropy=4.28681  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(118,388)  n_ticks=150  timeout=True  other_grad_norm=3024.9
+    [ppo-kl] ep 4: approx_KL before epoch 1 = 0.00000  final = 0.03445  entropy=4.25820  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(224,433)  n_ticks=150  timeout=True  other_grad_norm=7700.0
+    [ppo-kl] ep 5: approx_KL before epoch 1 = 0.00000  final = 0.05309  entropy=4.19193  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(247,478)  n_ticks=51  timeout=False  other_grad_norm=1505.1
+    [ppo-kl] ep 6: approx_KL before epoch 1 = 0.00000  final = 0.13220  entropy=3.66976  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(285,419)  n_ticks=7  timeout=False  other_grad_norm=199.7
+    [ppo-kl] ep 7: approx_KL before epoch 1 = 0.00000  final = 0.08864  entropy=3.39087  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=20107.3
+    [ppo-kl] ep 8: approx_KL before epoch 1 = 0.00000  final = 0.10128  entropy=2.92261  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(290,529)  n_ticks=150  timeout=True  other_grad_norm=28204.9
+    [ppo-kl] ep 9: approx_KL before epoch 1 = 0.00000  final = 0.04895  entropy=2.46728  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(87,502)  n_ticks=150  timeout=True  other_grad_norm=35723.9
+    [ppo-kl] ep 10: approx_KL before epoch 1 = 0.00000  final = 0.03655  entropy=2.25335  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(99,470)  n_ticks=150  timeout=True  other_grad_norm=26509.4
+    [eval @ ep 10] (train     ) single_training: avg_reward=-119952.2  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -90541.3 (heuristic: -29410.9)
+    [eval @ ep 10] (train     ) topanga_ridge: avg_reward=-9928.2  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -4897.7 (heuristic: -5030.5)
+    [eval @ ep 10] (train     ) sullivan_canyon: avg_reward=-47707.5  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -42188.0 (heuristic: -5519.5)
+    [eval @ ep 10] (train     ) stone_canyon: avg_reward=-120943.9  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -120643.6 (heuristic: -300.3)
+    [eval @ ep 10] (VALIDATION) mandeville_canyon: avg_reward=-17982.2  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18012.7 (heuristic: 30.5)
+    [eval @ ep 10] (VALIDATION) getty_view_park: avg_reward=-81869.5  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81915.6 (heuristic: 46.1)
+    [eval @ ep 10] combined avg reward across all 6 scenarios: -66397.3
+  [checkpoint] new best combined-avg eval reward (-66397.3) at ep 10 -- saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/best.pt
+    [ppo-kl] ep 11: approx_KL before epoch 1 = 0.00000  final = 0.07870  entropy=1.63635  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(256,468)  n_ticks=8  timeout=False  other_grad_norm=17024.0
+    [ppo-kl] ep 12: approx_KL before epoch 1 = 0.00000  final = 0.06561  entropy=1.44992  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(97,451)  n_ticks=150  timeout=True  other_grad_norm=31006.9
+    [ppo-kl] ep 13: approx_KL before epoch 1 = 0.00000  final = 0.07325  entropy=1.13282  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(109,453)  n_ticks=150  timeout=True  other_grad_norm=75004.3
+    [ppo-kl] ep 14: approx_KL before epoch 1 = 0.00000  final = 0.05122  entropy=0.64427  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=58938.2
+    [ppo-kl] ep 15: approx_KL before epoch 1 = 0.00000  final = 0.05310  entropy=0.38926  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(186,544)  n_ticks=150  timeout=True  other_grad_norm=35480.5
+    [ppo-kl] ep 16: approx_KL before epoch 1 = 0.00000  final = -0.01493  entropy=0.18780  epochs_run=1 minibatches_run=1  ignition=(307,470)  n_ticks=7  timeout=False  other_grad_norm=158748.3
+    [ppo-kl] ep 17: approx_KL before epoch 1 = 0.00000  final = -0.00249  entropy=0.09075  epochs_run=1 minibatches_run=3  ignition=(301,427)  n_ticks=37  timeout=False  other_grad_norm=101574.9
+    [ppo-kl] ep 18: approx_KL before epoch 1 = 0.00000  final = 0.01892  entropy=0.10930  epochs_run=1 minibatches_run=10  ignition=(182,455)  n_ticks=150  timeout=True  other_grad_norm=6543.8
+    [ppo-kl] ep 19: approx_KL before epoch 1 = 0.00000  final = 0.03325  entropy=0.22761  epochs_run=0 minibatches_run=9  EARLY-STOPPED after 9 minibatch(es) (epoch 1, reason=kl)  ignition=(58,475)  n_ticks=150  timeout=True  other_grad_norm=13876.1
+    [ppo-kl] ep 20: approx_KL before epoch 1 = 0.00000  final = 0.04171  entropy=0.32244  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(177,511)  n_ticks=150  timeout=True  other_grad_norm=25932.0
+[status @ ep    20/40] episodes/min(last20)=  5.00  avg_reward(last20)=  -84536.4  entropy=0.322  policy_loss=   0.376  value_loss=  17.430  class_loss=0.037  reward_scale_std=834.69  value_grad_norm=8364.4  other_grad_norm=25932.0  device=mps
+    [anchor-flag probe] resource_logits(flag=0)=[-0.187, 0.988, 1.046, 0.472]  resource_logits(flag=1)=[-0.187, 0.988, 1.046, 0.472]  max_abs_diff=0.0001
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/episode_0020.pt (and latest.pt, resume_state.pt)
+    [eval @ ep 20] (train     ) single_training: avg_reward=-119980.9  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -90570.0 (heuristic: -29410.9)
+    [eval @ ep 20] (train     ) topanga_ridge: avg_reward=-9956.9  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -4926.4 (heuristic: -5030.5)
+    [eval @ ep 20] (train     ) sullivan_canyon: avg_reward=-47736.2  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -42216.7 (heuristic: -5519.5)
+    [eval @ ep 20] (train     ) stone_canyon: avg_reward=-120972.6  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -120672.3 (heuristic: -300.3)
+    [eval @ ep 20] (VALIDATION) mandeville_canyon: avg_reward=-18010.9  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18041.4 (heuristic: 30.5)
+    [eval @ ep 20] (VALIDATION) getty_view_park: avg_reward=-81898.2  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81944.3 (heuristic: 46.1)
+    [eval @ ep 20] combined avg reward across all 6 scenarios: -66426.0
+    [grad-norm SPIKE] ep 21: other_grad_norm=161539.0 vs recent median=26509.4 (6.1x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 21: approx_KL before epoch 1 = 0.00000  final = 0.04963  entropy=0.56987  epochs_run=0 minibatches_run=1  EARLY-STOPPED after 1 minibatch(es) (epoch 1, reason=kl)  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=161539.0
+    [ppo-kl] ep 22: approx_KL before epoch 1 = 0.00000  final = 0.10129  entropy=0.79873  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(101,98)  n_ticks=150  timeout=True  other_grad_norm=81393.5
+    [ppo-kl] ep 23: approx_KL before epoch 1 = 0.00000  final = 0.06391  entropy=1.02654  epochs_run=0 minibatches_run=4  EARLY-STOPPED after 4 minibatch(es) (epoch 1, reason=kl)  ignition=(35,541)  n_ticks=150  timeout=True  other_grad_norm=24464.1
+    [ppo-kl] ep 24: approx_KL before epoch 1 = 0.00000  final = 0.06745  entropy=0.65261  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(235,321)  n_ticks=150  timeout=True  other_grad_norm=8010.7
+    [grad-norm SPIKE] ep 25: other_grad_norm=299065.2 vs recent median=31006.9 (9.6x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 25: approx_KL before epoch 1 = 0.00000  final = -0.01690  entropy=0.45833  epochs_run=1 minibatches_run=1  ignition=(314,380)  n_ticks=9  timeout=False  other_grad_norm=299065.2
+    [ppo-kl] ep 26: approx_KL before epoch 1 = 0.00000  final = 0.03992  entropy=0.41622  epochs_run=0 minibatches_run=2  EARLY-STOPPED after 2 minibatch(es) (epoch 1, reason=kl)  ignition=(73,445)  n_ticks=150  timeout=True  other_grad_norm=24906.1
+    [grad-norm SPIKE] ep 27: other_grad_norm=220578.1 vs recent median=35480.5 (6.2x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 27: approx_KL before epoch 1 = 0.00000  final = -0.00065  entropy=0.25481  epochs_run=1 minibatches_run=2  ignition=(3,480)  n_ticks=28  timeout=False  other_grad_norm=220578.1
+    [ppo-kl] ep 28: approx_KL before epoch 1 = 0.00000  final = 0.04780  entropy=0.26620  epochs_run=0 minibatches_run=7  EARLY-STOPPED after 7 minibatch(es) (epoch 1, reason=kl)  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=12036.4
+    [grad-norm SPIKE] ep 29: other_grad_norm=256738.6 vs recent median=35480.5 (7.2x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 29: approx_KL before epoch 1 = 0.00000  final = 0.03122  entropy=0.09552  epochs_run=0 minibatches_run=5  EARLY-STOPPED after 5 minibatch(es) (epoch 1, reason=kl)  ignition=(269,234)  n_ticks=150  timeout=True  other_grad_norm=256738.6
+    [ppo-kl] ep 30: approx_KL before epoch 1 = 0.00000  final = 0.00714  entropy=0.04550  epochs_run=1 minibatches_run=10  ignition=(156,170)  n_ticks=150  timeout=True  other_grad_norm=12698.7
+    [eval @ ep 30] (train     ) single_training: avg_reward=-119980.9  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -90570.0 (heuristic: -29410.9)
+    [eval @ ep 30] (train     ) topanga_ridge: avg_reward=-9956.9  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -4926.4 (heuristic: -5030.5)
+    [eval @ ep 30] (train     ) sullivan_canyon: avg_reward=-47736.2  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -42216.7 (heuristic: -5519.5)
+    [eval @ ep 30] (train     ) stone_canyon: avg_reward=-120972.6  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -120672.3 (heuristic: -300.3)
+    [eval @ ep 30] (VALIDATION) mandeville_canyon: avg_reward=-18010.9  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18041.4 (heuristic: 30.5)
+    [eval @ ep 30] (VALIDATION) getty_view_park: avg_reward=-81898.2  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81944.3 (heuristic: 46.1)
+    [eval @ ep 30] combined avg reward across all 6 scenarios: -66426.0
+    [ppo-kl] ep 31: approx_KL before epoch 1 = 0.00000  final = 0.00058  entropy=0.04391  epochs_run=1 minibatches_run=10  ignition=(152,378)  n_ticks=150  timeout=True  other_grad_norm=63397.6
+    [ppo-kl] ep 32: approx_KL before epoch 1 = 0.00000  final = 0.00189  entropy=0.03059  epochs_run=1 minibatches_run=3  ignition=(190,207)  n_ticks=33  timeout=False  other_grad_norm=9401.8
+    [ppo-kl] ep 33: approx_KL before epoch 1 = 0.00000  final = 0.03503  entropy=0.10150  epochs_run=0 minibatches_run=10  EARLY-STOPPED after 10 minibatch(es) (epoch 1, reason=kl)  ignition=(34,579)  n_ticks=150  timeout=True  other_grad_norm=11763.4
+    [grad-norm SPIKE] ep 34: other_grad_norm=212751.5 vs recent median=35480.5 (6.0x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 34: approx_KL before epoch 1 = 0.00000  final = 0.00214  entropy=0.06520  epochs_run=1 minibatches_run=1  ignition=(22,451)  n_ticks=5  timeout=False  other_grad_norm=212751.5
+    [ppo-kl] ep 35: approx_KL before epoch 1 = 0.00000  final = 0.00581  entropy=0.03335  epochs_run=1 minibatches_run=10  ignition=(207,222)  n_ticks=150  timeout=True  [ANCHOR REPLAY]  other_grad_norm=8244.4
+    [grad-norm SPIKE] ep 36: other_grad_norm=482161.6 vs recent median=25932.0 (18.6x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 36: approx_KL before epoch 1 = 0.00000  final = 0.00275  entropy=0.03437  epochs_run=1 minibatches_run=1  ignition=(309,274)  n_ticks=15  timeout=False  other_grad_norm=482161.6
+    [grad-norm SPIKE] ep 37: other_grad_norm=189421.9 vs recent median=25932.0 (7.3x) -- watch next few episodes' entropy closely
+    [ppo-kl] ep 37: approx_KL before epoch 1 = 0.00000  final = 0.01385  entropy=0.05959  epochs_run=1 minibatches_run=2  ignition=(291,504)  n_ticks=27  timeout=False  other_grad_norm=189421.9
+    [ppo-kl] ep 38: approx_KL before epoch 1 = 0.00000  final = 0.00175  entropy=0.14181  epochs_run=1 minibatches_run=10  ignition=(230,222)  n_ticks=150  timeout=True  other_grad_norm=11558.5
+    [ppo-kl] ep 39: approx_KL before epoch 1 = 0.00000  final = -0.00028  entropy=0.01900  epochs_run=1 minibatches_run=10  ignition=(218,191)  n_ticks=150  timeout=True  other_grad_norm=2972.7
+    [ppo-kl] ep 40: approx_KL before epoch 1 = 0.00000  final = -0.02628  entropy=0.05214  epochs_run=1 minibatches_run=7  ignition=(238,531)  n_ticks=102  timeout=False  other_grad_norm=61120.1
+[status @ ep    40/40] episodes/min(last20)=  3.53  avg_reward(last20)=  -70763.0  entropy=0.052  policy_loss=   0.000  value_loss= 668.111  class_loss=0.017  reward_scale_std=827.76  value_grad_norm=21315.7  other_grad_norm=61120.1  device=mps
+    [anchor-flag probe] resource_logits(flag=0)=[-0.133, 0.75, 0.867, 0.334]  resource_logits(flag=1)=[-0.133, 0.75, 0.867, 0.333]  max_abs_diff=0.0001
+  [checkpoint] saved /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/episode_0040.pt (and latest.pt, resume_state.pt)
+    [eval @ ep 40] (train     ) single_training: avg_reward=-119980.9  avg_buildings_destroyed=391.3  containment_rate=0%  |  vs heuristic: -90570.0 (heuristic: -29410.9)
+    [eval @ ep 40] (train     ) topanga_ridge: avg_reward=-9956.9  avg_buildings_destroyed=31.7  containment_rate=0%  |  vs heuristic: -4926.4 (heuristic: -5030.5)
+    [eval @ ep 40] (train     ) sullivan_canyon: avg_reward=-47736.2  avg_buildings_destroyed=175.0  containment_rate=0%  |  vs heuristic: -42216.7 (heuristic: -5519.5)
+    [eval @ ep 40] (train     ) stone_canyon: avg_reward=-120972.6  avg_buildings_destroyed=417.3  containment_rate=0%  |  vs heuristic: -120672.3 (heuristic: -300.3)
+    [eval @ ep 40] (VALIDATION) mandeville_canyon: avg_reward=-18010.9  avg_buildings_destroyed=67.3  containment_rate=0%  |  vs heuristic: -18041.4 (heuristic: 30.5)
+    [eval @ ep 40] (VALIDATION) getty_view_park: avg_reward=-81898.2  avg_buildings_destroyed=276.0  containment_rate=0%  |  vs heuristic: -81944.3 (heuristic: 46.1)
+    [eval @ ep 40] combined avg reward across all 6 scenarios: -66426.0
+
+=== Multi-ignition v4 (GAE + multi-epoch PPO + continuous ignition) summary (completed all 40 episodes) ===
+Total wall time: 579.6s  Overall episodes/min: 4.14
+Policy loss: moved (range -0.574 to 0.407)
+Value loss: moved (range 1.08 to 3.32e+03)
+Classification loss: moved (range 0.0013 to 0.341)
+Entropy: moved (range 0.019 to 4.46)
+Final reward_scale_normalizer: mean=-708.48 std=827.76 n=4384
+Early-stopping: triggered in 24/40 episodes (60%), average stop after 2.6 minibatch(es)  -- by reason: {'kl': 24}  (KL_threshold=0.03, ENTROPY_FLOOR=0.005)
+single_training eval-reward trajectory across the run (watch for mid-run collapse, not just the final number -- warm-started value was +32.1, 100% containment):
+  ep    10: avg_reward=-119952.2
+  ep    20: avg_reward=-119980.9
+  ep    30: avg_reward=-119980.9
+  ep    40: avg_reward=-119980.9
+Ignition variety check: 36 unique points sampled out of 40 episodes; distance-to-nearest-named-point (grid cells): min=0.0 mean=78.2 max=172.2
+Stochastic rollout reward (raw, unshaped), first->last episode: -130780.9 -> -55859.7
+Stochastic rollout reward, mean first 20 vs last 20: -84536.4 vs -70763.0
+Final deterministic eval (all 6 scenarios) vs heuristic baseline:
+  (train     ) single_training: avg_reward=-119980.9  avg_buildings_destroyed=391.3  containment_rate=0%
+    heuristic:   avg_reward=-29410.9  avg_buildings_destroyed=98.4  containment_rate=80%  (delta: -90570.0)
+  (train     ) topanga_ridge: avg_reward=-9956.9  avg_buildings_destroyed=31.7  containment_rate=0%
+    heuristic:   avg_reward=-5030.5  avg_buildings_destroyed=18.6  containment_rate=80%  (delta: -4926.4)
+  (train     ) sullivan_canyon: avg_reward=-47736.2  avg_buildings_destroyed=175.0  containment_rate=0%
+    heuristic:   avg_reward=-5519.5  avg_buildings_destroyed=22.0  containment_rate=80%  (delta: -42216.7)
+  (train     ) stone_canyon: avg_reward=-120972.6  avg_buildings_destroyed=417.3  containment_rate=0%
+    heuristic:   avg_reward=-300.3  avg_buildings_destroyed=1.0  containment_rate=100%  (delta: -120672.3)
+  (VALIDATION) mandeville_canyon: avg_reward=-18010.9  avg_buildings_destroyed=67.3  containment_rate=0%
+    heuristic:   avg_reward=30.5  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -18041.4)
+  (VALIDATION) getty_view_park: avg_reward=-81898.2  avg_buildings_destroyed=276.0  containment_rate=0%
+    heuristic:   avg_reward=46.1  avg_buildings_destroyed=0.0  containment_rate=100%  (delta: -81944.3)
+Best checkpoint: ep 10, combined avg eval reward = -66397.3 -> /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/best.pt
+MPS errors encountered: none
+Final device: mps
+Latest checkpoint: /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_multi_v4/latest.pt

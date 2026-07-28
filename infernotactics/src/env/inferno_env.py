@@ -19,15 +19,27 @@ action = (resource_type, target_zone) where:
     real travel time -- it does not change what the CNN branch sees, which
     is still the full-resolution grid.
 
-Each resource type dispatches from its own real, fixed LAFD depot (see
-data_pipeline/real_depots.json) rather than one shared depot. The three
-ground types (water_team, trench_crew, rescue_vehicle) travel via the real
-road graph, exactly as before. helicopter is the odd one out: it has no
-road route at all -- travel time is straight-line distance from LAFD Air
-Operations (Van Nuys Airport) to the target divided by a fixed cruise
-speed (HELICOPTER_SPEED_MPS). That is its real advantage (it can reach
-zones the road graph can't, e.g. the 1 zone flagged unreachable for ground
-units), traded off against a small fixed roster and a long reload period
+Resources dispatch from a real, multi-station LAFD roster (see
+data_pipeline/real_depots.json) -- each real station carries its own roster
+across possibly multiple resource types (e.g. Station 19/Brentwood carries
+both a real Engine and a real Brush Patrol unit), and a resource type can
+exist at more than one station (e.g. water_team units at both Station 69
+and Station 37), matching how LAFD actually pools units across stations
+during a real incident rather than one station being "the" source for a
+resource category city-wide. _try_dispatch() picks the nearest AVAILABLE
+unit of the requested type across every station that carries it -- real
+"nearest unit of type X," not a fixed single depot. Station selection is
+automatic/internal to dispatch, not part of the action space: the agent
+still only ever picks (resource_type, target_zone), exactly as before.
+
+The three ground types (water_team, trench_crew, rescue_vehicle) travel via
+the real road graph, one Dijkstra tree per STATION (not per type -- a
+station's tree is reused for every resource type in its roster). helicopter
+is the odd one out: its one station (Air Operations, Van Nuys) has no road
+route at all -- travel time is straight-line distance to the target divided
+by a fixed cruise speed (HELICOPTER_SPEED_MPS). That is its real advantage
+(it can reach zones the road graph can't, e.g. the 1 zone flagged
+unreachable for ground units), traded off against a long reload period
 after each drop (HELICOPTER_RELOAD_TICKS, a round trip back to Van Nuys to
 refill retardant/water -- longer than the ground units' post-arrival
 DEPLOYED_BUSY_TICKS) -- a helicopter is not simply a strictly-better ground
@@ -200,7 +212,44 @@ MULTI_IGNITION_TRAINING_SCENARIO = [
 ]
 
 # --- Resources ---------------------------------------------------------------
-RESOURCE_COUNTS = {"water_team": 3, "trench_crew": 3, "rescue_vehicle": 3, "helicopter": 2}
+def _load_real_stations(path=None):
+    """Load the real multi-station LAFD depot roster (see
+    data_pipeline/real_depots.json for sourcing notes -- each station's
+    roster of resource types is grounded in the LAFD Fire Station
+    Directory, not assumed) into a list of station dicts, each with a
+    'roster' {resource_type: count}. Called once at MODULE level below
+    (not just lazily inside InfernoEnv._prepare_routing(), unlike the old
+    single-depot version) because RESOURCE_COUNTS/RESOURCE_TYPES are
+    themselves derived from it and need to exist before other modules'
+    own `from env.inferno_env import RESOURCE_TYPES` resolves at THEIR
+    import time (e.g. train/eval.py, train/heuristic_policy.py)."""
+    with open(path or REAL_DEPOTS_PATH) as f:
+        return json.load(f)["stations"]
+
+
+_REAL_STATIONS = _load_real_stations()  # module-level load, ONLY for computing the constants below
+
+RESOURCE_TYPE_ORDER = ("water_team", "trench_crew", "rescue_vehicle", "helicopter")
+
+
+def _compute_resource_counts(stations):
+    """Total units per resource type across all stations' rosters -- the
+    real, multi-station replacement for the old one-depot-per-type flat
+    RESOURCE_COUNTS constant (was a hardcoded {"water_team": 3, ...} literal;
+    now derived from real_depots.json so the two can't drift out of sync).
+    Order fixed by RESOURCE_TYPE_ORDER (not real_depots.json's station-list
+    order) so RESOURCE_TYPES below doesn't silently depend on JSON
+    ordering."""
+    counts = {rtype: 0 for rtype in RESOURCE_TYPE_ORDER}
+    for station in stations:
+        for rtype, n in station["roster"].items():
+            counts[rtype] += n
+    missing = {rtype for rtype, n in counts.items() if n == 0}
+    assert not missing, f"real_depots.json has no station carrying {missing}"
+    return counts
+
+
+RESOURCE_COUNTS = _compute_resource_counts(_REAL_STATIONS)
 RESOURCE_TYPES = tuple(RESOURCE_COUNTS)
 GROUND_RESOURCE_TYPES = ("water_team", "trench_crew", "rescue_vehicle")  # dispatch via road-graph routing
 AIR_RESOURCE_TYPES = ("helicopter",)  # dispatch via straight-line distance, no road graph
@@ -425,8 +474,12 @@ def _near_building_mask(building_present, radius):
     return total > 0
 
 
-def _new_resource_unit():
-    return {"state": "available", "remaining_ticks": 0, "target_zone": None}
+def _new_resource_unit(station_id):
+    """station_id: which real station this unit's roster slot belongs to
+    -- fixed for the unit's lifetime (a unit always returns to and
+    redispatches from its own home station), used by _try_dispatch() to
+    look up this specific unit's travel time to a candidate zone."""
+    return {"state": "available", "remaining_ticks": 0, "target_zone": None, "station_id": station_id}
 
 
 def _build_zones(grid_static, meta, zone_size_cells=ZONE_SIZE_CELLS):
@@ -465,17 +518,6 @@ def _load_routing_graph(grid_crs):
     graph = ox.routing.add_edge_speeds(graph)
     graph = ox.routing.add_edge_travel_times(graph)
     return graph
-
-
-def _load_real_depots(path=REAL_DEPOTS_PATH):
-    """Load the real per-resource-type LAFD depot locations (see
-    real_depots.json for sourcing notes) into {resource_type: depot_dict}."""
-    with open(path) as f:
-        depots = json.load(f)["depots"]
-    by_type = {d["resource_type"]: d for d in depots}
-    missing = set(RESOURCE_TYPES) - set(by_type)
-    assert not missing, f"real_depots.json is missing depot(s) for {missing}"
-    return by_type
 
 
 class InfernoEnv:
@@ -521,13 +563,23 @@ class InfernoEnv:
         self.ignition_points = None
 
     def _prepare_routing(self):
-        """Compute, for every resource type, a per-zone travel time in
-        seconds from that type's real depot (see real_depots.json) to each
-        zone's centroid. Ground types (GROUND_RESOURCE_TYPES) get a real
-        road-graph Dijkstra ETA per depot; helicopter (AIR_RESOURCE_TYPES)
-        gets straight-line distance / HELICOPTER_SPEED_MPS instead -- no
-        road graph involved, so it is never math.inf the way an
-        unreachable-by-road zone is for ground units."""
+        """Compute, for every STATION (v2 of this method -- was per
+        resource type), a per-zone travel time in seconds from that
+        station's real location to each zone's centroid. Road stations
+        (travel_mode='road') get a real road-graph Dijkstra ETA; the one
+        air station (travel_mode='air_straight_line', Station 114/Air
+        Operations) gets straight-line distance / HELICOPTER_SPEED_MPS
+        instead -- no road graph involved, so it is never math.inf the way
+        an unreachable-by-road zone is for ground units.
+
+        self._station_travel_time_s[station_id] holds the real per-station
+        data _try_dispatch() uses to pick the nearest available UNIT.
+        self.zone_travel_time_s[resource_type] is kept as a backward-
+        compatible per-TYPE view (the best/minimum travel time to each zone
+        across every station carrying that type) for callers that only
+        care "how fast can type X reach zone Z" -- heuristic_policy.py and
+        test_inferno_env.py's diagnostics -- without needing to know about
+        individual stations."""
         transform_coeffs = self.meta["transform"]  # (a, b, c, d, e, f), (col,row)->(x,y)
         a, b, c, d, e, f = transform_coeffs
 
@@ -544,34 +596,51 @@ class InfernoEnv:
             zone["road_node"] = int(node)
 
         transformer = Transformer.from_crs("EPSG:4326", self.meta["crs"], always_xy=True)
-        self.depots = _load_real_depots()
+        # Fresh load per instance (not the module-level _REAL_STATIONS used only to
+        # compute RESOURCE_COUNTS) so each InfernoEnv gets its own station dicts to
+        # mutate (road_node below) -- avoids sharing mutable state across instances.
+        self.stations = _load_real_stations()
+        self._stations_by_type = {}
+        for station in self.stations:
+            for rtype in station["roster"]:
+                self._stations_by_type.setdefault(rtype, []).append(station["station_id"])
 
-        self.zone_travel_time_s = {}
+        self._station_travel_time_s = {}
 
-        for rtype in GROUND_RESOURCE_TYPES:
-            depot = self.depots[rtype]
-            depot_x, depot_y = transformer.transform(depot["lon"], depot["lat"])
-            depot_node = ox.distance.nearest_nodes(self.road_graph, X=depot_x, Y=depot_y)
-            depot["road_node"] = int(depot_node)
+        for station in self.stations:
+            station_id = station["station_id"]
+            station_x, station_y = transformer.transform(station["lon"], station["lat"])
 
-            travel_times_from_depot = nx.single_source_dijkstra_path_length(
-                self.road_graph, depot_node, weight="travel_time"
+            if station["travel_mode"] == "air_straight_line":
+                self._station_travel_time_s[station_id] = [
+                    math.hypot(x - station_x, y - station_y) / HELICOPTER_SPEED_MPS for x, y in zone_xy
+                ]
+                continue
+
+            station_node = ox.distance.nearest_nodes(self.road_graph, X=station_x, Y=station_y)
+            station["road_node"] = int(station_node)
+
+            travel_times_from_station = nx.single_source_dijkstra_path_length(
+                self.road_graph, station_node, weight="travel_time"
             )
-            self.zone_travel_time_s[rtype] = [
-                travel_times_from_depot.get(int(node), math.inf) for node in zone_nodes
+            self._station_travel_time_s[station_id] = [
+                travel_times_from_station.get(int(node), math.inf) for node in zone_nodes
             ]
 
-            n_unreachable = sum(1 for t in self.zone_travel_time_s[rtype] if not math.isfinite(t))
+            n_unreachable = sum(1 for t in self._station_travel_time_s[station_id] if not math.isfinite(t))
             if n_unreachable:
                 print(f"[InfernoEnv] Warning: {n_unreachable}/{self.n_zones} zones unreachable "
-                      f"from {depot['station_name']} via the road graph "
-                      f"(dispatches there will always be wasted for {rtype}).")
+                      f"from {station['station_name']} via the road graph "
+                      f"(dispatches routed to this station specifically will be wasted there).")
 
-        heli_depot = self.depots["helicopter"]
-        heli_x, heli_y = transformer.transform(heli_depot["lon"], heli_depot["lat"])
-        self.zone_travel_time_s["helicopter"] = [
-            math.hypot(x - heli_x, y - heli_y) / HELICOPTER_SPEED_MPS for x, y in zone_xy
-        ]
+        self.zone_travel_time_s = {
+            rtype: [
+                min((self._station_travel_time_s[sid][z] for sid in self._stations_by_type.get(rtype, [])),
+                    default=math.inf)
+                for z in range(self.n_zones)
+            ]
+            for rtype in RESOURCE_TYPES
+        }
 
     # --- Episode lifecycle ---------------------------------------------------
 
@@ -625,10 +694,10 @@ class InfernoEnv:
         self.ignition_points = points
 
         self.tick_count = 0
-        self.resources = {
-            rtype: [_new_resource_unit() for _ in range(RESOURCE_COUNTS[rtype])]
-            for rtype in RESOURCE_TYPES
-        }
+        self.resources = {rtype: [] for rtype in RESOURCE_TYPES}
+        for station in self.stations:
+            for rtype, count in station["roster"].items():
+                self.resources[rtype].extend(_new_resource_unit(station["station_id"]) for _ in range(count))
         self.evacuated_cells = set()
         self._last_weather = self._weather_schedule(0)
 
@@ -654,24 +723,44 @@ class InfernoEnv:
         return resource_type, target_zone
 
     def _try_dispatch(self, resource_type, target_zone_id):
-        travel_s = self.zone_travel_time_s[resource_type][target_zone_id]
-        if not math.isfinite(travel_s):
+        """v2: picks the nearest AVAILABLE unit of resource_type across
+        EVERY station that carries it (self._stations_by_type), not the
+        first idle unit in a flat single-depot list. "zone_unreachable"
+        now means unreachable from every station carrying this type (a
+        real improvement over the old single-depot version -- a zone the
+        nearest station's road can't reach may still be reachable from a
+        second, farther station of the same type); "no_unit_available"
+        means at least one station could reach the zone but every unit
+        stationed there (or at any other reachable station of this type)
+        is currently busy."""
+        station_ids = self._stations_by_type.get(resource_type, [])
+        zone_reachable = any(
+            math.isfinite(self._station_travel_time_s[sid][target_zone_id]) for sid in station_ids
+        )
+        if not zone_reachable:
             return {"resource_type": resource_type, "target_zone": target_zone_id,
                     "status": "zone_unreachable", "reward_delta": -RESOURCE_WASTED_PENALTY}
 
         roster = self.resources[resource_type]
-        unit = next((u for u in roster if u["state"] == "available"), None)
-        if unit is None:
+        best_unit, best_travel_s = None, math.inf
+        for unit in roster:
+            if unit["state"] != "available":
+                continue
+            travel_s = self._station_travel_time_s[unit["station_id"]][target_zone_id]
+            if math.isfinite(travel_s) and travel_s < best_travel_s:
+                best_unit, best_travel_s = unit, travel_s
+
+        if best_unit is None:
             return {"resource_type": resource_type, "target_zone": target_zone_id,
                     "status": "no_unit_available", "reward_delta": -RESOURCE_WASTED_PENALTY}
 
-        eta_ticks = max(1, math.ceil(travel_s / (TICK_DURATION_MINUTES * 60.0)))
-        unit["state"] = "traveling"
-        unit["remaining_ticks"] = eta_ticks
-        unit["target_zone"] = target_zone_id
+        eta_ticks = max(1, math.ceil(best_travel_s / (TICK_DURATION_MINUTES * 60.0)))
+        best_unit["state"] = "traveling"
+        best_unit["remaining_ticks"] = eta_ticks
+        best_unit["target_zone"] = target_zone_id
         return {"resource_type": resource_type, "target_zone": target_zone_id, "status": "dispatched",
-                "travel_time_s": travel_s, "eta_ticks": eta_ticks,
-                "reward_delta": -LAMBDA_TRAVEL_TIME * travel_s}
+                "travel_time_s": best_travel_s, "eta_ticks": eta_ticks, "station_id": best_unit["station_id"],
+                "reward_delta": -LAMBDA_TRAVEL_TIME * best_travel_s}
 
     def _advance_resources(self):
         """Advance every non-available unit by one tick; apply effects for

@@ -74,7 +74,7 @@ Four changes, all requested together, all present in this file:
    once at rollout time -- the policy that actually acted -- and held fixed
    for all 4 epochs of that episode's update, so the ratio has real policy
    drift to clip against. Verified via an approximate-KL probe
-   (compute_batch_kl()) logged before epoch 1 and after every epoch: should
+   (compute_batch_kl_and_entropy()) logged before epoch 1 and after every epoch: should
    read ~0 at the very start (ratio=1 everywhere, nothing has moved yet)
    and grow monotonically-ish across epochs 1->4 within one episode's
    update, then reset back near 0 at the start of the NEXT episode's
@@ -148,7 +148,7 @@ every prior run before trusting a real one:
   - GAE correctness: src/train/test_gae.py, a hand-computed 3-step
     known-values unit test (run standalone, BEFORE the smoke test:
     `python -m src.train.test_gae`).
-  - PPO epochs actually moving the policy: compute_batch_kl()'s per-epoch
+  - PPO epochs actually moving the policy: compute_batch_kl_and_entropy()'s per-epoch
     approximate KL, logged every episode during the smoke test (see above).
   - Ignition variety: every episode's sampled (row, col) is written to
     TRAIN_LOG_PATH's ignition_row/ignition_col columns; the end-of-run
@@ -160,6 +160,18 @@ every prior run before trusting a real one:
     INFERNO_N_EPISODES=50 python -m src.train.train_actor_critic_multi_v4 # smoke test
     python -m src.train.train_actor_critic_multi_v4                      # real 500-episode run
     INFERNO_REWARD_SHAPING=1 python -m src.train.train_actor_critic_multi_v4  # with shaping toggle on
+
+TEST 1 / TEST 2 (added after epoch-count and grad-clip-magnitude sweeps both
+still collapsed -- see GRAD_CLIP_NORM's comment): two remaining single-variable
+levers, each run INDEPENDENTLY via env vars so results aren't confounded, each
+writing to its own INFERNO_RUN_TAG-suffixed checkpoint/log paths so neither
+collides with the other or with the stale, incomplete 0.05-grad-clip run
+already sitting in models/checkpoints_multi_v5/ (left untouched):
+
+    INFERNO_LEARNING_RATE=3e-5 INFERNO_N_EPISODES=50 INFERNO_RUN_TAG=lrtest \\
+        python -m src.train.train_actor_critic_multi_v4       # TEST 1: lower LR only
+    INFERNO_ADV_CLIP=1 INFERNO_N_EPISODES=50 INFERNO_RUN_TAG=advcliptest \\
+        python -m src.train.train_actor_critic_multi_v4       # TEST 2: advantage clipping only
 """
 
 import csv
@@ -196,16 +208,40 @@ from train.eval import eval_policy  # noqa: E402
 # --- Hyperparameters ----------------------------------------------------------
 N_EPISODES = int(os.environ.get("INFERNO_N_EPISODES", 500))  # bounded follow-up, not a fresh full run
 BASE_SEED = 2000
-LEARNING_RATE = 3e-4
+# INFERNO_LEARNING_RATE override for TEST 1 (see module docstring) -- default 3e-4 is the
+# value every prior v1-v5 run has used, unchanged; never varied before this test.
+LEARNING_RATE = float(os.environ.get("INFERNO_LEARNING_RATE", 3e-4))
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
-PPO_EPOCHS = 4
+PPO_EPOCHS = 1
 PPO_CLIP_EPS = 0.2
 MINIBATCH_SIZE = 16  # ticks per gradient step -- see module docstring's memory-footprint rationale (inherited from v1)
 VALUE_LOSS_COEFF = 0.5
 CLASSIFICATION_LOSS_COEFF = 0.3
 ENTROPY_COEFF = 0.01
+# GRAD_CLIP_NORM back to 0.5 (the original baseline), reverted from a 10x-tighter 0.05 test.
+# That test found pre-clip other_grad_norm exceeded even the OLD 0.5 threshold in 195/195
+# episodes -- clipping was already maximally aggressive at the vector-norm level -- and
+# tightening it further collapsed FASTER and DEEPER (ep20-29 vs ep170), not slower: worse,
+# not better. This rules out clip magnitude as the lever and points at update
+# direction/Adam's per-parameter adaptivity (not bounded by vector-norm clipping) as the
+# more likely amplifier. 0.5 is the confirmed best-known baseline for both remaining tests.
 GRAD_CLIP_NORM = 0.5
+
+# Advantage-estimate clipping for TEST 2 (see module docstring): independent of
+# gradient-norm clipping, this bounds each INDIVIDUAL tick's standardized advantage
+# (mean 0, std 1 over the episode's own batch, computed in ppo_update()) before it enters
+# the surrogate loss -- rather than clipping the resulting gradient's aggregate norm AFTER
+# one extreme tick has already skewed its direction. Diagnosed collapse pattern was a
+# single high-variance trajectory producing a large, effectively unclippable-by-magnitude
+# update (Part A: no detectable pre-collapse gradient buildup, confirmed twice) -- this
+# targets that outlier tick directly at the source. ADV_CLIP_STD=3.0: for ~150 ticks/episode
+# under an approximately normal advantage distribution, ~99.7% should fall within +-3 std;
+# clipping there removes genuine tail outliers (the suspected collapse trigger) while
+# leaving the bulk of the batch's signal untouched. Off by default (INFERNO_ADV_CLIP=1 to
+# enable) so every other run/test (including TEST 1) is completely unaffected.
+ADV_CLIP_ENABLED = os.environ.get("INFERNO_ADV_CLIP", "0") == "1"
+ADV_CLIP_STD = float(os.environ.get("INFERNO_ADV_CLIP_STD", 3.0))
 
 # Real-time gradient-norm spike detection (see ENTROPY_FLOOR's docstring for the
 # ep100-103 buildup this is meant to surface earlier next time): flags when the
@@ -369,10 +405,18 @@ ANCHOR_REPLAY_EVERY_N = 7
 ANCHOR_FLAG_DIM = 1
 N_SCALARS = len(SCALAR_KEYS) + ANCHOR_FLAG_DIM
 
-CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", "checkpoints_multi_v4")
+# INFERNO_RUN_TAG (see module docstring's TEST 1/TEST 2 section): suffixes every output
+# path so independent hyperparameter tests never share a checkpoint dir / resume_state.pt /
+# log file with each other OR with the untagged default -- critically, this keeps them from
+# auto-resuming into the stale, incomplete (ep29, already-collapsing) 0.05-grad-clip run
+# still sitting in the untagged models/checkpoints_multi_v5/, which is left untouched.
+RUN_TAG = os.environ.get("INFERNO_RUN_TAG", "")
+_TAG_SUFFIX = f"_{RUN_TAG}" if RUN_TAG else ""
+
+CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", f"checkpoints_multi_v5{_TAG_SUFFIX}")
 LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
-TRAIN_LOG_PATH = os.path.join(LOG_DIR, "train_log_multi_v4.csv")
-EVAL_LOG_PATH = os.path.join(LOG_DIR, "eval_log_multi_v4.csv")
+TRAIN_LOG_PATH = os.path.join(LOG_DIR, f"train_log_multi_v5{_TAG_SUFFIX}.csv")
+EVAL_LOG_PATH = os.path.join(LOG_DIR, f"eval_log_multi_v5{_TAG_SUFFIX}.csv")
 RESUME_STATE_PATH = os.path.join(CHECKPOINT_DIR, "resume_state.pt")
 WARM_START_CKPT = os.path.join(PROJECT_ROOT, "models", "checkpoints", "best.pt")  # ORIGINAL single-scenario best (ep 260)
 
@@ -396,13 +440,21 @@ EVAL_LOG_FIELDS = [
     "avg_buildings_saved", "containment_rate",
 ]
 
+# v5: re-baselined on the frozen 8-station real_depots.json environment (water_team 3,
+# trench_crew 4, rescue_vehicle 3, helicopter 5) -- NOT the v1-v4 single-depot-per-type
+# numbers. single_training/mandeville_canyon/getty_view_park re-run via
+# heuristic_policy.py's own _run_baseline_table(); topanga_ridge/sullivan_canyon/
+# stone_canyon computed individually (5 episodes each, same settings) since
+# _run_baseline_table() only evaluates the 3-simultaneous-ignition aggregate, not
+# each MULTI_IGNITION_TRAINING_SCENARIO point on its own -- what this per-scenario
+# eval suite actually needs.
 HEURISTIC_BASELINE = {
-    "single_training": {"avg_reward": -29410.9, "avg_buildings_destroyed": 98.4, "containment_rate": 0.80},
-    "topanga_ridge": {"avg_reward": -5030.5, "avg_buildings_destroyed": 18.6, "containment_rate": 0.80},
-    "sullivan_canyon": {"avg_reward": -5519.5, "avg_buildings_destroyed": 22.0, "containment_rate": 0.80},
-    "stone_canyon": {"avg_reward": -300.3, "avg_buildings_destroyed": 1.0, "containment_rate": 1.00},
-    "mandeville_canyon": {"avg_reward": 30.5, "avg_buildings_destroyed": 0.0, "containment_rate": 1.00},
-    "getty_view_park": {"avg_reward": 46.1, "avg_buildings_destroyed": 0.0, "containment_rate": 1.00},
+    "single_training": {"avg_reward": -19082.0, "avg_buildings_destroyed": 65.2, "containment_rate": 0.80},
+    "topanga_ridge": {"avg_reward": -3446.3, "avg_buildings_destroyed": 12.8, "containment_rate": 0.80},
+    "sullivan_canyon": {"avg_reward": -7821.5, "avg_buildings_destroyed": 31.6, "containment_rate": 0.80},
+    "stone_canyon": {"avg_reward": -45379.9, "avg_buildings_destroyed": 167.0, "containment_rate": 0.60},
+    "mandeville_canyon": {"avg_reward": 49.0, "avg_buildings_destroyed": 0.0, "containment_rate": 1.00},
+    "getty_view_park": {"avg_reward": 73.6, "avg_buildings_destroyed": 0.0, "containment_rate": 1.00},
 }
 
 
@@ -432,7 +484,7 @@ def build_model(n_grid_channels, device):
     anchor-flag=1 episodes."""
     model = InfernoModel(n_grid_channels=n_grid_channels, n_scalars=N_SCALARS).to(device)
     if not os.path.exists(WARM_START_CKPT):
-        print(f"[train-multi-v4] WARNING: {WARM_START_CKPT} not found -- falling back to random init.")
+        print(f"[train-multi-v5] WARNING: {WARM_START_CKPT} not found -- falling back to random init.")
         return model
     warm_sd = torch.load(WARM_START_CKPT, map_location=device, weights_only=False)
     new_sd = model.state_dict()
@@ -443,7 +495,7 @@ def build_model(n_grid_channels, device):
         else:
             new_sd[key] = value
     model.load_state_dict(new_sd)
-    print(f"[train-multi-v4] Warm-started from {WARM_START_CKPT} (original single-scenario best.pt, ep 260) -- "
+    print(f"[train-multi-v5] Warm-started from {WARM_START_CKPT} (original single-scenario best.pt, ep 260) -- "
           f"all layers loaded unchanged except mlp.net.0.weight, which gained one zero-initialized column "
           f"for the anchor-identity flag (N_SCALARS={N_SCALARS}, was {len(SCALAR_KEYS)}) -- see ANCHOR_FLAG_DIM "
           f"docstring for why.")
@@ -608,12 +660,29 @@ def collect_rollout(env, model, device, seed, ignition_point=None):
     }
 
 
-def compute_batch_kl(model, steps, device):
-    """Approximate KL(old || new) = mean(old_log_prob - new_log_prob) over
-    the whole episode's batch, under the model's CURRENT weights. See
-    module docstring's smoke-test verification section."""
+def compute_batch_kl_and_entropy(model, steps, device):
+    """Combined KL(old || new) and mean-entropy probe over the whole
+    episode's batch, under the model's CURRENT weights -- merged from two
+    formerly-separate functions (compute_batch_kl/compute_batch_entropy)
+    that each did their OWN full forward pass over every step, i.e. every
+    minibatch's safety check was silently doing 2x the necessary compute.
+    Since KL needs new_log_prob and entropy needs the SAME distributions'
+    .entropy(), both come from one forward pass per step -- this halves
+    the dominant compute cost in ppo_update() (the per-minibatch safety
+    check re-scans the WHOLE episode, not just that minibatch, so at
+    MINIBATCH_SIZE=16 on a 150-tick episode this ran ~10x/episode; before
+    this merge that was ~3000 extra forward passes/episode against ~450
+    for rollout+training combined -- diagnostic checking, not training,
+    was the actual bottleneck). Purely a redundant-computation removal:
+    checking frequency, safety semantics, and computed values are all
+    unchanged -- see ENTROPY_FLOOR's docstring for why entropy is checked
+    at all (KL(old||new)~=0 for two near-delta-function distributions
+    pointing at the same action, even as the underlying logits keep
+    growing, so KL alone can't catch a policy that's already collapsed
+    getting more extreme)."""
     with torch.no_grad():
-        total = 0.0
+        kl_total = 0.0
+        entropy_total = 0.0
         for step in steps:
             grid_t = torch.from_numpy(step["grid"]).unsqueeze(0).to(device)
             scalars_t = torch.from_numpy(step["scalars"]).unsqueeze(0).to(device)
@@ -624,28 +693,10 @@ def compute_batch_kl(model, steps, device):
                 resource_dist.log_prob(torch.tensor(step["resource_idx"], device=device))
                 + zone_dist.log_prob(torch.tensor(step["zone_idx"], device=device))
             )
-            total += step["old_log_prob"] - new_log_prob
-    return total / len(steps)
-
-
-def compute_batch_entropy(model, steps, device):
-    """Mean (resource_type entropy + zone entropy) over the whole episode's
-    batch, under the model's CURRENT weights -- the entropy-floor
-    counterpart to compute_batch_kl(). See ENTROPY_FLOOR's docstring for
-    why KL alone can't catch this: KL(old||new) is ~0 whenever both old and
-    new are already near-delta-function distributions pointing at the same
-    action, even while the underlying logits (and thus how "collapsed" the
-    policy is) keep growing. This function measures collapse directly."""
-    with torch.no_grad():
-        total = 0.0
-        for step in steps:
-            grid_t = torch.from_numpy(step["grid"]).unsqueeze(0).to(device)
-            scalars_t = torch.from_numpy(step["scalars"]).unsqueeze(0).to(device)
-            action_logits, _, _ = model(grid_t, scalars_t)
-            resource_dist = Categorical(logits=action_logits["resource_type"][0])
-            zone_dist = Categorical(logits=action_logits["zone"][0])
-            total += float(resource_dist.entropy() + zone_dist.entropy())
-    return total / len(steps)
+            kl_total += step["old_log_prob"] - new_log_prob
+            entropy_total += float(resource_dist.entropy() + zone_dist.entropy())
+    n = len(steps)
+    return kl_total / n, entropy_total / n
 
 
 def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl, seed, grad_norm_baseline):
@@ -708,6 +759,8 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl, see
     adv_var = sum((a - adv_mean) ** 2 for a in advantages) / n
     adv_std = math.sqrt(adv_var) + 1e-8
     advantages_norm = [(a - adv_mean) / adv_std for a in advantages]
+    if ADV_CLIP_ENABLED:
+        advantages_norm = [max(-ADV_CLIP_STD, min(ADV_CLIP_STD, a)) for a in advantages_norm]
 
     value_head_params = list(model.actor_critic.value_head.parameters())
     value_head_param_ids = {id(p) for p in value_head_params}
@@ -717,10 +770,8 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl, see
     n_updates = 0
     value_grad_norm_last = other_grad_norm_last = 0.0
 
-    kl_first = compute_batch_kl(model, steps, device)
-    kl_last = kl_first
-    entropy_first = compute_batch_entropy(model, steps, device)
-    entropy_last = entropy_first
+    kl_first, entropy_first = compute_batch_kl_and_entropy(model, steps, device)
+    kl_last, entropy_last = kl_first, entropy_first
     epochs_run = 0
     minibatches_run = 0
     early_stopped = False
@@ -788,8 +839,7 @@ def ppo_update(model, optimizer, steps, advantages, returns, device, log_kl, see
             if grad_norm_baseline is not None and other_grad_norm_last > GRAD_NORM_SPIKE_MULTIPLIER * grad_norm_baseline:
                 saw_grad_norm_spike = True
 
-            kl_last = compute_batch_kl(model, steps, device)
-            entropy_last = compute_batch_entropy(model, steps, device)
+            kl_last, entropy_last = compute_batch_kl_and_entropy(model, steps, device)
             if abs(kl_last) > KL_EARLY_STOP_THRESHOLD:
                 early_stopped = True
                 stop_reason = "kl"
@@ -979,12 +1029,15 @@ def main():
 
     device = get_device()
     run_kind = "REAL TRAINING RUN" if N_EPISODES > 100 else "dry run / smoke test"
-    print(f"[train-multi-v4] {run_kind}: {N_EPISODES} episodes, initial device={device}, "
+    tag_note = f" [RUN_TAG={RUN_TAG}]" if RUN_TAG else ""
+    print(f"[train-multi-v5{tag_note}] {run_kind}: {N_EPISODES} episodes, initial device={device}, "
           f"reward_shaping={'ON' if REWARD_SHAPING_ENABLED else 'off'} (SHAPING_COEFF={SHAPING_COEFF}), "
           f"GAE(lambda={GAE_LAMBDA}, gamma={GAMMA}), PPO(epochs={PPO_EPOCHS}, "
-          f"minibatch={MINIBATCH_SIZE}, clip_eps={PPO_CLIP_EPS})")
+          f"minibatch={MINIBATCH_SIZE}, clip_eps={PPO_CLIP_EPS}), "
+          f"LEARNING_RATE={LEARNING_RATE:g}, GRAD_CLIP_NORM={GRAD_CLIP_NORM}, "
+          f"adv_clip={'ON std=' + str(ADV_CLIP_STD) if ADV_CLIP_ENABLED else 'off'}")
 
-    print("[train-multi-v4] Building InfernoEnv...")
+    print("[train-multi-v5] Building InfernoEnv...")
     env = InfernoEnv(seed=BASE_SEED)
     probe_obs = env.reset(seed=BASE_SEED)
 
@@ -1014,7 +1067,7 @@ def main():
 
     resuming = os.path.exists(RESUME_STATE_PATH)
     if resuming:
-        print(f"[train-multi-v4] Found {RESUME_STATE_PATH} -- resuming (not starting from episode 1).")
+        print(f"[train-multi-v5] Found {RESUME_STATE_PATH} -- resuming (not starting from episode 1).")
         resumed = load_resume_state(RESUME_STATE_PATH, model, optimizer, reward_scale_normalizer)
         completed_episodes = resumed["completed_episodes"]
         best_avg_eval_reward = resumed["best_avg_eval_reward"]
@@ -1023,11 +1076,11 @@ def main():
         episode_rewards = resumed["episode_rewards"]
         episode_losses = resumed["episode_losses"]
         episode_wall_times = resumed["episode_wall_times"]
-        print(f"[train-multi-v4] Resuming from episode {completed_episodes + 1}/{N_EPISODES} "
+        print(f"[train-multi-v5] Resuming from episode {completed_episodes + 1}/{N_EPISODES} "
               f"(best combined-avg eval reward so far: {best_avg_eval_reward:.1f} at ep {best_episode})")
     start_episode = completed_episodes + 1
     if start_episode > N_EPISODES:
-        print(f"[train-multi-v4] Resume state already shows {completed_episodes}/{N_EPISODES} episodes "
+        print(f"[train-multi-v5] Resume state already shows {completed_episodes}/{N_EPISODES} episodes "
               f"complete -- nothing left to do. Delete {RESUME_STATE_PATH} to force a fresh run.")
         return
 
@@ -1062,7 +1115,7 @@ def main():
                         raise
                     op_name = _extract_op_name(e)
                     mps_errors.append(op_name)
-                    print(f"[train-multi-v4] MPS op not implemented: '{op_name}' -- "
+                    print(f"[train-multi-v5] MPS op not implemented: '{op_name}' -- "
                           f"falling back to CPU for the rest of this run.")
                     device = torch.device("cpu")
                     model = model.to(device)
@@ -1167,7 +1220,7 @@ def main():
                               f"at ep {ep} -- saved {best_ckpt_path}", flush=True)
         except KeyboardInterrupt:
             interrupted = True
-            print(f"\n[train-multi-v4] Caught interrupt (Ctrl+C or SIGTERM) after episode "
+            print(f"\n[train-multi-v5] Caught interrupt (Ctrl+C or SIGTERM) after episode "
                   f"{completed_episodes}/{N_EPISODES} -- saving checkpoint + resume state before exit.")
             torch.save(model.state_dict(), latest_ckpt_path)
             save_resume_state(RESUME_STATE_PATH, model, optimizer, reward_scale_normalizer,
