@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Palisades 3D Fire Sim</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #000; }
+    #cesiumContainer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+    #ui-panel {
+      position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.85);
+      color: white; padding: 15px; font-family: Arial, sans-serif; border-radius: 8px; z-index: 10;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    button { margin-top: 10px; padding: 8px 12px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #005999; }
+  </style>
+</head>
+<body>
+  <div id="ui-panel">
+    <h3>Palisades Fire Sim (8x4 Grid)</h3>
+    <p>Status: <span id="sim-status" style="color: #00ff00;">Waiting for RL Model...</span></p>
+    <button onclick="testAction()">Simulate RL Helicopter Drop (Sector 10)</button>
+  </div>
+  
+  <div id="cesiumContainer"></div>
+
+  <script>
+    // 1. Assign Access Token
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
+
+    // 2. Initialize Cesium Globe Asynchronously
+    async function initSim() {
+      // Load 3D Terrain
+      const terrain = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+      
+      const viewer = new Cesium.Viewer('cesiumContainer', {
+        terrainProvider: terrain,
+        timeline: false,
+        animation: false,
+        baseLayerPicker: false
+      });
+
+      // Enable trackpad Ctrl + Drag tilting
+      viewer.scene.screenSpaceCameraController.tiltEventTypes = [
+        Cesium.CameraEventType.RIGHT_DRAG,
+        Cesium.CameraEventType.PINCH,
+        {
+          eventType: Cesium.CameraEventType.LEFT_DRAG,
+          modifier: Cesium.KeyboardEventModifier.CTRL
+        }
+      ];
+
+      // Load 3D Buildings
+      const buildings = await Cesium.createOsmBuildingsAsync();
+      viewer.scene.primitives.add(buildings);
+
+      // 3. Define Pacific Palisades Coordinates
+      const south = 34.030, north = 34.070;
+      const west = -118.550, east = -118.500;
+
+      // Fly Camera Low & Tilted to Show 3D Height
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-118.525, 34.025, 1200.0), // Low altitude
+        orientation: {
+          heading: Cesium.Math.toRadians(0.0),   // Pointing North
+          pitch: Cesium.Math.toRadians(-20.0),   // Low side-angle view
+          roll: 0.0
+        }
+      });
+
+      // 4. Create 8x4 Grid Overlay
+      const gridEntities = {};
+      const latStep = (north - south) / 4;
+      const lonStep = (east - west) / 8;
+
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 8; c++) {
+          const sectorId = r * 8 + c;
+          const s = south + r * latStep;
+          const n = s + latStep;
+          const w = west + c * lonStep;
+          const e = w + lonStep;
+
+          gridEntities[sectorId] = viewer.entities.add({
+            name: `Sector ${sectorId}`,
+            rectangle: {
+              coordinates: Cesium.Rectangle.fromDegrees(w, s, e, n),
+              material: Cesium.Color.GREEN.withAlpha(0.25),
+              outline: true,
+              outlineColor: Cesium.Color.WHITE,
+              height: 0 // Fits to terrain base
+            }
+          });
+        }
+      }
+
+      // Set Sector 10 on Fire initially
+      if (gridEntities[10]) {
+        gridEntities[10].rectangle.material = Cesium.Color.RED.withAlpha(0.6);
+      }
+
+      // Action Handler
+      window.applyRLAction = function(actionIdx, resourceType) {
+        const entity = gridEntities[actionIdx];
+        if (!entity) return;
+
+        if (resourceType === 'helicopter' || resourceType === 'water_team') {
+          entity.rectangle.material = Cesium.Color.BLUE.withAlpha(0.5);
+          document.getElementById('sim-status').innerText = `Helicopter deployed to Sector ${actionIdx}`;
+        } else if (resourceType === 'trench_team') {
+          entity.rectangle.material = Cesium.Color.DARKGRAY.withAlpha(0.7);
+          document.getElementById('sim-status').innerText = `Trench built in Sector ${actionIdx}`;
+        }
+      };
+
+      // Poll Python Server for Incoming RL Model Decisions
+      setInterval(async () => {
+        try {
+          const res = await fetch('/get_latest_action');
+          const data = await res.json();
+          if (data.action_idx !== undefined) {
+            window.applyRLAction(data.action_idx, data.resource_type);
+          }
+        } catch (e) {}
+      }, 500);
+    }
+
+    // Launch Simulation
+    initSim();
+
+    function testAction() {
+      if (window.applyRLAction) window.applyRLAction(10, 'helicopter');
+    }
+  </script>
+</body>
+</html>
