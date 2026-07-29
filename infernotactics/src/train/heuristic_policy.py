@@ -132,6 +132,31 @@ class HeuristicPolicy:
         zone_id = candidates[rtype][0]
         return rtype, zone_id
 
+    def decide_actions(self, grid_np, scalars_np):
+        """Return a policy-decided list of dispatches for one simulation tick.
+
+        Re-runs the existing greedy rule after each selected unit, decrementing
+        that resource's local availability. The environment still validates
+        the final list against the actual roster.
+        """
+        fire_state = grid_np[-1]
+        building_density = grid_np[LAYER_INDEX["building_density"]]
+        population_density = grid_np[LAYER_INDEX["population_density"]]
+        available = {
+            rtype: int(scalars_np[SCALAR_KEYS.index(f"{rtype}_available")])
+            for rtype in RESOURCE_TYPES
+        }
+        actions = []
+        for _ in range(sum(available.values())):
+            rtype, zone_id = self._decide(
+                fire_state, building_density, population_density, available
+            )
+            if rtype is None:
+                break
+            actions.append((rtype, zone_id))
+            available[rtype] -= 1
+        return actions
+
     def __call__(self, grid, scalars):
         """grid: (1, n_grid_channels, H, W), scalars: (1, n_scalars) -- same
         shapes InfernoModel.forward() takes. Returns (action_logits,

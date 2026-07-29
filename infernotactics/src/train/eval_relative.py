@@ -21,6 +21,7 @@ from env.inferno_env import (  # noqa: E402
 from models.relative_model import RelativeInfernoModel  # noqa: E402
 from train.relative_actions import TARGET_TYPES, decode_action  # noqa: E402
 from train.train_relative import _forward  # noqa: E402
+from train.train_relative import MAX_DISPATCH_SLOTS  # noqa: E402
 
 
 def evaluate(model, env, name, point, device, episodes):
@@ -38,26 +39,34 @@ def evaluate(model, env, name, point, device, episodes):
             episode_dispatched = collections.Counter()
             episode_max_active = collections.Counter()
             while not done:
-                logits, _value, _classification, target_zones = _forward(model, obs, env, device)
-                resource_logits = logits["resource_type"][0].clone()
-                available = torch.tensor(
-                    [obs["scalars"][f"{rtype}_available"] > 0 for rtype in RESOURCE_TYPES],
-                    dtype=torch.bool,
-                    device=device,
-                )
-                resource_logits[~available] = -1e9
-                if bool(available.any()):
+                local_available = {
+                    rtype: int(obs["scalars"][f"{rtype}_available"])
+                    for rtype in RESOURCE_TYPES
+                }
+                tick_actions = []
+                for _ in range(MAX_DISPATCH_SLOTS):
+                    logits, _value, _classification, target_zones = _forward(model, obs, env, device)
+                    resource_logits = logits["resource_type"][0].clone()
+                    available = torch.tensor(
+                        [local_available[rtype] > 0 for rtype in RESOURCE_TYPES],
+                        dtype=torch.bool, device=device,
+                    )
+                    resource_logits[~available] = -1e9
+                    if not bool(available.any()):
+                        break
                     resource_idx = int(torch.argmax(resource_logits))
-                else:
-                    resource_idx = 0
-                target_idx = int(torch.argmax(logits["target"][0, resource_idx]))
-                action = decode_action(resource_idx, target_idx, target_zones)
-                if action is not None:
+                    target_idx = int(torch.argmax(logits["target"][0, resource_idx]))
+                    action = decode_action(resource_idx, target_idx, target_zones)
+                    if action is None:
+                        break
+                    local_available[RESOURCE_TYPES[resource_idx]] -= 1
+                    tick_actions.append(action)
                     actions[(RESOURCE_TYPES[resource_idx], TARGET_TYPES[target_idx])] += 1
-                obs, reward, done, info = env.step(action)
+                obs, reward, done, info = env.step(tick_actions)
                 dispatch = info.get("dispatch") or {}
-                if dispatch.get("status") == "dispatched":
-                    episode_dispatched[dispatch["resource_type"]] += 1
+                for dispatch_item in dispatch:
+                    if dispatch_item.get("status") == "dispatched":
+                        episode_dispatched[dispatch_item["resource_type"]] += 1
                 for rtype in RESOURCE_TYPES:
                     active = sum(unit["state"] != "available" for unit in env.resources[rtype])
                     episode_max_active[rtype] = max(episode_max_active[rtype], active)
