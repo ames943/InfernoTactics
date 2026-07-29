@@ -1,0 +1,1802 @@
+{
+  "checkpoints": [
+    500,
+    525,
+    550,
+    575,
+    600,
+    625,
+    650,
+    675,
+    700,
+    725,
+    750,
+    775,
+    800,
+    825,
+    850,
+    875,
+    900,
+    925,
+    950,
+    975,
+    1000,
+    1025,
+    1050,
+    1075,
+    1100,
+    1125,
+    1150,
+    1175,
+    1200,
+    1225,
+    1250,
+    1275,
+    1300,
+    1325,
+    1350,
+    1375,
+    1400,
+    1425,
+    1450,
+    1475,
+    1500,
+    1525,
+    1550,
+    1575,
+    1600,
+    1625,
+    1650,
+    1675,
+    1700,
+    1725,
+    1750,
+    1775,
+    1800,
+    1825,
+    1850,
+    1875,
+    1900,
+    1925,
+    1950,
+    1975,
+    2000
+  ],
+  "per_checkpoint": {
+    "500": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -130094.92806789481,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 447.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.5688888888888889
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -130052.5196098576
+    },
+    "525": {
+      "single_training": {
+        "avg_reward": -111445.40439852234,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 365.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5866666666666667
+      },
+      "stone_canyon": {
+        "avg_reward": -78433.8720287013,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 273.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.6222222222222222
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -189879.27642722364
+    },
+    "550": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -126133.81151076971,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 433.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.5044444444444445
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -126091.4030527325
+    },
+    "575": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -132941.12908124697,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 456.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.5288888888888889
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -132898.72062320975
+    },
+    "600": {
+      "single_training": {
+        "avg_reward": 42.67143024778719,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.9230769230769231
+      },
+      "stone_canyon": {
+        "avg_reward": -86319.2415847925,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 300.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.973293768545994
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -86276.57015454471
+    },
+    "625": {
+      "single_training": {
+        "avg_reward": -114129.58461520619,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 375.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.6177777777777778
+      },
+      "stone_canyon": {
+        "avg_reward": -72881.68484044533,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 256.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -187011.26945565152
+    },
+    "650": {
+      "single_training": {
+        "avg_reward": -120539.29487396835,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 397.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.6688888888888889
+      },
+      "stone_canyon": {
+        "avg_reward": -72881.68484044533,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 256.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -193420.9797144137
+    },
+    "675": {
+      "single_training": {
+        "avg_reward": -112767.2799318068,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 371.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.48
+      },
+      "stone_canyon": {
+        "avg_reward": -72857.2452762453,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 256.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.88
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -185624.5252080521
+    },
+    "700": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -86427.29961977217,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 300.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.9598930481283422
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -86384.89116173495
+    },
+    "725": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -128966.96963013046,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 443.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5177777777777778
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -128924.56117209325
+    },
+    "750": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -128925.72260682912,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 443.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.49333333333333335
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -128883.3141487919
+    },
+    "775": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -135010.7523249625,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 463.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.5511111111111111
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -134968.34386692528
+    },
+    "800": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -86440.103457726,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 300.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.8315508021390374
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -86397.69499968879
+    },
+    "825": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -139020.9499639898,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 477.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.36666666666666664
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -138978.5415059526
+    },
+    "850": {
+      "single_training": {
+        "avg_reward": -104240.47637353488,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 346.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.43777777777777777
+      },
+      "stone_canyon": {
+        "avg_reward": -67206.27386494477,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 237.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.72
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -171446.75023847964
+    },
+    "875": {
+      "single_training": {
+        "avg_reward": -113502.34814763849,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 373.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.5555555555555556
+      },
+      "stone_canyon": {
+        "avg_reward": -71820.04176304523,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 251.33333333333334,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5466666666666666
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -185322.38991068373
+    },
+    "900": {
+      "single_training": {
+        "avg_reward": -93605.40844776719,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 310.0,
+        "dominant_action": [
+          "water_team",
+          26
+        ],
+        "dominant_action_fraction": 0.4533333333333333
+      },
+      "stone_canyon": {
+        "avg_reward": -87257.09952799603,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 304.3333333333333,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5688888888888889
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -180862.50797576323
+    },
+    "925": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -85568.94759948218,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 297.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5508021390374331
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -85526.53914144497
+    },
+    "950": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -151188.02801044434,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 521.6666666666666,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.58
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -151145.61955240712
+    },
+    "975": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -141018.09851250125,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 487.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.6
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -140975.69005446404
+    },
+    "1000": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -127188.97865572467,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 439.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.39555555555555555
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -127146.57019768746
+    },
+    "1025": {
+      "single_training": {
+        "avg_reward": -105807.52488806285,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 349.0,
+        "dominant_action": [
+          "helicopter",
+          26
+        ],
+        "dominant_action_fraction": 0.37333333333333335
+      },
+      "stone_canyon": {
+        "avg_reward": -86102.39187039061,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 301.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5177777777777778
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -191909.91675845347
+    },
+    "1050": {
+      "single_training": {
+        "avg_reward": -120079.9821347294,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 396.0,
+        "dominant_action": [
+          "water_team",
+          26
+        ],
+        "dominant_action_fraction": 0.26666666666666666
+      },
+      "stone_canyon": {
+        "avg_reward": -89150.39828917819,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 310.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.3288888888888889
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -209230.3804239076
+    },
+    "1075": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -102783.44428557913,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 357.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5733333333333334
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -102741.03582754191
+    },
+    "1100": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -143648.19271019273,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 492.3333333333333,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.4066666666666667
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -143605.7842521555
+    },
+    "1125": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -127485.46991715075,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 441.0,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.6111111111111112
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -127443.06145911354
+    },
+    "1150": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -128925.72260682912,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 443.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.4822222222222222
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -128883.3141487919
+    },
+    "1175": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -124539.5533131926,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 430.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.4066666666666667
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -124497.14485515539
+    },
+    "1200": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -138217.8461734655,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 476.3333333333333,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.4
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -138175.4377154283
+    },
+    "1225": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -138791.12783394015,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 477.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.44
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -138748.71937590293
+    },
+    "1250": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -123809.14579314862,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 428.0,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5244444444444445
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -123766.73733511141
+    },
+    "1275": {
+      "single_training": {
+        "avg_reward": -111221.58240908704,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 366.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.29555555555555557
+      },
+      "stone_canyon": {
+        "avg_reward": -67130.15526632643,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 233.33333333333334,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.52
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -178351.7376754135
+    },
+    "1300": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -144869.2035235938,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 497.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.4066666666666667
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -144826.7950655566
+    },
+    "1325": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -117408.62166411297,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 405.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.4111111111111111
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -117366.21320607576
+    },
+    "1350": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -126155.5098974267,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 438.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.4066666666666667
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -126113.10143938949
+    },
+    "1375": {
+      "single_training": {
+        "avg_reward": -111244.39013762382,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 366.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.28444444444444444
+      },
+      "stone_canyon": {
+        "avg_reward": -37603.154181518716,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 130.66666666666666,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5527065527065527
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -148847.54431914253
+    },
+    "1400": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -123203.7407508539,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 425.3333333333333,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.4266666666666667
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -123161.33229281669
+    },
+    "1425": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -134412.0478307094,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 462.0,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.47333333333333333
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -134369.6393726722
+    },
+    "1450": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -142938.1757724672,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 492.6666666666667,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.6533333333333333
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -142895.76731442998
+    },
+    "1475": {
+      "single_training": {
+        "avg_reward": -109124.3050163496,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 359.0,
+        "dominant_action": [
+          "water_team",
+          26
+        ],
+        "dominant_action_fraction": 0.30666666666666664
+      },
+      "stone_canyon": {
+        "avg_reward": -40465.527953399345,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 140.66666666666666,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5128205128205128
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -149589.83296974894
+    },
+    "1500": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -144567.3924376522,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 499.0,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5222222222222223
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -144524.98397961498
+    },
+    "1525": {
+      "single_training": {
+        "avg_reward": -108730.00942679755,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 359.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.3688888888888889
+      },
+      "stone_canyon": {
+        "avg_reward": -74393.33043083952,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 260.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.6733333333333333
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -183123.33985763707
+    },
+    "1550": {
+      "single_training": {
+        "avg_reward": 44.24926351124822,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5384615384615384
+      },
+      "stone_canyon": {
+        "avg_reward": -43161.503340920455,
+        "containment_rate": 0.6666666666666666,
+        "avg_buildings_destroyed": 150.33333333333334,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5803921568627451
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -43117.254077409205
+    },
+    "1575": {
+      "single_training": {
+        "avg_reward": -103372.52919042064,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 339.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.2577777777777778
+      },
+      "stone_canyon": {
+        "avg_reward": -46030.576494850415,
+        "containment_rate": 0.6666666666666666,
+        "avg_buildings_destroyed": 160.33333333333334,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.5265306122448979
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -149403.10568527106
+    },
+    "1600": {
+      "single_training": {
+        "avg_reward": -102636.26834754816,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 338.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          26
+        ],
+        "dominant_action_fraction": 0.6066666666666667
+      },
+      "stone_canyon": {
+        "avg_reward": -89640.5742553418,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 312.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.4688888888888889
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -192276.84260288996
+    },
+    "1625": {
+      "single_training": {
+        "avg_reward": -103589.68537862647,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 343.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.44222222222222224
+      },
+      "stone_canyon": {
+        "avg_reward": -68160.17146415492,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 240.33333333333334,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.8333333333333334
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -171749.8568427814
+    },
+    "1650": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -86427.29961977217,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 300.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.8983957219251337
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -86384.89116173495
+    },
+    "1675": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -100812.56576200144,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 350.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.88
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -100770.15730396422
+    },
+    "1700": {
+      "single_training": {
+        "avg_reward": -102240.13478477084,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 340.3333333333333,
+        "dominant_action": [
+          "helicopter",
+          26
+        ],
+        "dominant_action_fraction": 0.3288888888888889
+      },
+      "stone_canyon": {
+        "avg_reward": -78659.24741467848,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 275.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.8511111111111112
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -180899.38219944932
+    },
+    "1725": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -124128.12660869637,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 431.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.54
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -124085.71815065916
+    },
+    "1750": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -120659.53393486528,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 416.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 0.3977777777777778
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -120617.12547682806
+    },
+    "1775": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -139582.21962784932,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 480.3333333333333,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.38666666666666666
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": false,
+      "direct_test_pass": false,
+      "combined_reward": -139539.8111698121
+    },
+    "1800": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -113024.16140003927,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 391.0,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5266666666666666
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -112981.75294200206
+    },
+    "1825": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -125477.07851076896,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 432.6666666666667,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5288888888888889
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -125434.67005273174
+    },
+    "1850": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -138031.2258977381,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 474.6666666666667,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.4888888888888889
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -137988.81743970088
+    },
+    "1875": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -125093.94516294828,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 431.6666666666667,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.5244444444444445
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -125051.53670491106
+    },
+    "1900": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -143108.33758650403,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 495.6666666666667,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.6933333333333334
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -143065.9291284668
+    },
+    "1925": {
+      "single_training": {
+        "avg_reward": -115389.49661134054,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 379.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.6022222222222222
+      },
+      "stone_canyon": {
+        "avg_reward": -60725.34364706656,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 211.33333333333334,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.7022222222222222
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -176114.84025840712
+    },
+    "1950": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -128683.39631054008,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 444.3333333333333,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.6044444444444445
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -128640.98785250286
+    },
+    "1975": {
+      "single_training": {
+        "avg_reward": -117086.45478305581,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 384.0,
+        "dominant_action": [
+          "water_team",
+          18
+        ],
+        "dominant_action_fraction": 0.6155555555555555
+      },
+      "stone_canyon": {
+        "avg_reward": -50796.21181921225,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 174.66666666666666,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.6177777777777778
+      },
+      "single_training_solved": false,
+      "dominant_zones_differ": true,
+      "direct_test_pass": false,
+      "combined_reward": -167882.66660226806
+    },
+    "2000": {
+      "single_training": {
+        "avg_reward": 42.40845803721036,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          18
+        ],
+        "dominant_action_fraction": 1.0
+      },
+      "stone_canyon": {
+        "avg_reward": -56655.5272496409,
+        "containment_rate": 0.6666666666666666,
+        "avg_buildings_destroyed": 198.33333333333334,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.7017543859649122
+      },
+      "single_training_solved": true,
+      "dominant_zones_differ": true,
+      "direct_test_pass": true,
+      "combined_reward": -56613.118791603694
+    }
+  },
+  "direct_test_passing_checkpoints": [
+    600,
+    700,
+    725,
+    800,
+    825,
+    925,
+    950,
+    975,
+    1075,
+    1125,
+    1175,
+    1200,
+    1250,
+    1350,
+    1400,
+    1425,
+    1450,
+    1500,
+    1650,
+    1675,
+    1725,
+    1800,
+    1825,
+    1850,
+    1875,
+    1900,
+    1950,
+    2000
+  ],
+  "top5_by_combined_reward": [
+    1550,
+    2000,
+    925,
+    600,
+    700
+  ],
+  "heldout_at_top5": {
+    "1550": {
+      "mandeville_canyon": {
+        "avg_reward": -17791.831998624624,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 67.33333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.4866666666666667
+      },
+      "getty_view_park": {
+        "avg_reward": 27.972814712805967,
+        "containment_rate": 1.0,
+        "avg_buildings_destroyed": 0.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.7368421052631579
+      }
+    },
+    "2000": {
+      "mandeville_canyon": {
+        "avg_reward": -17805.983454237616,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 67.33333333333333,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.43333333333333335
+      },
+      "getty_view_park": {
+        "avg_reward": -53803.380283371254,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 185.0,
+        "dominant_action": [
+          "water_team",
+          21
+        ],
+        "dominant_action_fraction": 0.7369791666666666
+      }
+    },
+    "925": {
+      "mandeville_canyon": {
+        "avg_reward": -17676.67711936159,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 67.33333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.41333333333333333
+      },
+      "getty_view_park": {
+        "avg_reward": -86258.70941314865,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 296.6666666666667,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.4888888888888889
+      }
+    },
+    "600": {
+      "mandeville_canyon": {
+        "avg_reward": -17557.773127448356,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 67.33333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.8733333333333333
+      },
+      "getty_view_park": {
+        "avg_reward": -51219.640052934315,
+        "containment_rate": 0.3333333333333333,
+        "avg_buildings_destroyed": 176.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.9706840390879479
+      }
+    },
+    "700": {
+      "mandeville_canyon": {
+        "avg_reward": -17562.726760638096,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 67.33333333333333,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.9044444444444445
+      },
+      "getty_view_park": {
+        "avg_reward": -89230.15313699403,
+        "containment_rate": 0.0,
+        "avg_buildings_destroyed": 306.0,
+        "dominant_action": [
+          "helicopter",
+          21
+        ],
+        "dominant_action_fraction": 0.9666666666666667
+      }
+    }
+  }
+}

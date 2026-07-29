@@ -1,0 +1,13 @@
+[zonehead_randign:zonehead_randign_v1] target=2000 episodes, device=mps  AUX_ZONE_LOSS_COEFF=0.1  warm_start=/Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_zonehead_zonehead_fix1_2k/episode_2000.pt  eval_every=50  checkpoint_every=25
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[zonehead_randign:zonehead_randign_v1] ignition pool: 94484/99657 candidates after excluding a 30-cell radius around both held-out points.
+[zonehead_randign:zonehead_randign_v1] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_zonehead_zonehead_fix1_2k/episode_2000.pt -- exact match, every key loaded unchanged.
+[status @ ep    20/2000] ignition=(174,391)  avg_reward(last20)=  -59528.3  aux_zone_loss=1.7240  resource_entropy=1.353/1.386  zone_entropy=2.092/3.466  device=mps
+[status @ ep    40/2000] ignition=(193,310)  avg_reward(last20)=  -39977.9  aux_zone_loss=3.6222  resource_entropy=1.344/1.386  zone_entropy=2.164/3.466  device=mps
