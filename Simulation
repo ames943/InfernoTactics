@@ -29,24 +29,21 @@
   <div id="cesiumContainer"></div>
 
   <script>
-    // 1. Assign Access Token
+    // 1. Assign Cesium Access Token
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
 
-    // 2. Initialize Cesium Globe Asynchronously
     async function initSim() {
-      const terrain = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
-      
+      // Viewer initialization (globe is enabled by default when omitted)
       const viewer = new Cesium.Viewer('cesiumContainer', {
-        terrainProvider: terrain,
         timeline: false,
         animation: false,
         baseLayerPicker: false
       });
 
-      // Enable realistic lighting & shadows for depth on facades and roofs
+      // Enable lighting for realistic daylight shadows
       viewer.scene.globe.enableLighting = true;
 
-      // Enable trackpad Ctrl + Drag tilting
+      // Trackpad controls
       viewer.scene.screenSpaceCameraController.tiltEventTypes = [
         Cesium.CameraEventType.RIGHT_DRAG,
         Cesium.CameraEventType.PINCH,
@@ -56,49 +53,53 @@
         }
       ];
 
-      // 3. Define Pacific Palisades Coordinates
+      // 2. Define Pacific Palisades Coordinates
       const south = 34.030, north = 34.070;
       const west = -118.550, east = -118.500;
+      const centerLon = (west + east) / 2.0;
 
-      // 4. Load ALL 3D OSM Buildings with Realistic Varied Architectural Colors
-      const buildings = await Cesium.createOsmBuildingsAsync();
-      
-      buildings.style = new Cesium.Cesium3DTileStyle({
-        color: {
-          conditions: [
-            // Material-specific color matching
-            ['${feature["building:material"]} === "brick"', 'color("#ab4e3f")'],
-            ['${feature["building:material"]} === "wood"', 'color("#8c5a2b")'],
-            ['${feature["building:material"]} === "glass"', 'color("#6b9ac4")'],
-            ['${feature["building:material"]} === "concrete"', 'color("#cbd5e1")'],
-            
-            // Varied architectural tones by building classification
-            ['${feature["building"]} === "house"', 'color("#d5bdaf")'],
-            ['${feature["building"]} === "residential"', 'color("#e3d5ca")'],
-            ['${feature["building"]} === "detached"', 'color("#f5ebe0")'],
-            ['${feature["building"]} === "apartments"', 'color("#edede9")'],
-            ['${feature["building"]} === "commercial"', 'color("#d6ccc2")'],
-            ['${feature["building"]} === "retail"', 'color("#e2e2e2")'],
+      // 3. LAYER 1: Load Google Photorealistic 3D Tiles
+      try {
+        const googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
+        googleTileset.maximumMemoryUsage = 1024;
+        googleTileset.maximumScreenSpaceError = 16;
+        viewer.scene.primitives.add(googleTileset);
+      } catch (e) {
+        console.error("Error loading Google 3D Tiles:", e);
+      }
 
-            // Safe fallback tones for remaining unclassified structures
-            ['true', 'color("#ebdccb")']
-          ]
-        }
-      });
+      // 4. LAYER 2: Load OSM 3D Buildings (Light Grey inside grid)
+      try {
+        const osmBuildings = await Cesium.createOsmBuildingsAsync();
+        
+        osmBuildings.style = new Cesium.Cesium3DTileStyle({
+          show: `\${feature["cesium#longitude"]} >= ${west} && \${feature["cesium#longitude"]} <= ${east} && \${feature["cesium#latitude"]} >= ${south} && \${feature["cesium#latitude"]} <= ${north}`,
+          color: 'color("#d1d5db", 0.9)',
+          height: {
+            conditions: [
+              ['Boolean(${feature["building:levels"]})', '${feature["building:levels"]} * 3.5'],
+              ['Boolean(${height}) && ${height} > 0', '${height}'],
+              ['true', '5.5']
+            ]
+          }
+        });
 
-      viewer.scene.primitives.add(buildings);
+        viewer.scene.primitives.add(osmBuildings);
+      } catch (e) {
+        console.error("Error loading OSM Buildings:", e);
+      }
 
-      // Fly Camera Low & Tilted to View 3D Heights
+      // 5. Fly Camera Target
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(-118.525, 34.025, 1200.0),
+        destination: Cesium.Cartesian3.fromDegrees(centerLon, south - 0.010, 1100.0),
         orientation: {
           heading: Cesium.Math.toRadians(0.0),
-          pitch: Cesium.Math.toRadians(-20.0),
+          pitch: Cesium.Math.toRadians(-25.0),
           roll: 0.0
         }
       });
 
-      // 5. CREATE MACRO GRID (8 x 4 Sectors)
+      // 6. CREATE 8x4 SECTOR GRID LINES PROJECTED ON EARTH
       const gridEntities = {};
       const latStep = (north - south) / 4;
       const lonStep = (east - west) / 8;
@@ -113,32 +114,40 @@
 
           gridEntities[sectorId] = viewer.entities.add({
             name: `Sector ${sectorId}`,
-            rectangle: {
-              coordinates: Cesium.Rectangle.fromDegrees(w, s, e, n),
-              material: Cesium.Color.GREEN.withAlpha(0.25),
-              outline: true,
-              outlineColor: Cesium.Color.WHITE,
-              height: 2
+            polyline: {
+              positions: Cesium.Cartesian3.fromDegreesArray([
+                w, s,
+                e, s,
+                e, n,
+                w, n,
+                w, s
+              ]),
+              width: 3,
+              material: Cesium.Color.WHITE.withAlpha(0.9),
+              clampToGround: true
             }
           });
         }
       }
 
+      // Helper to update sector line colors
+      window.setSectorColor = function(sectorId, color, width = 6) {
+        const entity = gridEntities[sectorId];
+        if (!entity) return;
+        entity.polyline.material = color;
+        entity.polyline.width = width;
+      };
+
       // Set Sector 10 on Fire initially
-      if (gridEntities[10]) {
-        gridEntities[10].rectangle.material = Cesium.Color.RED.withAlpha(0.5);
-      }
+      window.setSectorColor(10, Cesium.Color.RED, 6);
 
       // Action Handler
       window.applyRLAction = function(actionIdx, resourceType) {
-        const entity = gridEntities[actionIdx];
-        if (!entity) return;
-
         if (resourceType === 'helicopter' || resourceType === 'water_team') {
-          entity.rectangle.material = Cesium.Color.BLUE.withAlpha(0.5);
+          window.setSectorColor(actionIdx, Cesium.Color.BLUE, 6);
           document.getElementById('sim-status').innerText = `Helicopter deployed to Sector ${actionIdx}`;
         } else if (resourceType === 'trench_team') {
-          entity.rectangle.material = Cesium.Color.DARKGRAY.withAlpha(0.7);
+          window.setSectorColor(actionIdx, Cesium.Color.DARKGRAY, 6);
           document.getElementById('sim-status').innerText = `Trench built in Sector ${actionIdx}`;
         }
       };
@@ -155,7 +164,6 @@
       }, 500);
     }
 
-    // Launch Simulation
     initSim();
 
     function testAction() {
