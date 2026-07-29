@@ -53,6 +53,7 @@ EVAL_EVERY = int(os.environ.get("INFERNO_V8_EVAL_EVERY", 50))
 RUN_TAG = os.environ.get("INFERNO_RUN_TAG", "relative_v8")
 CHECKPOINT_EVERY = int(os.environ.get("INFERNO_V8_CHECKPOINT_EVERY", 2))
 CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", f"checkpoints_{RUN_TAG}")
+MAX_DISPATCH_SLOTS = int(os.environ.get("INFERNO_MAX_DISPATCH_SLOTS", 10))
 
 
 def _tensor_targets(env, obs, device):
@@ -87,29 +88,44 @@ def collect_rollout(env, model, ignition_point, device, seed):
     info = None
     with torch.no_grad():
         while not done:
-            logits, _value, _classification, raw_zones = _forward(model, obs, env, device)
-            resource_logits = logits["resource_type"][0].clone()
-            available = _resource_mask(obs).to(device)
-            resource_logits[~available] = -1e9
-            if not bool(available.any()):
-                action = None
-                resource_idx = 0
-                target_idx = N_TARGET_TYPES - 1
-            else:
-                resource_dist = Categorical(logits=resource_logits)
-                resource_idx = int(resource_dist.sample())
-                target_dist = Categorical(logits=logits["target"][0, resource_idx])
-                target_idx = int(target_dist.sample())
+            tick_obs = obs
+            tick_actions = []
+            local_available = {
+                rtype: int(tick_obs["scalars"][f"{rtype}_available"])
+                for rtype in RESOURCE_TYPES
+            }
+            for _ in range(MAX_DISPATCH_SLOTS):
+                logits, _value, _classification, raw_zones = _forward(model, tick_obs, env, device)
+                resource_logits = logits["resource_type"][0].clone()
+                available = torch.tensor(
+                    [local_available[rtype] > 0 for rtype in RESOURCE_TYPES],
+                    dtype=torch.bool, device=device,
+                )
+                resource_logits[~available] = -1e9
+                if not bool(available.any()):
+                    break
+                resource_idx = int(Categorical(logits=resource_logits).sample())
+                target_idx = int(Categorical(logits=logits["target"][0, resource_idx]).sample())
                 action = decode_action(resource_idx, target_idx, raw_zones)
-            next_obs, reward, done, info = env.step(action)
+                if action is None:
+                    break
+                local_available[RESOURCE_TYPES[resource_idx]] -= 1
+                tick_actions.append({
+                    "resource_idx": resource_idx,
+                    "target_idx": target_idx,
+                    "target_zones": raw_zones,
+                })
+
+            actions = [
+                decode_action(a["resource_idx"], a["target_idx"], a["target_zones"])
+                for a in tick_actions
+            ]
+            next_obs, reward, done, info = env.step([a for a in actions if a is not None])
             steps.append({
-                "grid": obs["grid"],
-                "scalars": flatten_scalars(obs["scalars"]),
-                "resource_idx": resource_idx,
-                "target_idx": target_idx,
-                "target_zones": raw_zones,
-                "resource_available": available.cpu().numpy(),
-                "fire_state_target": fire_state_to_class(torch.from_numpy(obs["grid"][-1]).long()),
+                "grid": tick_obs["grid"],
+                "scalars": flatten_scalars(tick_obs["scalars"]),
+                "actions": tick_actions,
+                "fire_state_target": fire_state_to_class(torch.from_numpy(tick_obs["grid"][-1]).long()),
                 "reward": reward,
             })
             total_reward += reward
@@ -137,24 +153,32 @@ def update_policy(model, optimizer, steps, device, normalizer):
     for step, g_t in zip(steps, returns):
         grid = torch.from_numpy(step["grid"]).unsqueeze(0).to(device)
         scalars = torch.from_numpy(step["scalars"]).unsqueeze(0).to(device)
-        zones = torch.from_numpy(step["target_zones"]).unsqueeze(0).to(device)
-        features_np = resolve_relative_targets_from_state(step["grid"], step["scalars"], step["target_zones"])
+        target_zones_np = step["actions"][0]["target_zones"] if step["actions"] else np.full(
+            (len(RESOURCE_TYPES), N_TARGET_TYPES), -1, dtype=np.int64
+        )
+        zones = torch.from_numpy(target_zones_np).unsqueeze(0).to(device)
+        features_np = resolve_relative_targets_from_state(step["grid"], step["scalars"], target_zones_np)
         features = torch.from_numpy(features_np).unsqueeze(0).to(device)
         logits, value, classification = model(grid, scalars, zones, features)
-        resource_logits = logits["resource_type"][0].clone()
-        available = torch.from_numpy(step["resource_available"]).to(device)
-        resource_logits[~available] = -1e9
-        resource_dist = Categorical(logits=resource_logits)
-        resource_idx = step["resource_idx"]
-        target_dist = Categorical(logits=logits["target"][0, resource_idx])
-        target_idx = step["target_idx"]
-        log_prob = resource_dist.log_prob(torch.tensor(resource_idx, device=device)) + target_dist.log_prob(torch.tensor(target_idx, device=device))
-        entropy = resource_dist.entropy() + target_dist.entropy()
+        resource_dist = Categorical(logits=logits["resource_type"][0])
+        log_prob = torch.tensor(0.0, device=device)
+        entropy = resource_dist.entropy()
+        aux_loss = torch.tensor(0.0, device=device)
+        for action_data in step["actions"]:
+            resource_idx = action_data["resource_idx"]
+            target_idx = action_data["target_idx"]
+            target_dist = Categorical(logits=logits["target"][0, resource_idx])
+            log_prob = log_prob + resource_dist.log_prob(torch.tensor(resource_idx, device=device)) \
+                + target_dist.log_prob(torch.tensor(target_idx, device=device))
+            entropy = entropy + target_dist.entropy()
+            aux_idx = _aux_target(resource_idx, target_zones_np)
+            aux_loss = aux_loss + F.cross_entropy(
+                logits["target"][0, resource_idx].unsqueeze(0),
+                torch.tensor([aux_idx], device=device),
+            )
         value_scalar = value.squeeze()
         target_return = torch.tensor(g_t, dtype=value_scalar.dtype, device=device)
         advantage = (target_return - value_scalar).detach()
-        aux_idx = _aux_target(resource_idx, step["target_zones"])
-        aux_loss = F.cross_entropy(logits["target"][0, resource_idx].unsqueeze(0), torch.tensor([aux_idx], device=device))
         classification_loss = F.cross_entropy(classification, step["fire_state_target"].unsqueeze(0).to(device))
         policy_loss = -log_prob * advantage
         value_loss = (value_scalar - target_return) ** 2
@@ -215,7 +239,8 @@ def evaluate(model, env, point, device, episodes=2):
                 resource_logits[~available] = -1e9
                 ri = int(torch.argmax(resource_logits)) if bool(available.any()) else 0
                 ti = int(torch.argmax(logits["target"][0, ri]))
-                obs, reward, done, info = env.step(decode_action(ri, ti, zones))
+                action = decode_action(ri, ti, zones)
+                obs, reward, done, info = env.step([action] if action is not None else [])
                 total += reward; lost += info["buildings_destroyed"]
             rewards.append(total); destroyed.append(lost); contained.append(info["contained"])
     model.train()

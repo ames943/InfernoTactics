@@ -62,17 +62,18 @@ def run_episode(env, episode_seed, scenario="single"):
     t = 0
     while not done:
         action = random_action(rng, env.n_zones)
+        actions = [action] if action is not None else []
 
         tick_t0 = time.perf_counter()
-        obs, reward, done, info = env.step(action)
+        obs, reward, done, info = env.step(actions)
         tick_wall_times.append(time.perf_counter() - tick_t0)
 
         total_reward += reward
         rewards.append(reward)
 
-        if info["dispatch"] is not None:
+        for dispatch in info["dispatch"]:
             dispatch_attempts += 1
-            status = info["dispatch"]["status"]
+            status = dispatch["status"]
             if status == "dispatched":
                 dispatch_ok += 1
             elif status == "no_unit_available":
@@ -435,7 +436,7 @@ def verify_multi_ignition(env, issues):
     active_cell_counts_over_time = [int(np.isin(env.sim.state, (THREAT, BLAZE)).sum())]
     for t in range(1, 11):
         action = random_action(rng, env.n_zones)
-        obs, reward, done, info = env.step(action)
+        obs, reward, done, info = env.step([action] if action is not None else [])
         cluster_counts_over_time.append(_n_active_fire_clusters(env.sim))
         active_cell_counts_over_time.append(info["state_counts"]["Threat"] + info["state_counts"]["Blaze"])
         if done:

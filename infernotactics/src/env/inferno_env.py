@@ -254,11 +254,29 @@ RESOURCE_TYPES = tuple(RESOURCE_COUNTS)
 GROUND_RESOURCE_TYPES = ("water_team", "trench_crew", "rescue_vehicle")  # dispatch via road-graph routing
 AIR_RESOURCE_TYPES = ("helicopter",)  # dispatch via straight-line distance, no road graph
 
-DEPLOYED_BUSY_TICKS = 5  # ground units: ticks tied up on-scene after arriving, before redispatchable
-# Helicopter: after a drop it must fly back to Van Nuys and reload retardant/water before
-# it's available again -- a real round trip, not just an on-scene task, hence longer than
-# DEPLOYED_BUSY_TICKS even though the helicopter's outbound leg is much faster than driving.
-HELICOPTER_RELOAD_TICKS = 12
+DEFAULT_TRAFFIC_MODE = "synthetic"
+ROAD_TRAFFIC_MULTIPLIER = {
+    "motorway": 1.00, "trunk": 1.05, "primary": 1.15, "secondary": 1.25,
+    "tertiary": 1.35, "residential": 1.20, "unclassified": 1.30, "service": 1.25,
+}
+ROAD_TRAFFIC_CAPACITY = {
+    "motorway": 40.0, "trunk": 30.0, "primary": 20.0, "secondary": 14.0,
+    "tertiary": 10.0, "residential": 6.0, "unclassified": 4.0, "service": 4.0,
+}
+TRAFFIC_BPR_ALPHA = 0.15
+TRAFFIC_BPR_BETA = 4.0
+TRAFFIC_UPDATE_INTERVAL_TICKS = 5
+RESOURCE_TRAFFIC_WEIGHT = {
+    "water_team": 1.0, "trench_crew": 1.0, "rescue_vehicle": 1.2, "helicopter": 0.0,
+}
+RESOURCE_DELAY_CONFIG = {
+    "water_team": {"dispatch_delay_ticks": 1, "arrival_setup_delay_ticks": 1, "post_effect_busy_ticks": 5},
+    "trench_crew": {"dispatch_delay_ticks": 1, "arrival_setup_delay_ticks": 2, "post_effect_busy_ticks": 5},
+    "rescue_vehicle": {"dispatch_delay_ticks": 2, "arrival_setup_delay_ticks": 2, "post_effect_busy_ticks": 5},
+    "helicopter": {"dispatch_delay_ticks": 2, "arrival_setup_delay_ticks": 1, "post_effect_busy_ticks": 12},
+}
+DEPLOYED_BUSY_TICKS = RESOURCE_DELAY_CONFIG["water_team"]["post_effect_busy_ticks"]
+HELICOPTER_RELOAD_TICKS = RESOURCE_DELAY_CONFIG["helicopter"]["post_effect_busy_ticks"]
 HELICOPTER_SPEED_MPS = 60.0  # ~135 mph cruise, plausible for a firefighting helicopter transiting to an incident
 
 # --- Time / weather -----------------------------------------------------------
@@ -282,6 +300,8 @@ FIRE_EXTINGUISHED_REWARD = 50.0
 BUILDING_DESTROYED_PENALTY = 100.0
 RESOURCE_WASTED_PENALTY = 10.0
 LAMBDA_TRAVEL_TIME = 0.02  # reward penalty per second of dispatch travel time
+LAMBDA_RESPONSE_DELAY = 0.02
+MU_CONGESTION = 0.01
 
 # --- Population-aware building-loss penalty (population_density layer is
 # 0-1, log1p+min-max normalized -- see grid_builder.py) -----------------------
@@ -320,6 +340,9 @@ SCALAR_KEYS = (
     "rescue_vehicle_available",
     "helicopter_available",
     "time_elapsed_ticks",
+    "traffic_mean_load",
+    "traffic_max_load",
+    "active_ground_resources",
 )
 
 
@@ -479,7 +502,12 @@ def _new_resource_unit(station_id):
     -- fixed for the unit's lifetime (a unit always returns to and
     redispatches from its own home station), used by _try_dispatch() to
     look up this specific unit's travel time to a candidate zone."""
-    return {"state": "available", "remaining_ticks": 0, "target_zone": None, "station_id": station_id}
+    return {
+        "state": "available", "remaining_ticks": 0, "target_zone": None,
+        "station_id": station_id, "route_edges": [], "travel_time_s": 0.0,
+        "traffic_delay_s": 0.0, "dispatch_tick": None, "arrival_tick": None,
+        "effect_tick": None, "available_again_tick": None,
+    }
 
 
 def _build_zones(grid_static, meta, zone_size_cells=ZONE_SIZE_CELLS):
@@ -526,12 +554,19 @@ class InfernoEnv:
     the module docstring for the observation/action/reward formats, and
     reset()'s own docstring for the ignition-point selection rules."""
 
-    def __init__(self, grid_static_path=GRID_STATIC_PATH, grid_meta_path=GRID_META_PATH, seed=None):
+    def __init__(self, grid_static_path=GRID_STATIC_PATH, grid_meta_path=GRID_META_PATH, seed=None,
+                 traffic_mode=DEFAULT_TRAFFIC_MODE, delay_config=None):
         self.grid_static = np.load(grid_static_path).astype(np.float32)
         with open(grid_meta_path) as f:
             self.meta = json.load(f)
         self.height, self.width = self.meta["height"], self.meta["width"]
         self.rng = np.random.default_rng(seed)
+        if traffic_mode not in ("legacy", "synthetic"):
+            raise ValueError("traffic_mode must be 'legacy' or 'synthetic'")
+        self.traffic_mode = traffic_mode
+        self.delay_config = {
+            rtype: dict((delay_config or RESOURCE_DELAY_CONFIG)[rtype]) for rtype in RESOURCE_TYPES
+        }
 
         self._building_mask = self.grid_static[LAYER_INDEX["building_density"]] > BUILDING_PRESENCE_THRESHOLD
 
@@ -550,6 +585,7 @@ class InfernoEnv:
         print(f"[InfernoEnv] Loading + preparing road routing graph from {ROADS_GRAPHML_PATH} ...")
         self.road_graph = _load_routing_graph(self.meta["crs"])
         self._prepare_routing()
+        self._edge_resource_load = {}
 
         self._weather_epochs, self._weather_values = _load_real_weather()
         self.use_real_weather = True  # overridable per-episode via reset(use_real_weather=...)
@@ -642,6 +678,94 @@ class InfernoEnv:
             for rtype in RESOURCE_TYPES
         }
 
+    def _road_class(self, data):
+        highway = data.get("highway", "unclassified")
+        if isinstance(highway, (list, tuple)):
+            highway = highway[0] if highway else "unclassified"
+        return str(highway).lower()
+
+    def _synthetic_background_factor(self):
+        """Deterministic traffic profile for the simulated fire timeline."""
+        hour = (10.5 + self.tick_count * TICK_DURATION_MINUTES / 60.0) % 24.0
+        if 7.0 <= hour < 9.5 or 16.0 <= hour < 19.0:
+            return 1.25
+        if 11.0 <= hour < 14.0:
+            return 1.05
+        return 1.10
+
+    def _edge_effective_time(self, u, v, data):
+        """Weight callback for dynamic synthetic-traffic Dijkstra routing."""
+        if "travel_time" in data:
+            base_time = float(data["travel_time"])
+            edge_data = data
+            edge_key = data.get("key")
+        else:
+            # NetworkX passes all parallel-edge records for a MultiDiGraph to
+            # a callable weight function. Select the fastest current edge.
+            candidates = []
+            for key, attrs in data.items():
+                if not isinstance(attrs, dict):
+                    continue
+                candidates.append((self._edge_effective_time(u, v, {**attrs, "key": key}), attrs, key))
+            if not candidates:
+                return math.inf
+            return min(candidates, key=lambda item: item[0])[0]
+
+        if self.traffic_mode == "legacy":
+            return base_time
+        road_class = self._road_class(edge_data)
+        background = ROAD_TRAFFIC_MULTIPLIER.get(road_class, ROAD_TRAFFIC_MULTIPLIER["unclassified"])
+        background *= self._synthetic_background_factor()
+        load = 0.0
+        if edge_key is not None:
+            load = self._edge_resource_load.get((u, v, edge_key), 0.0)
+        capacity = ROAD_TRAFFIC_CAPACITY.get(road_class, ROAD_TRAFFIC_CAPACITY["unclassified"])
+        congestion = 1.0 + TRAFFIC_BPR_ALPHA * (load / max(capacity, 1.0)) ** TRAFFIC_BPR_BETA
+        return base_time * background * congestion
+
+    def _route_edges_from_nodes(self, nodes):
+        edges = []
+        for u, v in zip(nodes, nodes[1:]):
+            records = self.road_graph.get_edge_data(u, v) or {}
+            best = min(
+                records.items(),
+                key=lambda item: self._edge_effective_time(u, v, {**item[1], "key": item[0]}),
+                default=(None, None),
+            )
+            if best[0] is not None:
+                edges.append((u, v, best[0]))
+        return edges
+
+    def _dynamic_ground_route(self, station_id, target_zone_id):
+        station = next(s for s in self.stations if s["station_id"] == station_id)
+        source = int(station["road_node"])
+        target = int(self.zones[target_zone_id]["road_node"])
+        try:
+            travel_s, nodes = nx.single_source_dijkstra(
+                self.road_graph, source, target, weight=self._edge_effective_time
+            )
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return math.inf, []
+        return float(travel_s), self._route_edges_from_nodes(nodes)
+
+    def _reserve_route(self, resource_type, route_edges):
+        weight = RESOURCE_TRAFFIC_WEIGHT[resource_type]
+        if weight <= 0:
+            return
+        for edge in route_edges:
+            self._edge_resource_load[edge] = self._edge_resource_load.get(edge, 0.0) + weight
+
+    def _release_route(self, resource_type, route_edges):
+        weight = RESOURCE_TRAFFIC_WEIGHT[resource_type]
+        if weight <= 0:
+            return
+        for edge in route_edges:
+            remaining = self._edge_resource_load.get(edge, 0.0) - weight
+            if remaining > 1e-9:
+                self._edge_resource_load[edge] = remaining
+            else:
+                self._edge_resource_load.pop(edge, None)
+
     # --- Episode lifecycle ---------------------------------------------------
 
     def _sample_ignition_point(self):
@@ -695,6 +819,7 @@ class InfernoEnv:
 
         self.tick_count = 0
         self.resources = {rtype: [] for rtype in RESOURCE_TYPES}
+        self._edge_resource_load.clear()
         for station in self.stations:
             for rtype, count in station["roster"].items():
                 self.resources[rtype].extend(_new_resource_unit(station["station_id"]) for _ in range(count))
@@ -709,18 +834,26 @@ class InfernoEnv:
             return _real_weather_at(elapsed_seconds, self._weather_epochs, self._weather_values)
         return _placeholder_weather_schedule(tick)
 
-    def _parse_action(self, action):
-        if action is None:
-            return None, None
-        resource_type, target_zone = action
-        if resource_type is None or resource_type == "noop":
-            return None, None
-        if resource_type not in RESOURCE_TYPES:
-            raise ValueError(f"Unknown resource_type {resource_type!r}; expected one of "
-                              f"{RESOURCE_TYPES} or None/'noop'")
-        if not (0 <= target_zone < self.n_zones):
-            raise ValueError(f"target_zone {target_zone} out of range [0, {self.n_zones})")
-        return resource_type, target_zone
+    def _parse_actions(self, actions):
+        if not isinstance(actions, list):
+            raise ValueError("actions must be a list of (resource_type, target_zone) pairs")
+        parsed = []
+        for action in actions:
+            if action is None:
+                parsed.append((None, None))
+                continue
+            if not isinstance(action, tuple) or len(action) != 2:
+                raise ValueError("each action must be a (resource_type, target_zone) tuple or None")
+            resource_type, target_zone = action
+            if resource_type is None or resource_type == "noop":
+                parsed.append((None, None))
+                continue
+            if resource_type not in RESOURCE_TYPES:
+                raise ValueError(f"Unknown resource_type {resource_type!r}; expected one of {RESOURCE_TYPES}")
+            if not isinstance(target_zone, (int, np.integer)) or not (0 <= target_zone < self.n_zones):
+                raise ValueError(f"target_zone {target_zone} out of range [0, {self.n_zones})")
+            parsed.append((resource_type, int(target_zone)))
+        return parsed
 
     def _try_dispatch(self, resource_type, target_zone_id):
         """v2: picks the nearest AVAILABLE unit of resource_type across
@@ -734,33 +867,48 @@ class InfernoEnv:
         stationed there (or at any other reachable station of this type)
         is currently busy."""
         station_ids = self._stations_by_type.get(resource_type, [])
-        zone_reachable = any(
-            math.isfinite(self._station_travel_time_s[sid][target_zone_id]) for sid in station_ids
-        )
-        if not zone_reachable:
-            return {"resource_type": resource_type, "target_zone": target_zone_id,
-                    "status": "zone_unreachable", "reward_delta": -RESOURCE_WASTED_PENALTY}
-
         roster = self.resources[resource_type]
-        best_unit, best_travel_s = None, math.inf
+        best_unit, best_travel_s, best_route = None, math.inf, []
+        best_free_flow_s = math.inf
         for unit in roster:
             if unit["state"] != "available":
                 continue
-            travel_s = self._station_travel_time_s[unit["station_id"]][target_zone_id]
+            if resource_type in GROUND_RESOURCE_TYPES and self.traffic_mode == "synthetic":
+                travel_s, route_edges = self._dynamic_ground_route(unit["station_id"], target_zone_id)
+                free_flow_s = self._station_travel_time_s[unit["station_id"]][target_zone_id]
+            else:
+                travel_s = self._station_travel_time_s[unit["station_id"]][target_zone_id]
+                route_edges = []
+                free_flow_s = travel_s
             if math.isfinite(travel_s) and travel_s < best_travel_s:
-                best_unit, best_travel_s = unit, travel_s
+                best_unit, best_travel_s, best_route, best_free_flow_s = unit, travel_s, route_edges, free_flow_s
 
         if best_unit is None:
+            zone_reachable = any(
+                math.isfinite(self._station_travel_time_s[sid][target_zone_id]) for sid in station_ids
+            )
             return {"resource_type": resource_type, "target_zone": target_zone_id,
-                    "status": "no_unit_available", "reward_delta": -RESOURCE_WASTED_PENALTY}
+                    "status": "zone_unreachable" if not zone_reachable else "no_unit_available",
+                    "reward_delta": -RESOURCE_WASTED_PENALTY}
 
         eta_ticks = max(1, math.ceil(best_travel_s / (TICK_DURATION_MINUTES * 60.0)))
-        best_unit["state"] = "traveling"
-        best_unit["remaining_ticks"] = eta_ticks
+        delay = self.delay_config[resource_type]
+        dispatch_delay_ticks = delay["dispatch_delay_ticks"] if self.traffic_mode == "synthetic" else 0
+        best_unit["state"] = "preparing" if dispatch_delay_ticks else "traveling"
+        best_unit["remaining_ticks"] = dispatch_delay_ticks or eta_ticks
         best_unit["target_zone"] = target_zone_id
+        best_unit["route_edges"] = best_route
+        best_unit["travel_time_s"] = best_travel_s
+        best_unit["traffic_delay_s"] = max(0.0, best_travel_s - best_free_flow_s)
+        best_unit["pending_travel_ticks"] = eta_ticks
+        best_unit["dispatch_tick"] = self.tick_count
         return {"resource_type": resource_type, "target_zone": target_zone_id, "status": "dispatched",
-                "travel_time_s": best_travel_s, "eta_ticks": eta_ticks, "station_id": best_unit["station_id"],
-                "reward_delta": -LAMBDA_TRAVEL_TIME * best_travel_s}
+                "travel_time_s": best_travel_s, "traffic_delay_s": best_unit["traffic_delay_s"],
+                "response_delay_ticks": dispatch_delay_ticks,
+                "eta_ticks": dispatch_delay_ticks + eta_ticks,
+                "station_id": best_unit["station_id"],
+                "reward_delta": -LAMBDA_TRAVEL_TIME * best_travel_s
+                - LAMBDA_RESPONSE_DELAY * dispatch_delay_ticks * TICK_DURATION_MINUTES * 60.0}
 
     def _advance_resources(self):
         """Advance every non-available unit by one tick; apply effects for
@@ -776,7 +924,24 @@ class InfernoEnv:
                 if unit["remaining_ticks"] > 0:
                     continue
 
+                if unit["state"] == "preparing":
+                    unit["state"] = "traveling"
+                    unit["remaining_ticks"] = unit["pending_travel_ticks"]
+                    if rtype in GROUND_RESOURCE_TYPES and self.traffic_mode == "synthetic":
+                        self._reserve_route(rtype, unit["route_edges"])
+                    continue
+
                 if unit["state"] == "traveling":
+                    if rtype in GROUND_RESOURCE_TYPES and self.traffic_mode == "synthetic":
+                        self._release_route(rtype, unit["route_edges"])
+                    unit["arrival_tick"] = self.tick_count
+                    setup_ticks = self.delay_config[rtype]["arrival_setup_delay_ticks"] \
+                        if self.traffic_mode == "synthetic" else 0
+                    if setup_ticks:
+                        unit["state"] = "arrival_setup"
+                        unit["remaining_ticks"] = setup_ticks
+                        continue
+
                     zone = self.zones[unit["target_zone"]]
                     row, col = _effect_target_point(self.sim, zone)
                     if rtype == "water_team" or rtype == "helicopter":
@@ -796,13 +961,36 @@ class InfernoEnv:
                         reward -= RESOURCE_WASTED_PENALTY
                     events.append({"resource_type": rtype, "zone": unit["target_zone"],
                                    "cells_affected": n_affected, "success": success})
+                    unit["effect_tick"] = self.tick_count
                     unit["state"] = "deployed"
-                    unit["remaining_ticks"] = (
-                        HELICOPTER_RELOAD_TICKS if rtype == "helicopter" else DEPLOYED_BUSY_TICKS
-                    )
+                    unit["remaining_ticks"] = self.delay_config[rtype]["post_effect_busy_ticks"] \
+                        if self.traffic_mode == "synthetic" else (
+                            HELICOPTER_RELOAD_TICKS if rtype == "helicopter" else DEPLOYED_BUSY_TICKS
+                        )
+                elif unit["state"] == "arrival_setup":
+                    zone = self.zones[unit["target_zone"]]
+                    row, col = _effect_target_point(self.sim, zone)
+                    if rtype == "water_team" or rtype == "helicopter":
+                        n_affected = _apply_water(self.sim, row, col)
+                    elif rtype == "trench_crew":
+                        n_affected = _apply_trench(self.sim, row, col)
+                    else:
+                        n_affected = _apply_rescue(self.sim, row, col, self.evacuated_cells)
+                    success = n_affected > 0
+                    if success and (rtype == "water_team" or rtype == "helicopter"):
+                        reward += FIRE_EXTINGUISHED_REWARD
+                    elif not success:
+                        reward -= RESOURCE_WASTED_PENALTY
+                    events.append({"resource_type": rtype, "zone": unit["target_zone"],
+                                   "cells_affected": n_affected, "success": success})
+                    unit["effect_tick"] = self.tick_count
+                    unit["state"] = "deployed"
+                    unit["remaining_ticks"] = self.delay_config[rtype]["post_effect_busy_ticks"]
                 elif unit["state"] == "deployed":
                     unit["state"] = "available"
                     unit["target_zone"] = None
+                    unit["route_edges"] = []
+                    unit["available_again_tick"] = self.tick_count
         return reward, events
 
     def _score_building_destruction(self, before_state):
@@ -836,17 +1024,20 @@ class InfernoEnv:
         return reward, int(len(rows)), n_evacuated, events
 
     def step(self, action):
-        resource_type, target_zone = self._parse_action(action)
+        actions = self._parse_actions(action)
 
         # Advance units already en route/deployed BEFORE committing this
         # tick's new dispatch, so a freshly-dispatched unit's ETA countdown
         # starts on the *next* step() rather than losing a tick to this one.
         reward, resource_events = self._advance_resources()
 
-        dispatch_info = None
-        if resource_type is not None:
-            dispatch_info = self._try_dispatch(resource_type, target_zone)
-            reward += dispatch_info["reward_delta"]
+        dispatch_info = []
+        for resource_type, target_zone in actions:
+            if resource_type is None:
+                continue
+            result = self._try_dispatch(resource_type, target_zone)
+            dispatch_info.append(result)
+            reward += result["reward_delta"]
 
         wind_speed, wind_direction, humidity = self._weather_schedule(self.tick_count)
         self._last_weather = (wind_speed, wind_direction, humidity)
@@ -888,6 +1079,11 @@ class InfernoEnv:
             rtype: float(sum(1 for u in self.resources[rtype] if u["state"] == "available"))
             for rtype in RESOURCE_TYPES
         }
+        loads = list(self._edge_resource_load.values())
+        active_ground = sum(
+            unit["state"] == "traveling"
+            for rtype in GROUND_RESOURCE_TYPES for unit in self.resources[rtype]
+        )
         scalars = OrderedDict([
             ("wind_speed_mph", wind_speed),
             ("wind_direction_deg", wind_direction),
@@ -897,5 +1093,8 @@ class InfernoEnv:
             ("rescue_vehicle_available", available["rescue_vehicle"]),
             ("helicopter_available", available["helicopter"]),
             ("time_elapsed_ticks", float(self.tick_count)),
+            ("traffic_mean_load", float(np.mean(loads)) if loads else 0.0),
+            ("traffic_max_load", float(max(loads)) if loads else 0.0),
+            ("active_ground_resources", float(active_ground)),
         ])
         return {"grid": grid, "scalars": scalars}

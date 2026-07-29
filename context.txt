@@ -493,4 +493,51 @@ Generalization gap — extensively investigated, partially advanced, still open.
 Structural capacity limit. Fire exceeds the 8-unit suppression fleet by tick 2–4, while the one-dispatch-per-tick action space requires 8 ticks to commit that fleet and helicopters reload for 12 ticks. Some scenarios may be uncontainable by any policy, meaning they supply no successful behavior to learn from. Achievable containment on the harder scenarios is capped by the environment, not only by the policy.
 Future work — relative action space. Absolute zone indices (0–31) are inherently memorizable; "dispatch to zone 18" cannot transfer to a fire elsewhere. A fire-relative action space — "dispatch to the zone with most active fire," "to the highest threatened population," "to the fire-adjacent zone furthest downwind" — would be transferable by construction and would shrink the action space from 32 to ~6–8, increasing gradient signal per option. This is the most promising untested direction, and was scoped out because it constitutes a new action space (v8), breaking comparability with all v1–v7 results.
 
+Add: Workspace Update — v8 Relative Actions, v9 Synthetic Traffic, and Multi-Dispatch
+
+Runtime environment and data assets:
+- The project now runs in the local conda environment `cosmos-venv`.
+- The environment is CPU-only for this workspace: PyTorch is `2.13.0+cpu`; no CUDA or MPS backend is available. GPU training was explicitly removed from the current plan.
+- Missing generated assets were rebuilt locally from the data pipeline: `roads.graphml`, `buildings.geojson`, `elevation.tif`, `population.tif`, `grid_static.npy`, and `grid_meta.json`.
+- Rebuilt static grid remains `(8, 316, 595)` at 30m resolution in EPSG:5070.
+
+v8 relative-action implementation:
+- `src/train/relative_actions.py` defines semantic targets: `active_fire`, `downwind_fire_front`, `adjacent_fuel`, `threatened_population`, `nearest_reachable_fire`, and `noop`.
+- `src/models/relative_model.py` scores resource-conditioned semantic targets instead of absolute zone IDs.
+- `src/train/train_relative.py` trains from randomized WUI ignition points while excluding 30-cell buffers around Mandeville Canyon and Getty View Park.
+- `src/train/eval_relative.py` performs deterministic inference on named and randomized ignition points, including roster availability and maximum-concurrent-resource diagnostics.
+- `src/train/test_relative_actions.py` verifies semantic target resolution changes with ignition location and validates target shapes/noop handling.
+
+v8 smoke results before synthetic traffic/delay changes:
+- The 3-episode checkpoint `models/checkpoints_relative_v8_smoke/episode_0002.pt` achieved 100% containment on the anchor and both named validation points in short deterministic inference, with zero buildings lost in those tests.
+- A 30-point randomized test of the 10-episode checkpoint under the then-current environment achieved 100% containment, average reward `-387.3`, and average buildings lost `1.4`; 18/30 points lost zero buildings.
+- The policy was heavily helicopter-biased because helicopters have the strongest immediate suppression behavior in the current simulator.
+
+v9 synthetic traffic and configurable response delays:
+- `src/env/inferno_env.py` now defaults to `traffic_mode="synthetic"`; `traffic_mode="legacy"` remains available for historical comparisons.
+- Synthetic traffic is deterministic and based on road class, simulation time, and BPR-style congestion from active ground-resource routes. No external or real-time traffic service is used.
+- Ground resources (`water_team`, `trench_crew`, `rescue_vehicle`) reserve road edges while traveling and add configurable traffic load. Helicopters add no road traffic.
+- Resource delays are configured by `RESOURCE_DELAY_CONFIG` in `inferno_env.py`: dispatch preparation, arrival setup, and post-effect busy/reload delay are configurable independently for every resource type.
+- Observation scalars expanded from 8 to 11 with `traffic_mean_load`, `traffic_max_load`, and `active_ground_resources`.
+- Resource lifecycle is now `available -> preparing -> traveling -> arrival_setup -> effect -> post_effect_busy/reloading -> available` in synthetic mode.
+- `src/env/test_synthetic_traffic.py` has four passing tests covering synthetic defaults, ground route reservation, helicopter delay/no-road-load, and legacy mode.
+- The existing environment mechanics suite passed under synthetic mode with no anomalies; roster totals remain water 3, trench 4, rescue 3, helicopter 5.
+
+v9 inference/training status:
+- A 50-episode v9 training run was started with `relative_v9_traffic_50` and checkpoint interval 10, but the process was aborted after the episode 10 checkpoint. Available artifacts are `models/checkpoints_relative_v9_traffic_50/episode_0010.pt` and `latest.pt`; there is no completed 50-episode result.
+- Inference of that early checkpoint under synthetic traffic/delays was poor: anchor reward `-112,745.5`, 381.7 buildings destroyed, 0% containment; Mandeville reward `-6,590.6`, 24.7 destroyed, 67% containment; Getty reward `-41,315.9`, 141 destroyed, 67% containment.
+- The early checkpoint did respect concurrent roster limits but had not learned stable delayed-resource behavior.
+
+Multi-dispatch change currently in progress:
+- The environment action interface was changed to lists only: `env.step([])` is a no-dispatch tick and `env.step([(resource_type, zone), ...])` dispatches multiple resources during one simulation tick. Passing a tuple now raises `ValueError`.
+- Multi-dispatch advances resources and fire exactly once per tick, then processes all list entries; it does not incorrectly advance the fire once per dispatch.
+- The policy-decided sequential decoder in `train_relative.py` uses `MAX_DISPATCH_SLOTS` as a safety cap (default 10), while local resource availability prevents selecting more units than the roster.
+- `HeuristicPolicy.decide_actions()` now produces a same-tick list of greedy dispatches; the legacy logits adapter remains for older evaluation callers and still needs full list-interface migration where those callers are used.
+- `src/env/test_multi_dispatch.py` has four passing tests: list-only validation, two dispatches sharing one tick, empty-list advancement, and same-tick resource availability consumption.
+- The first end-to-end multi-dispatch smoke training attempt was interrupted during verification and should not be treated as a completed training result. It still requires a clean one-episode smoke run before the planned 50-episode v10 run.
+- Existing historical v9 checkpoint directories are retained as requested. New multi-dispatch training must use a fresh run tag and start from random initialization.
+
+Current next step:
+- Complete the multi-dispatch end-to-end smoke test, then run 50 fresh episodes under synthetic traffic, configurable delays, and list-only multi-dispatch. Save checkpoints every 10 episodes and evaluate the final checkpoint on Skull Rock, both named validation points, and 30 random ignition points.
+
 
