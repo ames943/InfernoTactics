@@ -241,3 +241,14 @@
 [zonehead_randign:zonehead_randign_v1] ===== end eval =====
 
 [status @ ep  1120/2000] ignition=(118,445)  avg_reward(last20)=  -39159.8  aux_zone_loss=2.5011  resource_entropy=1.379/1.386  zone_entropy=3.082/3.466  device=mps
+[status @ ep  1140/2000] ignition=(244,361)  avg_reward(last20)=  -56815.1  aux_zone_loss=1.8990  resource_entropy=1.385/1.386  zone_entropy=2.703/3.466  device=mps
+
+[zonehead_randign:zonehead_randign_v1] ===== eval @ ep 1150 =====
+    [eval @ ep 1150] single_training: avg_reward=-103442.9  destroyed=340.3  containment=0%  dominant=('helicopter', 28) (42.7%)  vs heuristic: -84360.9 (heuristic: -19082.0)
+    [eval @ ep 1150] mandeville_canyon [HELD-OUT]: avg_reward=-17512.3  destroyed=67.0  containment=0%  dominant=('helicopter', 28) (67.6%)  vs heuristic: -17542.8 (heuristic: 30.5)
+    [eval @ ep 1150] getty_view_park [HELD-OUT]: avg_reward=-91248.3  destroyed=312.7  containment=0%  dominant=('helicopter', 21) (46.2%)  vs heuristic: -91294.4 (heuristic: 46.1)
+    [CORR PROBE @ ep 1150] zone_logit-vs-real-fire corr: flat=0.1248  per_obs_mean=0.1162
+[zonehead_randign:zonehead_randign_v1] ===== end eval =====
+
+[status @ ep  1160/2000] ignition=(295,395)  avg_reward(last20)=  -44057.6  aux_zone_loss=3.6194  resource_entropy=1.384/1.386  zone_entropy=3.170/3.466  device=mps
+[status @ ep  1180/2000] ignition=(268,464)  avg_reward(last20)=  -39469.2  aux_zone_loss=3.1712  resource_entropy=1.385/1.386  zone_entropy=3.092/3.466  device=mps
