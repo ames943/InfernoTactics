@@ -1,0 +1,110 @@
+{
+  "single": {
+    "label": "single",
+    "n_episodes": 5,
+    "mean_ticks": 33.6,
+    "mean_dispatch_attempts": 23.8,
+    "mean_dispatched": 23.8,
+    "mean_zone_unreachable": 0.0,
+    "mean_no_unit_available": 0.0,
+    "mean_effect_ok": 9.4,
+    "mean_effect_failed": 11.6,
+    "dispatched_fraction_of_ticks": 0.9026666666666667,
+    "no_unit_available_fraction_of_ticks": 0.0,
+    "helicopter_max_concurrent_mean": 4.4,
+    "helicopter_max_concurrent_max": 5,
+    "contained_rate": 0.8,
+    "first_exceed_fleet_tick": [
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "per_resource_type": {
+      "water_team": {
+        "n_dispatches": 25,
+        "mean_busy_ticks_total": 10.5,
+        "mean_travel_out_ticks": 4.56,
+        "mean_onscene_plus_return_ticks": 5.94,
+        "mean_available_units_per_tick": 1.6547619047619047
+      },
+      "trench_crew": {
+        "n_dispatches": 9,
+        "mean_busy_ticks_total": 10.777777777777779,
+        "mean_travel_out_ticks": 5.777777777777778,
+        "mean_onscene_plus_return_ticks": 5.000000000000001,
+        "mean_available_units_per_tick": 3.4226190476190474
+      },
+      "rescue_vehicle": {
+        "n_dispatches": 22,
+        "mean_busy_ticks_total": 12.375,
+        "mean_travel_out_ticks": 5.2272727272727275,
+        "mean_onscene_plus_return_ticks": 7.1477272727272725,
+        "mean_available_units_per_tick": 1.7738095238095237
+      },
+      "helicopter": {
+        "n_dispatches": 63,
+        "mean_busy_ticks_total": 15.0,
+        "mean_travel_out_ticks": 3.0,
+        "mean_onscene_plus_return_ticks": 12.0,
+        "mean_available_units_per_tick": 0.8690476190476191
+      }
+    },
+    "water_helicopter_fleet_size": 8
+  },
+  "stone_canyon": {
+    "label": "stone_canyon",
+    "n_episodes": 5,
+    "mean_ticks": 81.4,
+    "mean_dispatch_attempts": 71.2,
+    "mean_dispatched": 71.2,
+    "mean_zone_unreachable": 0.0,
+    "mean_no_unit_available": 0.0,
+    "mean_effect_ok": 26.6,
+    "mean_effect_failed": 41.8,
+    "dispatched_fraction_of_ticks": 0.8770692431561997,
+    "no_unit_available_fraction_of_ticks": 0.0,
+    "helicopter_max_concurrent_mean": 5.0,
+    "helicopter_max_concurrent_max": 5,
+    "contained_rate": 0.6,
+    "first_exceed_fleet_tick": [
+      4,
+      2,
+      2,
+      4,
+      2
+    ],
+    "per_resource_type": {
+      "water_team": {
+        "n_dispatches": 92,
+        "mean_busy_ticks_total": 9.5,
+        "mean_travel_out_ticks": 3.9782608695652173,
+        "mean_onscene_plus_return_ticks": 5.521739130434783,
+        "mean_available_units_per_tick": 1.0687960687960687
+      },
+      "trench_crew": {
+        "n_dispatches": 32,
+        "mean_busy_ticks_total": 9.576923076923077,
+        "mean_travel_out_ticks": 4.125,
+        "mean_onscene_plus_return_ticks": 5.451923076923077,
+        "mean_available_units_per_tick": 3.329238329238329
+      },
+      "rescue_vehicle": {
+        "n_dispatches": 100,
+        "mean_busy_ticks_total": 9.94047619047619,
+        "mean_travel_out_ticks": 4.66,
+        "mean_onscene_plus_return_ticks": 5.28047619047619,
+        "mean_available_units_per_tick": 0.7641277641277642
+      },
+      "helicopter": {
+        "n_dispatches": 132,
+        "mean_busy_ticks_total": 14.383928571428571,
+        "mean_travel_out_ticks": 2.371212121212121,
+        "mean_onscene_plus_return_ticks": 12.01271645021645,
+        "mean_available_units_per_tick": 0.8255528255528255
+      }
+    },
+    "water_helicopter_fleet_size": 8
+  }
+}

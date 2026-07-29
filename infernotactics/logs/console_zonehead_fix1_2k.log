@@ -1,0 +1,672 @@
+[zonehead_fix:zonehead_fix1_2k] target=2000 episodes, device=mps  AUX_ZONE_LOSS_COEFF=0.1  training scenarios=['single_training', 'stone_canyon']
+[InfernoEnv] Loading + preparing road routing graph from /Users/ameygarg/COSMOS_FINAL/infernotactics/data/roads.graphml ...
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 69 (Pacific Palisades) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 19 (Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 23 (Palisades Highlands) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 37 (Westwood / UCLA) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 71 (Bel-Air / Holmby Hills) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 99 (Mulholland Drive) via the road graph (dispatches routed to this station specifically will be wasted there).
+[InfernoEnv] Warning: 1/32 zones unreachable from LAFD Station 109 (Mulholland Drive / Brentwood) via the road graph (dispatches routed to this station specifically will be wasted there).
+[zonehead_fix:zonehead_fix1_2k] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_bisect/episode_0260.pt -- zone_head cold (Fix 3), everything else loaded unchanged.
+[status @ ep    20/2000] scenario=stone_canyon     avg_reward(last20)= -109062.8  aux_zone_loss=3.3877  resource_entropy=1.264/1.386  zone_entropy=3.456/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 25 =====
+    [eval @ ep 25] single_training: avg_reward=-119713.1  destroyed=391.3  containment=0%  action_lock=('helicopter', 30) (41.3%)  vs heuristic: -100631.1 (heuristic: -19082.0)
+    [eval @ ep 25] stone_canyon: avg_reward=-121492.7  destroyed=417.3  containment=0%  action_lock=('helicopter', 30) (41.3%)  vs heuristic: -76112.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 25] (a) argmax zones: single_training=30 stone_canyon=30  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.0555  per_obs_mean=0.0715
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep    40/2000] scenario=single_training  avg_reward(last20)=  -95718.0  aux_zone_loss=3.4380  resource_entropy=1.238/1.386  zone_entropy=3.444/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 50 =====
+    [eval @ ep 50] single_training: avg_reward=-119667.9  destroyed=391.3  containment=0%  action_lock=('rescue_vehicle', 30) (45.3%)  vs heuristic: -100585.9 (heuristic: -19082.0)
+    [eval @ ep 50] stone_canyon: avg_reward=-121447.5  destroyed=417.3  containment=0%  action_lock=('rescue_vehicle', 30) (45.3%)  vs heuristic: -76067.6 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 50] (a) argmax zones: single_training=30 stone_canyon=30  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1463  per_obs_mean=0.1029
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep    60/2000] scenario=single_training  avg_reward(last20)= -114866.9  aux_zone_loss=3.3306  resource_entropy=1.229/1.386  zone_entropy=3.441/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 75 =====
+    [eval @ ep 75] single_training: avg_reward=-123047.9  destroyed=404.3  containment=0%  action_lock=('rescue_vehicle', 29) (40.4%)  vs heuristic: -103965.9 (heuristic: -19082.0)
+    [eval @ ep 75] stone_canyon: avg_reward=-105607.3  destroyed=366.0  containment=0%  action_lock=('rescue_vehicle', 29) (37.3%)  vs heuristic: -60227.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 75] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1284  per_obs_mean=0.2391
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep    80/2000] scenario=stone_canyon     avg_reward(last20)= -113994.5  aux_zone_loss=3.3739  resource_entropy=1.306/1.386  zone_entropy=3.446/3.466  device=mps
+[status @ ep   100/2000] scenario=single_training  avg_reward(last20)= -116857.0  aux_zone_loss=3.3609  resource_entropy=1.350/1.386  zone_entropy=3.436/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 100 =====
+    [eval @ ep 100] single_training: avg_reward=-119749.4  destroyed=391.3  containment=0%  action_lock=('rescue_vehicle', 29) (41.3%)  vs heuristic: -100667.4 (heuristic: -19082.0)
+    [eval @ ep 100] stone_canyon: avg_reward=-121529.0  destroyed=417.3  containment=0%  action_lock=('rescue_vehicle', 29) (41.3%)  vs heuristic: -76149.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 100] (a) argmax zones: single_training=29 stone_canyon=29  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1610  per_obs_mean=0.2143
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   120/2000] scenario=single_training  avg_reward(last20)= -112136.3  aux_zone_loss=3.3012  resource_entropy=1.348/1.386  zone_entropy=3.407/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 125 =====
+    [eval @ ep 125] single_training: avg_reward=-119729.3  destroyed=391.3  containment=0%  action_lock=('rescue_vehicle', 22) (41.3%)  vs heuristic: -100647.3 (heuristic: -19082.0)
+    [eval @ ep 125] stone_canyon: avg_reward=-674.8  destroyed=3.0  containment=100%  action_lock=('helicopter', 22) (58.9%)  vs heuristic: +44705.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 125] (a) argmax zones: single_training=22 stone_canyon=22  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2043  per_obs_mean=0.2391
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   140/2000] scenario=single_training  avg_reward(last20)= -120358.1  aux_zone_loss=3.1856  resource_entropy=1.325/1.386  zone_entropy=3.364/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 150 =====
+    [eval @ ep 150] single_training: avg_reward=-119756.0  destroyed=391.3  containment=0%  action_lock=('rescue_vehicle', 21) (39.3%)  vs heuristic: -100674.0 (heuristic: -19082.0)
+    [eval @ ep 150] stone_canyon: avg_reward=-101615.3  destroyed=356.0  containment=0%  action_lock=('rescue_vehicle', 22) (38.0%)  vs heuristic: -56235.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 150] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2180  per_obs_mean=0.2379
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   160/2000] scenario=single_training  avg_reward(last20)= -104767.3  aux_zone_loss=3.2639  resource_entropy=1.328/1.386  zone_entropy=3.338/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 175 =====
+    [eval @ ep 175] single_training: avg_reward=-119727.4  destroyed=391.3  containment=0%  action_lock=('rescue_vehicle', 20) (56.0%)  vs heuristic: -100645.4 (heuristic: -19082.0)
+    [eval @ ep 175] stone_canyon: avg_reward=-121507.0  destroyed=417.3  containment=0%  action_lock=('rescue_vehicle', 20) (56.0%)  vs heuristic: -76127.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 175] (a) argmax zones: single_training=20 stone_canyon=20  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1468  per_obs_mean=0.1908
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   180/2000] scenario=stone_canyon     avg_reward(last20)= -112995.4  aux_zone_loss=2.8366  resource_entropy=1.336/1.386  zone_entropy=3.312/3.466  device=mps
+[status @ ep   200/2000] scenario=single_training  avg_reward(last20)= -110628.9  aux_zone_loss=3.0803  resource_entropy=1.332/1.386  zone_entropy=3.338/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 200 =====
+    [eval @ ep 200] single_training: avg_reward=-119881.5  destroyed=391.3  containment=0%  action_lock=('rescue_vehicle', 21) (32.7%)  vs heuristic: -100799.5 (heuristic: -19082.0)
+    [eval @ ep 200] stone_canyon: avg_reward=-124360.2  destroyed=431.0  containment=0%  action_lock=('rescue_vehicle', 11) (26.2%)  vs heuristic: -78980.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 200] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1770  per_obs_mean=0.2218
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   220/2000] scenario=single_training  avg_reward(last20)= -109167.5  aux_zone_loss=2.9347  resource_entropy=1.344/1.386  zone_entropy=3.289/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 225 =====
+    [eval @ ep 225] single_training: avg_reward=-119914.7  destroyed=391.3  containment=0%  action_lock=('trench_crew', 21) (72.0%)  vs heuristic: -100832.7 (heuristic: -19082.0)
+    [eval @ ep 225] stone_canyon: avg_reward=-103871.6  destroyed=359.0  containment=0%  action_lock=('trench_crew', 21) (44.7%)  vs heuristic: -58491.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 225] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2560  per_obs_mean=0.2746
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   240/2000] scenario=stone_canyon     avg_reward(last20)= -120781.8  aux_zone_loss=3.3165  resource_entropy=1.339/1.386  zone_entropy=2.880/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 250 =====
+    [eval @ ep 250] single_training: avg_reward=-119909.9  destroyed=391.3  containment=0%  action_lock=('trench_crew', 21) (72.0%)  vs heuristic: -100827.9 (heuristic: -19082.0)
+    [eval @ ep 250] stone_canyon: avg_reward=-105075.0  destroyed=363.7  containment=0%  action_lock=('trench_crew', 21) (72.0%)  vs heuristic: -59695.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 250] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2413  per_obs_mean=0.2737
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   260/2000] scenario=single_training  avg_reward(last20)=  -94858.5  aux_zone_loss=2.8546  resource_entropy=1.340/1.386  zone_entropy=2.984/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 275 =====
+    [eval @ ep 275] single_training: avg_reward=-100975.4  destroyed=331.3  containment=0%  action_lock=('helicopter', 26) (46.0%)  vs heuristic: -81893.4 (heuristic: -19082.0)
+    [eval @ ep 275] stone_canyon: avg_reward=-105752.7  destroyed=366.0  containment=0%  action_lock=('helicopter', 26) (46.0%)  vs heuristic: -60372.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 275] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2170  per_obs_mean=0.2481
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   280/2000] scenario=single_training  avg_reward(last20)= -117030.3  aux_zone_loss=2.7266  resource_entropy=1.348/1.386  zone_entropy=3.090/3.466  device=mps
+[status @ ep   300/2000] scenario=stone_canyon     avg_reward(last20)= -106721.4  aux_zone_loss=2.6602  resource_entropy=1.381/1.386  zone_entropy=3.152/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 300 =====
+    [eval @ ep 300] single_training: avg_reward=-119721.2  destroyed=391.3  containment=0%  action_lock=('helicopter', 21) (66.7%)  vs heuristic: -100639.2 (heuristic: -19082.0)
+    [eval @ ep 300] stone_canyon: avg_reward=-78432.3  destroyed=273.3  containment=0%  action_lock=('helicopter', 21) (66.7%)  vs heuristic: -33052.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 300] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2233  per_obs_mean=0.3001
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   320/2000] scenario=single_training  avg_reward(last20)=  -96425.6  aux_zone_loss=2.5742  resource_entropy=1.336/1.386  zone_entropy=3.003/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 325 =====
+    [eval @ ep 325] single_training: avg_reward=-119683.6  destroyed=391.3  containment=0%  action_lock=('helicopter', 21) (68.0%)  vs heuristic: -100601.6 (heuristic: -19082.0)
+    [eval @ ep 325] stone_canyon: avg_reward=-78206.6  destroyed=272.7  containment=0%  action_lock=('helicopter', 21) (68.0%)  vs heuristic: -32826.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 325] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2448  per_obs_mean=0.3126
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   340/2000] scenario=single_training  avg_reward(last20)= -101289.0  aux_zone_loss=2.4482  resource_entropy=1.340/1.386  zone_entropy=2.932/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 350 =====
+    [eval @ ep 350] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 350] stone_canyon: avg_reward=-134688.1  destroyed=465.0  containment=0%  action_lock=('trench_crew', 21) (42.0%)  vs heuristic: -89308.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 350] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2223  per_obs_mean=0.2972
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   360/2000] scenario=stone_canyon     avg_reward(last20)=  -93923.4  aux_zone_loss=2.4524  resource_entropy=1.351/1.386  zone_entropy=2.654/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 375 =====
+    [eval @ ep 375] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 375] stone_canyon: avg_reward=-86455.0  destroyed=300.7  containment=33%  action_lock=('helicopter', 21) (86.4%)  vs heuristic: -41075.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 375] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2350  per_obs_mean=0.3033
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   380/2000] scenario=single_training  avg_reward(last20)= -106537.0  aux_zone_loss=2.0146  resource_entropy=1.374/1.386  zone_entropy=2.837/3.466  device=mps
+[status @ ep   400/2000] scenario=stone_canyon     avg_reward(last20)= -112046.7  aux_zone_loss=2.3972  resource_entropy=1.337/1.386  zone_entropy=2.808/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 400 =====
+    [eval @ ep 400] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 400] stone_canyon: avg_reward=-136320.7  destroyed=471.3  containment=0%  action_lock=('helicopter', 21) (56.7%)  vs heuristic: -90940.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 400] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2302  per_obs_mean=0.2995
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   420/2000] scenario=stone_canyon     avg_reward(last20)=  -88149.8  aux_zone_loss=3.5074  resource_entropy=1.334/1.386  zone_entropy=2.678/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 425 =====
+    [eval @ ep 425] single_training: avg_reward=-105947.1  destroyed=348.7  containment=0%  action_lock=('helicopter', 26) (51.3%)  vs heuristic: -86865.1 (heuristic: -19082.0)
+    [eval @ ep 425] stone_canyon: avg_reward=-96445.7  destroyed=334.3  containment=0%  action_lock=('helicopter', 26) (51.3%)  vs heuristic: -51065.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 425] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2214  per_obs_mean=0.2629
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   440/2000] scenario=stone_canyon     avg_reward(last20)=  -98454.6  aux_zone_loss=2.0430  resource_entropy=1.312/1.386  zone_entropy=2.725/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 450 =====
+    [eval @ ep 450] single_training: avg_reward=-116083.3  destroyed=382.0  containment=0%  action_lock=('helicopter', 18) (60.9%)  vs heuristic: -97001.3 (heuristic: -19082.0)
+    [eval @ ep 450] stone_canyon: avg_reward=-133282.3  destroyed=458.0  containment=0%  action_lock=('helicopter', 12) (58.7%)  vs heuristic: -87902.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 450] (a) argmax zones: single_training=12 stone_canyon=12  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1493  per_obs_mean=0.2082
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   460/2000] scenario=single_training  avg_reward(last20)=  -96602.3  aux_zone_loss=2.7935  resource_entropy=1.332/1.386  zone_entropy=2.403/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 475 =====
+    [eval @ ep 475] single_training: avg_reward=-117033.9  destroyed=385.3  containment=0%  action_lock=('helicopter', 21) (65.3%)  vs heuristic: -97951.9 (heuristic: -19082.0)
+    [eval @ ep 475] stone_canyon: avg_reward=-74365.9  destroyed=261.0  containment=0%  action_lock=('helicopter', 21) (83.3%)  vs heuristic: -28986.0 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 475] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2481  per_obs_mean=0.3214
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   480/2000] scenario=stone_canyon     avg_reward(last20)= -124768.5  aux_zone_loss=2.0855  resource_entropy=1.316/1.386  zone_entropy=2.633/3.466  device=mps
+[status @ ep   500/2000] scenario=stone_canyon     avg_reward(last20)=  -96813.8  aux_zone_loss=2.2145  resource_entropy=1.329/1.386  zone_entropy=2.663/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 500 =====
+    [eval @ ep 500] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 500] stone_canyon: avg_reward=-130094.9  destroyed=447.0  containment=0%  action_lock=('helicopter', 18) (56.9%)  vs heuristic: -84715.0 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 500] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1946  per_obs_mean=0.2733
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   520/2000] scenario=stone_canyon     avg_reward(last20)= -105281.4  aux_zone_loss=2.6917  resource_entropy=1.326/1.386  zone_entropy=2.603/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 525 =====
+    [eval @ ep 525] single_training: avg_reward=-111445.4  destroyed=365.3  containment=0%  action_lock=('helicopter', 21) (58.7%)  vs heuristic: -92363.4 (heuristic: -19082.0)
+    [eval @ ep 525] stone_canyon: avg_reward=-78433.9  destroyed=273.0  containment=0%  action_lock=('helicopter', 21) (62.2%)  vs heuristic: -33054.0 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 525] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2535  per_obs_mean=0.3139
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   540/2000] scenario=stone_canyon     avg_reward(last20)=  -85676.4  aux_zone_loss=3.0911  resource_entropy=1.356/1.386  zone_entropy=2.604/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 550 =====
+    [eval @ ep 550] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 550] stone_canyon: avg_reward=-126133.8  destroyed=433.3  containment=0%  action_lock=('helicopter', 18) (50.4%)  vs heuristic: -80753.9 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 550] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2124  per_obs_mean=0.3023
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   560/2000] scenario=single_training  avg_reward(last20)=  -90043.1  aux_zone_loss=1.9450  resource_entropy=1.288/1.386  zone_entropy=2.472/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 575 =====
+    [eval @ ep 575] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 575] stone_canyon: avg_reward=-132941.1  destroyed=456.7  containment=0%  action_lock=('helicopter', 18) (52.9%)  vs heuristic: -87561.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 575] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2091  per_obs_mean=0.2855
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   580/2000] scenario=single_training  avg_reward(last20)=  -68828.0  aux_zone_loss=1.8302  resource_entropy=1.255/1.386  zone_entropy=2.553/3.466  device=mps
+[status @ ep   600/2000] scenario=single_training  avg_reward(last20)=  -77302.6  aux_zone_loss=2.1023  resource_entropy=1.263/1.386  zone_entropy=2.342/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 600 =====
+    [eval @ ep 600] single_training: avg_reward=42.7  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (92.3%)  vs heuristic: +19124.7 (heuristic: -19082.0)
+    [eval @ ep 600] stone_canyon: avg_reward=-86319.2  destroyed=300.7  containment=33%  action_lock=('helicopter', 21) (97.3%)  vs heuristic: -40939.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 600] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2440  per_obs_mean=0.3026
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   620/2000] scenario=stone_canyon     avg_reward(last20)=  -64233.7  aux_zone_loss=2.4573  resource_entropy=1.322/1.386  zone_entropy=2.478/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 625 =====
+    [eval @ ep 625] single_training: avg_reward=-114129.6  destroyed=375.7  containment=0%  action_lock=('helicopter', 21) (61.8%)  vs heuristic: -95047.6 (heuristic: -19082.0)
+    [eval @ ep 625] stone_canyon: avg_reward=-72881.7  destroyed=256.3  containment=0%  action_lock=('helicopter', 21) (100.0%)  vs heuristic: -27501.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 625] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2678  per_obs_mean=0.3253
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   640/2000] scenario=stone_canyon     avg_reward(last20)=  -72524.7  aux_zone_loss=1.8646  resource_entropy=1.312/1.386  zone_entropy=2.435/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 650 =====
+    [eval @ ep 650] single_training: avg_reward=-120539.3  destroyed=397.7  containment=0%  action_lock=('helicopter', 21) (66.9%)  vs heuristic: -101457.3 (heuristic: -19082.0)
+    [eval @ ep 650] stone_canyon: avg_reward=-72881.7  destroyed=256.3  containment=0%  action_lock=('helicopter', 21) (100.0%)  vs heuristic: -27501.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 650] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2698  per_obs_mean=0.3239
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   660/2000] scenario=stone_canyon     avg_reward(last20)=  -86129.8  aux_zone_loss=1.6177  resource_entropy=1.306/1.386  zone_entropy=2.340/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 675 =====
+    [eval @ ep 675] single_training: avg_reward=-112767.3  destroyed=371.0  containment=0%  action_lock=('helicopter', 18) (48.0%)  vs heuristic: -93685.3 (heuristic: -19082.0)
+    [eval @ ep 675] stone_canyon: avg_reward=-72857.2  destroyed=256.3  containment=0%  action_lock=('helicopter', 21) (88.0%)  vs heuristic: -27477.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 675] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2685  per_obs_mean=0.3269
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   680/2000] scenario=stone_canyon     avg_reward(last20)=  -71793.8  aux_zone_loss=2.0196  resource_entropy=1.289/1.386  zone_entropy=2.114/3.466  device=mps
+[status @ ep   700/2000] scenario=stone_canyon     avg_reward(last20)=  -64324.4  aux_zone_loss=1.9189  resource_entropy=1.287/1.386  zone_entropy=2.243/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 700 =====
+    [eval @ ep 700] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 700] stone_canyon: avg_reward=-86427.3  destroyed=300.7  containment=33%  action_lock=('helicopter', 21) (96.0%)  vs heuristic: -41047.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 700] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2658  per_obs_mean=0.3351
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   720/2000] scenario=single_training  avg_reward(last20)=  -82099.3  aux_zone_loss=1.9799  resource_entropy=1.240/1.386  zone_entropy=2.250/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 725 =====
+    [eval @ ep 725] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 725] stone_canyon: avg_reward=-128967.0  destroyed=443.7  containment=0%  action_lock=('helicopter', 21) (51.8%)  vs heuristic: -83587.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 725] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2017  per_obs_mean=0.2678
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   740/2000] scenario=single_training  avg_reward(last20)=  -84777.2  aux_zone_loss=2.1952  resource_entropy=1.306/1.386  zone_entropy=2.270/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 750 =====
+    [eval @ ep 750] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 750] stone_canyon: avg_reward=-128925.7  destroyed=443.3  containment=0%  action_lock=('helicopter', 18) (49.3%)  vs heuristic: -83545.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 750] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2106  per_obs_mean=0.2863
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   760/2000] scenario=stone_canyon     avg_reward(last20)=  -86946.5  aux_zone_loss=2.0033  resource_entropy=1.304/1.386  zone_entropy=2.307/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 775 =====
+    [eval @ ep 775] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 775] stone_canyon: avg_reward=-135010.8  destroyed=463.7  containment=0%  action_lock=('helicopter', 18) (55.1%)  vs heuristic: -89630.9 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 775] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1939  per_obs_mean=0.2719
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   780/2000] scenario=stone_canyon     avg_reward(last20)=  -83500.5  aux_zone_loss=2.1509  resource_entropy=1.331/1.386  zone_entropy=2.014/3.466  device=mps
+[status @ ep   800/2000] scenario=single_training  avg_reward(last20)=  -76964.7  aux_zone_loss=1.5337  resource_entropy=1.339/1.386  zone_entropy=2.127/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 800 =====
+    [eval @ ep 800] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 800] stone_canyon: avg_reward=-86440.1  destroyed=300.7  containment=33%  action_lock=('helicopter', 21) (83.2%)  vs heuristic: -41060.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 800] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2636  per_obs_mean=0.3518
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   820/2000] scenario=single_training  avg_reward(last20)=  -73610.4  aux_zone_loss=1.9017  resource_entropy=1.248/1.386  zone_entropy=2.280/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 825 =====
+    [eval @ ep 825] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 825] stone_canyon: avg_reward=-139020.9  destroyed=477.7  containment=0%  action_lock=('helicopter', 21) (36.7%)  vs heuristic: -93641.0 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 825] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2232  per_obs_mean=0.3140
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   840/2000] scenario=single_training  avg_reward(last20)=  -84490.9  aux_zone_loss=2.2893  resource_entropy=1.336/1.386  zone_entropy=2.098/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 850 =====
+    [eval @ ep 850] single_training: avg_reward=-104240.5  destroyed=346.0  containment=0%  action_lock=('helicopter', 18) (43.8%)  vs heuristic: -85158.5 (heuristic: -19082.0)
+    [eval @ ep 850] stone_canyon: avg_reward=-67206.3  destroyed=237.0  containment=0%  action_lock=('helicopter', 21) (72.0%)  vs heuristic: -21826.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 850] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2599  per_obs_mean=0.3516
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   860/2000] scenario=single_training  avg_reward(last20)=  -82081.6  aux_zone_loss=1.5713  resource_entropy=1.338/1.386  zone_entropy=2.198/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 875 =====
+    [eval @ ep 875] single_training: avg_reward=-113502.3  destroyed=373.0  containment=0%  action_lock=('water_team', 18) (55.6%)  vs heuristic: -94420.3 (heuristic: -19082.0)
+    [eval @ ep 875] stone_canyon: avg_reward=-71820.0  destroyed=251.3  containment=0%  action_lock=('water_team', 21) (54.7%)  vs heuristic: -26440.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 875] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2490  per_obs_mean=0.3450
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   880/2000] scenario=single_training  avg_reward(last20)=  -80499.2  aux_zone_loss=1.1461  resource_entropy=1.250/1.386  zone_entropy=2.304/3.466  device=mps
+[status @ ep   900/2000] scenario=single_training  avg_reward(last20)=  -85712.4  aux_zone_loss=2.4850  resource_entropy=1.340/1.386  zone_entropy=2.039/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 900 =====
+    [eval @ ep 900] single_training: avg_reward=-93605.4  destroyed=310.0  containment=0%  action_lock=('water_team', 26) (45.3%)  vs heuristic: -74523.4 (heuristic: -19082.0)
+    [eval @ ep 900] stone_canyon: avg_reward=-87257.1  destroyed=304.3  containment=0%  action_lock=('water_team', 21) (56.9%)  vs heuristic: -41877.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 900] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2502  per_obs_mean=0.3257
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   920/2000] scenario=single_training  avg_reward(last20)=  -63376.2  aux_zone_loss=1.4933  resource_entropy=1.342/1.386  zone_entropy=1.931/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 925 =====
+    [eval @ ep 925] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 925] stone_canyon: avg_reward=-85568.9  destroyed=297.7  containment=33%  action_lock=('helicopter', 21) (55.1%)  vs heuristic: -40189.0 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 925] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2601  per_obs_mean=0.3481
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   940/2000] scenario=single_training  avg_reward(last20)=  -75237.0  aux_zone_loss=1.5765  resource_entropy=1.344/1.386  zone_entropy=1.929/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 950 =====
+    [eval @ ep 950] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 950] stone_canyon: avg_reward=-151188.0  destroyed=521.7  containment=0%  action_lock=('helicopter', 21) (58.0%)  vs heuristic: -105808.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 950] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2599  per_obs_mean=0.3393
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   960/2000] scenario=single_training  avg_reward(last20)=  -65128.6  aux_zone_loss=0.7719  resource_entropy=1.059/1.386  zone_entropy=1.932/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 975 =====
+    [eval @ ep 975] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 975] stone_canyon: avg_reward=-141018.1  destroyed=487.3  containment=0%  action_lock=('helicopter', 21) (60.0%)  vs heuristic: -95638.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 975] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2606  per_obs_mean=0.3454
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep   980/2000] scenario=single_training  avg_reward(last20)=  -61379.7  aux_zone_loss=0.5882  resource_entropy=1.031/1.386  zone_entropy=1.758/3.466  device=mps
+[status @ ep  1000/2000] scenario=stone_canyon     avg_reward(last20)=  -36511.2  aux_zone_loss=1.8783  resource_entropy=1.305/1.386  zone_entropy=1.986/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1000 =====
+    [eval @ ep 1000] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1000] stone_canyon: avg_reward=-127189.0  destroyed=439.3  containment=0%  action_lock=('helicopter', 18) (39.6%)  vs heuristic: -81809.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1000] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2427  per_obs_mean=0.3374
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1020/2000] scenario=single_training  avg_reward(last20)=  -53830.9  aux_zone_loss=1.3260  resource_entropy=1.031/1.386  zone_entropy=1.993/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1025 =====
+    [eval @ ep 1025] single_training: avg_reward=-105807.5  destroyed=349.0  containment=0%  action_lock=('helicopter', 26) (37.3%)  vs heuristic: -86725.5 (heuristic: -19082.0)
+    [eval @ ep 1025] stone_canyon: avg_reward=-86102.4  destroyed=301.3  containment=0%  action_lock=('helicopter', 21) (51.8%)  vs heuristic: -40722.5 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1025] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2611  per_obs_mean=0.3242
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1040/2000] scenario=stone_canyon     avg_reward(last20)=  -36841.0  aux_zone_loss=2.5972  resource_entropy=1.303/1.386  zone_entropy=1.918/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1050 =====
+    [eval @ ep 1050] single_training: avg_reward=-120080.0  destroyed=396.0  containment=0%  action_lock=('water_team', 26) (26.7%)  vs heuristic: -100998.0 (heuristic: -19082.0)
+    [eval @ ep 1050] stone_canyon: avg_reward=-89150.4  destroyed=310.0  containment=0%  action_lock=('helicopter', 21) (32.9%)  vs heuristic: -43770.5 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1050] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2557  per_obs_mean=0.3260
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1060/2000] scenario=single_training  avg_reward(last20)=  -45093.6  aux_zone_loss=2.3577  resource_entropy=1.292/1.386  zone_entropy=1.133/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1075 =====
+    [eval @ ep 1075] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1075] stone_canyon: avg_reward=-102783.4  destroyed=357.3  containment=0%  action_lock=('helicopter', 21) (57.3%)  vs heuristic: -57403.5 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1075] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2744  per_obs_mean=0.3703
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1080/2000] scenario=single_training  avg_reward(last20)=  -81893.6  aux_zone_loss=1.0892  resource_entropy=1.217/1.386  zone_entropy=1.936/3.466  device=mps
+[status @ ep  1100/2000] scenario=single_training  avg_reward(last20)=  -49449.4  aux_zone_loss=0.5947  resource_entropy=1.177/1.386  zone_entropy=1.760/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1100 =====
+    [eval @ ep 1100] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1100] stone_canyon: avg_reward=-143648.2  destroyed=492.3  containment=0%  action_lock=('water_team', 18) (40.7%)  vs heuristic: -98268.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1100] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1860  per_obs_mean=0.2691
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1120/2000] scenario=single_training  avg_reward(last20)=  -54644.4  aux_zone_loss=0.7933  resource_entropy=1.174/1.386  zone_entropy=1.834/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1125 =====
+    [eval @ ep 1125] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1125] stone_canyon: avg_reward=-127485.5  destroyed=441.0  containment=0%  action_lock=('water_team', 21) (61.1%)  vs heuristic: -82105.6 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1125] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2594  per_obs_mean=0.3569
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1140/2000] scenario=single_training  avg_reward(last20)=  -75713.3  aux_zone_loss=0.7961  resource_entropy=1.192/1.386  zone_entropy=2.034/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1150 =====
+    [eval @ ep 1150] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1150] stone_canyon: avg_reward=-128925.7  destroyed=443.3  containment=0%  action_lock=('helicopter', 18) (48.2%)  vs heuristic: -83545.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1150] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2475  per_obs_mean=0.3357
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1160/2000] scenario=single_training  avg_reward(last20)=  -85702.3  aux_zone_loss=1.3663  resource_entropy=1.352/1.386  zone_entropy=1.901/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1175 =====
+    [eval @ ep 1175] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1175] stone_canyon: avg_reward=-124539.6  destroyed=430.7  containment=0%  action_lock=('helicopter', 21) (40.7%)  vs heuristic: -79159.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1175] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2682  per_obs_mean=0.3586
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1180/2000] scenario=stone_canyon     avg_reward(last20)=  -57057.0  aux_zone_loss=2.0292  resource_entropy=1.355/1.386  zone_entropy=1.823/3.466  device=mps
+[status @ ep  1200/2000] scenario=single_training  avg_reward(last20)=  -82191.3  aux_zone_loss=0.8895  resource_entropy=1.242/1.386  zone_entropy=2.175/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1200 =====
+    [eval @ ep 1200] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1200] stone_canyon: avg_reward=-138217.8  destroyed=476.3  containment=0%  action_lock=('water_team', 21) (40.0%)  vs heuristic: -92837.9 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1200] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2375  per_obs_mean=0.3325
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1220/2000] scenario=single_training  avg_reward(last20)=  -66897.2  aux_zone_loss=2.1775  resource_entropy=1.345/1.386  zone_entropy=1.967/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1225 =====
+    [eval @ ep 1225] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1225] stone_canyon: avg_reward=-138791.1  destroyed=477.0  containment=0%  action_lock=('water_team', 18) (44.0%)  vs heuristic: -93411.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1225] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1760  per_obs_mean=0.2551
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1240/2000] scenario=stone_canyon     avg_reward(last20)=  -62514.8  aux_zone_loss=2.1506  resource_entropy=1.341/1.386  zone_entropy=1.907/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1250 =====
+    [eval @ ep 1250] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1250] stone_canyon: avg_reward=-123809.1  destroyed=428.0  containment=0%  action_lock=('water_team', 21) (52.4%)  vs heuristic: -78429.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1250] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2548  per_obs_mean=0.3490
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1260/2000] scenario=single_training  avg_reward(last20)=  -46359.8  aux_zone_loss=1.7885  resource_entropy=1.336/1.386  zone_entropy=1.430/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1275 =====
+    [eval @ ep 1275] single_training: avg_reward=-111221.6  destroyed=366.0  containment=0%  action_lock=('water_team', 18) (29.6%)  vs heuristic: -92139.6 (heuristic: -19082.0)
+    [eval @ ep 1275] stone_canyon: avg_reward=-67130.2  destroyed=233.3  containment=33%  action_lock=('water_team', 21) (52.0%)  vs heuristic: -21750.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1275] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2826  per_obs_mean=0.3551
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1280/2000] scenario=single_training  avg_reward(last20)=  -54956.6  aux_zone_loss=1.8001  resource_entropy=1.330/1.386  zone_entropy=1.753/3.466  device=mps
+[status @ ep  1300/2000] scenario=single_training  avg_reward(last20)=  -70922.0  aux_zone_loss=0.8124  resource_entropy=1.113/1.386  zone_entropy=2.033/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1300 =====
+    [eval @ ep 1300] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1300] stone_canyon: avg_reward=-144869.2  destroyed=497.0  containment=0%  action_lock=('water_team', 18) (40.7%)  vs heuristic: -99489.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1300] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1810  per_obs_mean=0.2698
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1320/2000] scenario=stone_canyon     avg_reward(last20)=  -72738.8  aux_zone_loss=2.8085  resource_entropy=1.333/1.386  zone_entropy=1.624/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1325 =====
+    [eval @ ep 1325] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1325] stone_canyon: avg_reward=-117408.6  destroyed=405.0  containment=0%  action_lock=('water_team', 18) (41.1%)  vs heuristic: -72028.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1325] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.1455  per_obs_mean=0.2134
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1340/2000] scenario=single_training  avg_reward(last20)=  -83734.6  aux_zone_loss=1.2235  resource_entropy=1.330/1.386  zone_entropy=1.760/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1350 =====
+    [eval @ ep 1350] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1350] stone_canyon: avg_reward=-126155.5  destroyed=438.0  containment=0%  action_lock=('helicopter', 21) (40.7%)  vs heuristic: -80775.6 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1350] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2731  per_obs_mean=0.3715
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1360/2000] scenario=single_training  avg_reward(last20)=  -76958.3  aux_zone_loss=1.8503  resource_entropy=1.332/1.386  zone_entropy=1.383/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1375 =====
+    [eval @ ep 1375] single_training: avg_reward=-111244.4  destroyed=366.0  containment=0%  action_lock=('water_team', 18) (28.4%)  vs heuristic: -92162.4 (heuristic: -19082.0)
+    [eval @ ep 1375] stone_canyon: avg_reward=-37603.2  destroyed=130.7  containment=33%  action_lock=('water_team', 21) (55.3%)  vs heuristic: +7776.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1375] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2897  per_obs_mean=0.3735
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1380/2000] scenario=stone_canyon     avg_reward(last20)=  -82673.1  aux_zone_loss=1.7976  resource_entropy=1.325/1.386  zone_entropy=1.857/3.466  device=mps
+[status @ ep  1400/2000] scenario=stone_canyon     avg_reward(last20)=  -69746.9  aux_zone_loss=2.0275  resource_entropy=1.320/1.386  zone_entropy=1.781/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1400 =====
+    [eval @ ep 1400] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1400] stone_canyon: avg_reward=-123203.7  destroyed=425.3  containment=0%  action_lock=('water_team', 21) (42.7%)  vs heuristic: -77823.8 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1400] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2516  per_obs_mean=0.3596
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1420/2000] scenario=stone_canyon     avg_reward(last20)=  -79034.9  aux_zone_loss=1.9081  resource_entropy=1.326/1.386  zone_entropy=1.864/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1425 =====
+    [eval @ ep 1425] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1425] stone_canyon: avg_reward=-134412.0  destroyed=462.0  containment=0%  action_lock=('water_team', 21) (47.3%)  vs heuristic: -89032.1 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1425] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2344  per_obs_mean=0.3319
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1440/2000] scenario=stone_canyon     avg_reward(last20)=  -53649.0  aux_zone_loss=1.6793  resource_entropy=1.340/1.386  zone_entropy=1.913/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1450 =====
+    [eval @ ep 1450] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1450] stone_canyon: avg_reward=-142938.2  destroyed=492.7  containment=0%  action_lock=('water_team', 21) (65.3%)  vs heuristic: -97558.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1450] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2948  per_obs_mean=0.3905
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1460/2000] scenario=single_training  avg_reward(last20)=  -80057.1  aux_zone_loss=0.8226  resource_entropy=1.306/1.386  zone_entropy=2.015/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1475 =====
+    [eval @ ep 1475] single_training: avg_reward=-109124.3  destroyed=359.0  containment=0%  action_lock=('water_team', 26) (30.7%)  vs heuristic: -90042.3 (heuristic: -19082.0)
+    [eval @ ep 1475] stone_canyon: avg_reward=-40465.5  destroyed=140.7  containment=33%  action_lock=('water_team', 21) (51.3%)  vs heuristic: +4914.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1475] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2883  per_obs_mean=0.3604
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1480/2000] scenario=single_training  avg_reward(last20)=  -43494.0  aux_zone_loss=0.8765  resource_entropy=1.168/1.386  zone_entropy=1.844/3.466  device=mps
+[status @ ep  1500/2000] scenario=stone_canyon     avg_reward(last20)=  -72177.8  aux_zone_loss=1.3558  resource_entropy=1.337/1.386  zone_entropy=1.677/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1500 =====
+    [eval @ ep 1500] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1500] stone_canyon: avg_reward=-144567.4  destroyed=499.0  containment=0%  action_lock=('water_team', 21) (52.2%)  vs heuristic: -99187.5 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1500] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2871  per_obs_mean=0.3740
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1520/2000] scenario=stone_canyon     avg_reward(last20)=  -78575.4  aux_zone_loss=2.4960  resource_entropy=1.345/1.386  zone_entropy=2.014/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1525 =====
+    [eval @ ep 1525] single_training: avg_reward=-108730.0  destroyed=359.7  containment=0%  action_lock=('helicopter', 21) (36.9%)  vs heuristic: -89648.0 (heuristic: -19082.0)
+    [eval @ ep 1525] stone_canyon: avg_reward=-74393.3  destroyed=260.0  containment=0%  action_lock=('helicopter', 21) (67.3%)  vs heuristic: -29013.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1525] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2980  per_obs_mean=0.3657
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1540/2000] scenario=single_training  avg_reward(last20)=  -73585.0  aux_zone_loss=0.8021  resource_entropy=1.313/1.386  zone_entropy=1.924/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1550 =====
+    [eval @ ep 1550] single_training: avg_reward=44.2  destroyed=0.0  containment=100%  action_lock=('helicopter', 21) (53.8%)  vs heuristic: +19126.2 (heuristic: -19082.0)
+    [eval @ ep 1550] stone_canyon: avg_reward=-43161.5  destroyed=150.3  containment=67%  action_lock=('helicopter', 21) (58.0%)  vs heuristic: +2218.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1550] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2994  per_obs_mean=0.3710
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1560/2000] scenario=single_training  avg_reward(last20)=  -83365.2  aux_zone_loss=1.3703  resource_entropy=1.342/1.386  zone_entropy=1.390/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1575 =====
+    [eval @ ep 1575] single_training: avg_reward=-103372.5  destroyed=339.3  containment=0%  action_lock=('helicopter', 18) (25.8%)  vs heuristic: -84290.5 (heuristic: -19082.0)
+    [eval @ ep 1575] stone_canyon: avg_reward=-46030.6  destroyed=160.3  containment=67%  action_lock=('helicopter', 21) (52.7%)  vs heuristic: -650.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1575] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2883  per_obs_mean=0.3573
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1580/2000] scenario=single_training  avg_reward(last20)=  -67725.6  aux_zone_loss=2.1954  resource_entropy=1.344/1.386  zone_entropy=1.906/3.466  device=mps
+[status @ ep  1600/2000] scenario=stone_canyon     avg_reward(last20)=  -81378.9  aux_zone_loss=3.7746  resource_entropy=1.196/1.386  zone_entropy=2.057/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1600 =====
+    [eval @ ep 1600] single_training: avg_reward=-102636.3  destroyed=338.3  containment=0%  action_lock=('helicopter', 26) (60.7%)  vs heuristic: -83554.3 (heuristic: -19082.0)
+    [eval @ ep 1600] stone_canyon: avg_reward=-89640.6  destroyed=312.0  containment=0%  action_lock=('helicopter', 21) (46.9%)  vs heuristic: -44260.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1600] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2588  per_obs_mean=0.3092
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1620/2000] scenario=single_training  avg_reward(last20)=  -60487.4  aux_zone_loss=1.7231  resource_entropy=1.226/1.386  zone_entropy=2.117/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1625 =====
+    [eval @ ep 1625] single_training: avg_reward=-103589.7  destroyed=343.7  containment=0%  action_lock=('helicopter', 18) (44.2%)  vs heuristic: -84507.7 (heuristic: -19082.0)
+    [eval @ ep 1625] stone_canyon: avg_reward=-68160.2  destroyed=240.3  containment=0%  action_lock=('helicopter', 21) (83.3%)  vs heuristic: -22780.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1625] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2852  per_obs_mean=0.3755
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1640/2000] scenario=stone_canyon     avg_reward(last20)=  -61811.2  aux_zone_loss=1.4459  resource_entropy=1.317/1.386  zone_entropy=1.646/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1650 =====
+    [eval @ ep 1650] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1650] stone_canyon: avg_reward=-86427.3  destroyed=300.7  containment=33%  action_lock=('helicopter', 21) (89.8%)  vs heuristic: -41047.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1650] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2928  per_obs_mean=0.3813
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1660/2000] scenario=stone_canyon     avg_reward(last20)=  -67495.0  aux_zone_loss=2.0513  resource_entropy=1.308/1.386  zone_entropy=2.051/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1675 =====
+    [eval @ ep 1675] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1675] stone_canyon: avg_reward=-100812.6  destroyed=350.7  containment=0%  action_lock=('helicopter', 21) (88.0%)  vs heuristic: -55432.7 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1675] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2909  per_obs_mean=0.3732
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1680/2000] scenario=single_training  avg_reward(last20)=  -58743.5  aux_zone_loss=0.7213  resource_entropy=1.057/1.386  zone_entropy=1.759/3.466  device=mps
+[status @ ep  1700/2000] scenario=stone_canyon     avg_reward(last20)=  -64841.0  aux_zone_loss=2.3757  resource_entropy=1.317/1.386  zone_entropy=1.831/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1700 =====
+    [eval @ ep 1700] single_training: avg_reward=-102240.1  destroyed=340.3  containment=0%  action_lock=('helicopter', 26) (32.9%)  vs heuristic: -83158.1 (heuristic: -19082.0)
+    [eval @ ep 1700] stone_canyon: avg_reward=-78659.2  destroyed=275.7  containment=0%  action_lock=('helicopter', 21) (85.1%)  vs heuristic: -33279.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1700] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2944  per_obs_mean=0.3600
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1720/2000] scenario=stone_canyon     avg_reward(last20)=  -54107.4  aux_zone_loss=2.1358  resource_entropy=1.316/1.386  zone_entropy=1.688/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1725 =====
+    [eval @ ep 1725] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1725] stone_canyon: avg_reward=-124128.1  destroyed=431.0  containment=0%  action_lock=('helicopter', 21) (54.0%)  vs heuristic: -78748.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1725] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.3025  per_obs_mean=0.3879
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1740/2000] scenario=stone_canyon     avg_reward(last20)=  -50118.8  aux_zone_loss=2.0736  resource_entropy=1.317/1.386  zone_entropy=1.953/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1750 =====
+    [eval @ ep 1750] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1750] stone_canyon: avg_reward=-120659.5  destroyed=416.0  containment=0%  action_lock=('helicopter', 18) (39.8%)  vs heuristic: -75279.6 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1750] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2443  per_obs_mean=0.3256
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1760/2000] scenario=single_training  avg_reward(last20)=  -58421.7  aux_zone_loss=1.4692  resource_entropy=1.326/1.386  zone_entropy=1.605/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1775 =====
+    [eval @ ep 1775] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1775] stone_canyon: avg_reward=-139582.2  destroyed=480.3  containment=0%  action_lock=('water_team', 18) (38.7%)  vs heuristic: -94202.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1775] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2443  per_obs_mean=0.3270
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1780/2000] scenario=stone_canyon     avg_reward(last20)=  -56299.4  aux_zone_loss=1.7558  resource_entropy=1.317/1.386  zone_entropy=1.478/3.466  device=mps
+[status @ ep  1800/2000] scenario=single_training  avg_reward(last20)=  -74740.0  aux_zone_loss=0.6225  resource_entropy=1.205/1.386  zone_entropy=1.734/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1800 =====
+    [eval @ ep 1800] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1800] stone_canyon: avg_reward=-113024.2  destroyed=391.0  containment=0%  action_lock=('water_team', 21) (52.7%)  vs heuristic: -67644.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1800] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2682  per_obs_mean=0.3496
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1820/2000] scenario=single_training  avg_reward(last20)=  -45809.6  aux_zone_loss=0.8877  resource_entropy=1.248/1.386  zone_entropy=1.849/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1825 =====
+    [eval @ ep 1825] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1825] stone_canyon: avg_reward=-125477.1  destroyed=432.7  containment=0%  action_lock=('water_team', 21) (52.9%)  vs heuristic: -80097.2 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1825] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2165  per_obs_mean=0.2988
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1840/2000] scenario=single_training  avg_reward(last20)=  -62543.1  aux_zone_loss=2.0648  resource_entropy=1.324/1.386  zone_entropy=1.849/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1850 =====
+    [eval @ ep 1850] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1850] stone_canyon: avg_reward=-138031.2  destroyed=474.7  containment=0%  action_lock=('water_team', 21) (48.9%)  vs heuristic: -92651.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1850] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2473  per_obs_mean=0.3323
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1860/2000] scenario=single_training  avg_reward(last20)=  -41044.4  aux_zone_loss=0.5363  resource_entropy=1.202/1.386  zone_entropy=1.605/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1875 =====
+    [eval @ ep 1875] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1875] stone_canyon: avg_reward=-125093.9  destroyed=431.7  containment=0%  action_lock=('water_team', 21) (52.4%)  vs heuristic: -79714.0 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1875] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2824  per_obs_mean=0.3540
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1880/2000] scenario=stone_canyon     avg_reward(last20)=  -57054.4  aux_zone_loss=2.8967  resource_entropy=1.339/1.386  zone_entropy=1.749/3.466  device=mps
+[status @ ep  1900/2000] scenario=stone_canyon     avg_reward(last20)=  -68494.0  aux_zone_loss=2.2930  resource_entropy=1.321/1.386  zone_entropy=1.380/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1900 =====
+    [eval @ ep 1900] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1900] stone_canyon: avg_reward=-143108.3  destroyed=495.7  containment=0%  action_lock=('water_team', 21) (69.3%)  vs heuristic: -97728.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1900] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.3142  per_obs_mean=0.3928
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1920/2000] scenario=stone_canyon     avg_reward(last20)=  -38361.8  aux_zone_loss=2.5832  resource_entropy=1.361/1.386  zone_entropy=2.169/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1925 =====
+    [eval @ ep 1925] single_training: avg_reward=-115389.5  destroyed=379.0  containment=0%  action_lock=('water_team', 18) (60.2%)  vs heuristic: -96307.5 (heuristic: -19082.0)
+    [eval @ ep 1925] stone_canyon: avg_reward=-60725.3  destroyed=211.3  containment=0%  action_lock=('water_team', 21) (70.2%)  vs heuristic: -15345.4 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1925] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2958  per_obs_mean=0.3737
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1940/2000] scenario=single_training  avg_reward(last20)=  -68745.6  aux_zone_loss=0.9646  resource_entropy=1.245/1.386  zone_entropy=2.122/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1950 =====
+    [eval @ ep 1950] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 1950] stone_canyon: avg_reward=-128683.4  destroyed=444.3  containment=0%  action_lock=('water_team', 21) (60.4%)  vs heuristic: -83303.5 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1950] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.2781  per_obs_mean=0.3667
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1960/2000] scenario=single_training  avg_reward(last20)=  -51211.5  aux_zone_loss=2.3013  resource_entropy=1.301/1.386  zone_entropy=1.763/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 1975 =====
+    [eval @ ep 1975] single_training: avg_reward=-117086.5  destroyed=384.0  containment=0%  action_lock=('water_team', 18) (61.6%)  vs heuristic: -98004.5 (heuristic: -19082.0)
+    [eval @ ep 1975] stone_canyon: avg_reward=-50796.2  destroyed=174.7  containment=0%  action_lock=('water_team', 21) (61.8%)  vs heuristic: -5416.3 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 1975] (a) argmax zones: single_training=21 stone_canyon=21  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.3035  per_obs_mean=0.3758
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+[status @ ep  1980/2000] scenario=stone_canyon     avg_reward(last20)=  -74817.8  aux_zone_loss=2.2397  resource_entropy=1.357/1.386  zone_entropy=1.944/3.466  device=mps
+[status @ ep  2000/2000] scenario=stone_canyon     avg_reward(last20)=  -62437.8  aux_zone_loss=1.3354  resource_entropy=1.334/1.386  zone_entropy=1.663/3.466  device=mps
+
+[zonehead_fix:zonehead_fix1_2k] ===== eval @ ep 2000 =====
+    [eval @ ep 2000] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  action_lock=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 2000] stone_canyon: avg_reward=-56655.5  destroyed=198.3  containment=67%  action_lock=('water_team', 21) (70.2%)  vs heuristic: -11275.6 (heuristic: -45379.9)
+    [DIRECT TEST @ ep 2000] (a) argmax zones: single_training=18 stone_canyon=18  DIFFER=False  |  (b) zone_logit-vs-real-fire corr: flat=0.3101  per_obs_mean=0.3904
+[zonehead_fix:zonehead_fix1_2k] ===== end eval =====
+
+
+[zonehead_fix:zonehead_fix1_2k] STOPPED at episode 2000. Reason: Reached target N_EPISODES=2000.
