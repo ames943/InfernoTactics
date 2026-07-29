@@ -108,6 +108,7 @@ def collect_rollout(env, model, ignition_point, device, seed):
                 "resource_idx": resource_idx,
                 "target_idx": target_idx,
                 "target_zones": raw_zones,
+                "resource_available": available.cpu().numpy(),
                 "fire_state_target": fire_state_to_class(torch.from_numpy(obs["grid"][-1]).long()),
                 "reward": reward,
             })
@@ -140,7 +141,10 @@ def update_policy(model, optimizer, steps, device, normalizer):
         features_np = resolve_relative_targets_from_state(step["grid"], step["scalars"], step["target_zones"])
         features = torch.from_numpy(features_np).unsqueeze(0).to(device)
         logits, value, classification = model(grid, scalars, zones, features)
-        resource_dist = Categorical(logits=logits["resource_type"][0])
+        resource_logits = logits["resource_type"][0].clone()
+        available = torch.from_numpy(step["resource_available"]).to(device)
+        resource_logits[~available] = -1e9
+        resource_dist = Categorical(logits=resource_logits)
         resource_idx = step["resource_idx"]
         target_dist = Categorical(logits=logits["target"][0, resource_idx])
         target_idx = step["target_idx"]
