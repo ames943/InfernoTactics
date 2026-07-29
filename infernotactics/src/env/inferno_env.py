@@ -99,7 +99,10 @@ from datetime import datetime, timezone
 
 import networkx as nx
 import numpy as np
-import osmnx as ox
+try:
+    import osmnx as ox
+except ImportError:
+    ox = None
 from pyproj import Transformer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

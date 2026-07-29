@@ -1,0 +1,415 @@
+Integration Guide for InfernoTactics v10
+======================================
+
+This document describes how to consume outputs from the v10
+relative-action RL policy and integrate it into a larger
+simulation environment or external software.
+
+The policy was trained on the Palisades Fire study area
+(316x595 grid @ 30m, 32 macro-zones, 8 real LAFD stations,
+15 resource units across 4 types, synthetic traffic and
+configurable resource delays).
+
+
+1. Quick Reference: Standalone Inference
+-----------------------------------------
+
+The simplest way to run inference:
+
+    set PYTHONPATH=A:\AI\InfernoTactics\infernotactics\src
+    conda run -n cosmos-venv python -m src.train.eval_relative ^
+        --checkpoint models/checkpoints_relative_v10_multi_dispatch_100/latest.pt ^
+        --random-points 20 ^
+        --episodes 1
+
+Available flags:
+
+    --checkpoint        path to model .pt file (required)
+    --episodes          number of deterministic rollouts per ignition (default 5)
+    --random-points N   use N randomly-sampled WUI ignition points
+                        instead of the named anchor / mandeville / getty
+                        scenarios
+
+Output is printed to stdout in this format per scenario:
+
+    random_001: reward=-382.9  destroyed=0.0  containment=100%  avg_ticks=7.0
+      rewards=[-382.9486792097872]
+      roster={water_team: 3, trench_crew: 4, rescue_vehicle: 3, helicopter: 5}
+      dispatched={'helicopter': 5, 'rescue_vehicle': 3, 'trench_crew': 4, 'water_team': 3}
+      max_concurrent={'water_team': 3, 'trench_crew': 4, 'rescue_vehicle': 3, 'helicopter': 5}
+      actions=Counter({('helicopter', 'active_fire'): 5,
+                       ('trench_crew', 'active_fire'): 4,
+                       ('rescue_vehicle', 'active_fire'): 3,
+                       ('water_team', 'active_fire'): 3})
+
+The final aggregate line:
+
+    random aggregate: reward=-19672.7  destroyed=62.9  containment=85%
+
+
+2. Programmatic Inference From Python
+-------------------------------------
+
+The recommended entry point for embedding the policy in another
+simulation is to construct InfernoEnv directly and call step() with
+list-of-action tuples. A minimal harness:
+
+    import sys, torch
+    sys.path.insert(0, r"A:\AI\InfernoTactics\infernotactics\src")
+    from env.inferno_env import InfernoEnv, SCALAR_KEYS
+    from models.relative_model import RelativeInfernoModel
+    from train.relative_actions import TARGET_TYPES, decode_action
+    from train.train_relative import _forward, MAX_DISPATCH_SLOTS
+
+    device = torch.device("cpu")
+    env = InfernoEnv(seed=12345)               # uses cosmos-venv
+    obs = env.reset(seed=12345)
+
+    n_grid_channels = obs["grid"].shape[0]
+    model = RelativeInfernoModel(
+        n_grid_channels=n_grid_channels,
+        n_scalars=len(SCALAR_KEYS),
+        n_resources=4,
+        n_zones=env.n_zones,
+    ).to(device)
+    state = torch.load(
+        r"A:\AI\InfernoTactics\infernotactics\models\checkpoints_relative_v10_multi_dispatch_100\latest.pt",
+        map_location=device,
+        weights_only=True,
+    )
+    model.load_state_dict(state)
+    model.eval()
+
+    done = False
+    while not done:
+        # Build a list of actions this tick.
+        local_available = {
+            r: int(obs["scalars"][f"{r}_available"]) for r in env.resources.keys()
+        }
+        actions = []
+        with torch.no_grad():
+            for _ in range(MAX_DISPATCH_SLOTS):
+                logits, _, _, zones = _forward(model, obs, env, device)
+                resource_logits = logits["resource_type"][0].clone()
+                mask = torch.tensor(
+                    [local_available[r] > 0 for r in env.resources.keys()],
+                    dtype=torch.bool, device=device,
+                )
+                resource_logits[~mask] = -1e9
+                if not bool(mask.any()):
+                    break
+                r_idx = int(torch.argmax(resource_logits))
+                t_idx = int(torch.argmax(logits["target"][0, r_idx]))
+                action = decode_action(r_idx, t_idx, zones)
+                if action is None:
+                    break
+                local_available[action[0]] -= 1
+                actions.append(action)
+        # IMPORTANT: actions MUST be a list. Tuples are no longer
+        # accepted since the multi-dispatch rollout change.
+        obs, reward, done, info = env.step(actions)
+
+
+3. Action Interface
+-------------------
+
+The policy emits a list of (resource_type, target_zone) tuples per
+simulation tick. Each action means "dispatch this unit from its
+home station to that zone." The environment:
+
+  - validates every action against the current roster
+  - reserves the unit (and, for ground units, the planned route)
+    during its preparation / travel phase
+  - releases the unit when it returns to available after post-effect
+    busy / reload
+  - does not consume additional simulation time for each list entry;
+    one tick advances once even if the list contains many dispatches
+
+Resource types (fixed order, indexed in RESOURCE_TYPES):
+
+    0 = water_team       (suppresses active fire)
+    1 = trench_crew      (creates fire breaks on fuel cells)
+    2 = rescue_vehicle   (evacuates threatened buildings)
+    3 = helicopter       (suppresses active fire, fast air routing)
+
+Action semantics:
+
+    action = ("helicopter", zone_id)        # dispatch a single unit
+    actions = []                            # no-dispatch tick
+    actions = [...]                         # multi-dispatch tick
+
+Zone ids are integers in [0, env.n_zones). For the current build
+the grid is 316x595 cells partitioned into 32 macro-zones
+(4 rows x 8 columns, 80 cells per side at 30 m). The zone grid
+is defined by InfernoEnv._build_zones() and is the same one the
+model was trained on.
+
+
+4. Observation Schema
+---------------------
+
+obs = {
+    "grid":     np.ndarray shape (9, 316, 595) float32
+                channels: 8 static layers + 1 fire-state channel
+                static layer order:
+                  0 elevation
+                  1 slope
+                  2 building_density
+                  3 building_height
+                  4 road_mask
+                  5 fuel_density
+                  6 water_mask
+                  7 population_density
+                  8 fire state (0 Safe, 1 Fuel, 2 Threat, 3 Blaze, 4 Burned Out)
+    "scalars": OrderedDict with 11 keys in this fixed order:
+                  wind_speed_mph
+                  wind_direction_deg
+                  humidity_pct
+                  water_team_available
+                  trench_crew_available
+                  rescue_vehicle_available
+                  helicopter_available
+                  time_elapsed_ticks
+                  traffic_mean_load     (NEW in v9)
+                  traffic_max_load      (NEW in v9)
+                  active_ground_resources  (NEW in v9)
+}
+
+SCALAR_KEYS in env.inferno_env is the canonical ordered list.
+Convert to a fixed vector with env.inferno_env.flatten_scalars(obs).
+
+
+5. Step Output Schema
+---------------------
+
+env.step(actions) returns:
+
+    observation   next observation (same schema as above)
+    reward        float, sum of:
+                    +50  per water/helicopter arrival that
+                         extinguishes >= 1 active fire cell
+                    -100 .. -400 per building destroyed
+                         (population-weighted, capped 4x)
+                    -10  per dispatch that fails or has no effect
+                    -0.02 * travel_time_seconds per dispatched unit
+                    -0.02 * dispatch_delay_seconds (response delay)
+                    -0.01 * congestion_seconds imposed on others
+                    (no separate travel tax on no-op ticks)
+    done          bool, True if contained or MAX_TICKS reached
+    info          dict with keys:
+                    "dispatch"               list[dict], one per list entry
+                                              in the order submitted
+                                              each dict:
+                                                resource_type
+                                                target_zone
+                                                status in
+                                                  "dispatched" /
+                                                  "no_unit_available" /
+                                                  "zone_unreachable"
+                                                travel_time_s
+                                                traffic_delay_s
+                                                response_delay_ticks
+                                                eta_ticks
+                                                station_id
+                                                reward_delta
+                    "resource_events"        list of units whose travel
+                                              or busy period ended this tick
+                    "weather"                {wind_speed_mph,
+                                              wind_direction_deg,
+                                              humidity_pct}
+                    "state_counts"           {Safe, Fuel, Threat, Blaze,
+                                              Burned Out}
+                    "buildings_destroyed"    int, this tick only
+                    "buildings_destroyed_evacuated"
+                    "building_destruction_events"
+                                              list of population-weighted
+                                              destruction detail
+                    "contained"              bool
+                    "timeout"                bool
+                    "tick"                   int, 1-based
+
+
+6. Environment Construction
+----------------------------
+
+    InfernoEnv(
+        seed=None,
+        traffic_mode="synthetic",     # or "legacy" for original
+                                      # no-delay / no-traffic behavior
+        delay_config=None,            # overrides RESOURCE_DELAY_CONFIG
+                                      # default when non-None
+    )
+
+The default environment is "synthetic": deterministic BPR-style
+congestion based on road class + simulation time + currently
+traveling ground units. Ground resources add to road traffic;
+helicopters do not.
+
+Switch to "legacy" to recover the pre-v9 behavior for direct
+comparison with old logs and old checkpoints:
+
+    env = InfernoEnv(seed=42, traffic_mode="legacy")
+
+
+7. Roster Limits (Current Build)
+--------------------------------
+
+Real LAFD depot roster from data_pipeline/real_depots.json:
+
+    water_team       3 units  (stations 69, 19, 37)
+    trench_crew      4 units  (stations 19, 23, 99, 109)
+    rescue_vehicle   3 units  (stations 23, 37, 71)
+    helicopter       5 units  (station 114 Air Operations only)
+
+These are the rosters used in training. Changing them in
+real_depots.json after training invalidates the policy.
+
+
+8. Determinism
+--------------
+
+For the SAME seed and checkpoint, eval_relative.py is fully
+deterministic because it uses argmax decoding instead of
+stochastic sampling. For reproducible results always set
+PYTHONHASHSEED, fix numpy / torch seeds, and call model.eval().
+
+Training-time rollouts are stochastic (Categorical sampling).
+
+
+
+9. Logging Artifacts for Integration Debugging
+-----------------------------------------------
+
+When the trainer is launched with INFERNO_TRACE_EVERY=N, every
+Nth episode emits a per-tick JSONL trace at:
+
+    logs/runs/<run_tag>/train_tick.jsonl
+
+Each line is a JSON object with keys:
+
+    run_tag, episode, tick, ignition, device,
+    state_counts (dict), buildings_destroyed, reward,
+    actions (list), dispatches (list),
+    traffic_mean_load, traffic_max_load
+
+The episode-level CSV at:
+
+    logs/runs/<run_tag>/train_episode.csv
+
+gives one row per episode with per-resource counts, effect
+success, response latency, traffic metrics, and loss values.
+
+A matplotlib dashboard can be regenerated from those CSVs:
+
+    conda run -n cosmos-venv python -m src.train.plot_training ^
+        --run-tag relative_v10_multi_dispatch_100
+
+Output: reports/<run_tag>/training_dashboard.png and summary.json
+
+
+10. Known Limitations
+---------------------
+
+- 100-episode training is short. The policy is not converged.
+  Random inference shows bimodal performance: most random
+  fires are contained in under 10 ticks, but a long-tail set
+  (~20-25%) causes the model to dispatch the full fleet every
+  tick and never converges within 150 ticks.
+
+- noop is declared but its zone is set to -1, so the model
+  cannot formally select "do nothing this tick." Inference
+  falls back to "stop dispatching when decode_action returns
+  None or when no resources are available." Real noop learning
+  requires a follow-up fix.
+
+- Policy gradients are computed against the rollout-time
+  availability-masked distribution. If you change the
+  availability logic in env.inferno_env, retrain.
+
+- The grid geometry is fixed at 4x8 macro-zones. The
+  cnn_branch.ZONE_SIZE_CELLS constant duplicates this. If you
+  rezone, both must change in lock-step and you must retrain.
+
+- Resource delays (RESOURCE_DELAY_CONFIG) are model assumptions
+  embedded in training. Changing them at inference time will
+  produce different behavior than training.
+
+
+11. Embedding In a Bigger Simulation
+-------------------------------------
+
+Typical integration steps:
+
+  1. Add InfernoTactics to PYTHONPATH and conda env.
+  2. In your driver loop, instantiate one InfernoEnv per
+     scenario you want to evaluate.
+  3. Reset it with env.reset(ignition_point=..., seed=...),
+     call env.resources read-only to populate your own UI.
+  4. On each tick:
+       a. Convert your world state -> obs dict via env._build_observation
+          or by constructing one manually using SCALAR_KEYS for ordering.
+       b. Run model forward (see Section 2).
+       c. Submit env.step(actions) where actions is a Python list.
+       d. Read info["dispatch"], info["state_counts"],
+          info["buildings_destroyed"], etc. to drive your UI.
+  5. Treat env.resources as read-only. The env mutates it on
+     every step. If you need to inject resources externally,
+     do it via reset() with a custom real_depots.json path.
+
+
+12. GPU / Device Notes
+----------------------
+
+This run was CPU-only because the local machine has an AMD
+Radeon 880M (no CUDA, no MPS support in cosmos-venv's torch
+build). To use GPU on NVIDIA hardware:
+
+    pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+and ensure the host has an NVIDIA driver. The model is small
+(~250K parameters) so even a low-end GPU is sufficient.
+
+
+13. Versioning
+--------------
+
+The history of significant policy / environment changes:
+
+  v1-v3   original absolute-zone actor-critic
+  v4      GAE / multi-epoch PPO rewrite (collapsed)
+  v5      bisect against v4 collapse
+  v6      multi-trajectory batching (collapsed)
+  v7      zone-head repair (per-zone features)
+  v8      relative action space (fire-relative semantic targets)
+  v9      synthetic traffic + configurable resource delays
+  v10     list-only multi-dispatch (policy-decided count)
+
+Old checkpoints from v1-v9 use the absolute-zone action space
+and are NOT compatible with v10. Use relative_v10_*.pt files
+when working with this document.
+
+
+14. Contact / Maintenance Notes
+--------------------------------
+
+Code organization:
+
+    infernotactics/
+        src/
+            env/                  InfernoEnv + FireSim + grid_builder
+            data_pipeline/        OSMnx, NOAA, USGS, WorldPop fetchers
+            models/               CNN + MLP + actor-critic + relative
+            train/                train_relative.py, eval_relative.py,
+                                   heuristic_policy.py, run_logger.py,
+                                   plot_training.py
+            validation/           WFIGS perimeter comparison
+        models/
+            checkpoints_relative_v10_multi_dispatch_100/
+                episode_0020.pt ... episode_0100.pt, latest.pt
+        logs/runs/<run_tag>/     per-run episode CSV, JSONL, eval, manifest
+        reports/<run_tag>/       matplotlib dashboard PNG, summary JSON
+
+The training script writes all output paths relative to the
+project root (data_pipeline.config.PROJECT_ROOT). Moving or
+copying checkpoints requires updating RUN_TAG in the launcher
+and PROJECT_ROOT in the conda environment.
