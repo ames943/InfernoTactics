@@ -99,7 +99,10 @@ from datetime import datetime, timezone
 
 import networkx as nx
 import numpy as np
-import osmnx as ox
+try:
+    import osmnx as ox
+except ImportError:
+    ox = None
 from pyproj import Transformer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -508,16 +511,16 @@ def _build_zones(grid_static, meta, zone_size_cells=ZONE_SIZE_CELLS):
 
 def _load_routing_graph(grid_crs):
     """Load the OSMnx road graph and project it into the grid's CRS so zone
-    centroids (already in that CRS, from the grid's affine transform) can be
-    used directly for nearest-node lookups without a second pyproj hop.
-    Also adds OSMnx's imputed edge speeds/travel times, reused for real
-    shortest-path ETAs (nx.single_source_dijkstra_path_length, weight=
-    'travel_time', seconds) from a fixed depot to each zone."""
-    graph = ox.load_graphml(ROADS_GRAPHML_PATH)
-    graph = ox.project_graph(graph, to_crs=grid_crs)
-    graph = ox.routing.add_edge_speeds(graph)
-    graph = ox.routing.add_edge_travel_times(graph)
-    return graph
+    centroids can be used directly for nearest-node lookups."""
+    if ox is not None:
+        graph = ox.load_graphml(ROADS_GRAPHML_PATH)
+        graph = ox.project_graph(graph, to_crs=grid_crs)
+        graph = ox.routing.add_edge_speeds(graph)
+        graph = ox.routing.add_edge_travel_times(graph)
+        return graph
+    else:
+        graph = nx.read_graphml(ROADS_GRAPHML_PATH)
+        return graph
 
 
 class InfernoEnv:
