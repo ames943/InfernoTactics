@@ -540,4 +540,25 @@ Multi-dispatch change currently in progress:
 Current next step:
 - Complete the multi-dispatch end-to-end smoke test, then run 50 fresh episodes under synthetic traffic, configurable delays, and list-only multi-dispatch. Save checkpoints every 10 episodes and evaluate the final checkpoint on Skull Rock, both named validation points, and 30 random ignition points.
 
+Add: Training Logging and 100-Episode v10 Run
+
+Logging implementation:
+- `src/train/run_logger.py` now writes crash-safe per-run artifacts under `logs/runs/<run_tag>/`.
+- Artifacts include `config.json`, `train_episode.csv`, `train_tick.jsonl`, `eval.csv`, and `checkpoints.csv`.
+- Episode logs cover reward, buildings destroyed, containment, fire peaks, losses, entropy, action-list length, no-op ticks, dispatch status, resource usage, response latency, and synthetic traffic load.
+- Tick traces are controlled by `INFERNO_TRACE_EVERY`; checkpoint-episode traces were used for the 100-episode run.
+- `src/train/plot_training.py` generates `reports/<run_tag>/training_dashboard.png` and `summary.json` from the durable CSV logs.
+- TensorBoard support is optional in the logger and `tensorboard` is now installed in `cosmos-venv` for future runs. CSV/JSONL remain the source of truth.
+- A two-episode `logging_smoke` run successfully generated the manifest, episode CSV, tick JSONL, evaluation CSV, checkpoint CSV, and dashboard.
+
+v10 multi-dispatch 100-episode run:
+- Run tag: `relative_v10_multi_dispatch_100`.
+- Configuration: 100 fresh episodes, synthetic traffic/delays, list-only multi-dispatch, `MAX_DISPATCH_SLOTS=10`, evaluation/checkpoints every 20 episodes, trace every 20 episodes, CPU in `cosmos-venv`.
+- Checkpoints: episodes 20, 40, 60, 80, 100 plus `latest.pt` under `models/checkpoints_relative_v10_multi_dispatch_100/`.
+- Dashboard: `reports/relative_v10_multi_dispatch_100/training_dashboard.png`.
+- Training reward oscillated substantially. At episode 40 the training rollout was `-1,408.6` with 4 buildings destroyed and containment; episode 100 was `-281.5`, 0 buildings destroyed, contained.
+- Named deterministic evaluation at episode 100: anchor reward `-43,753.8`, 145.5 buildings destroyed, 50% containment; Mandeville reward `-11,688.0`, 44.5 destroyed, 50% containment; Getty reward `-6.7`, 0 destroyed, 100% containment.
+- Final-checkpoint 30-point random inference under the new environment: average reward `-7,520.3`, average buildings destroyed `22.7`, containment `90%`. The model respected concurrent rosters and used list actions, but often dispatched the full available fleet at once and frequently targeted `active_fire` with every resource type.
+- The run is informative but not a solved policy. The logging data should be used to diagnose over-dispatch, poor target/resource matching, and the remaining long-tail fires before extending training.
+
 
