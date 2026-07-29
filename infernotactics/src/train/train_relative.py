@@ -42,6 +42,7 @@ from train.train_actor_critic import (  # noqa: E402
     compute_returns,
     get_device,
 )
+from train.run_logger import RunLogger, summarize_episode  # noqa: E402
 
 
 N_EPISODES = int(os.environ.get("INFERNO_N_EPISODES", 2000))
@@ -54,6 +55,7 @@ RUN_TAG = os.environ.get("INFERNO_RUN_TAG", "relative_v8")
 CHECKPOINT_EVERY = int(os.environ.get("INFERNO_V8_CHECKPOINT_EVERY", 2))
 CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", f"checkpoints_{RUN_TAG}")
 MAX_DISPATCH_SLOTS = int(os.environ.get("INFERNO_MAX_DISPATCH_SLOTS", 10))
+TRACE_EVERY = int(os.environ.get("INFERNO_TRACE_EVERY", 0))
 
 
 def _tensor_targets(env, obs, device):
@@ -114,6 +116,7 @@ def collect_rollout(env, model, ignition_point, device, seed):
                     "resource_idx": resource_idx,
                     "target_idx": target_idx,
                     "target_zones": raw_zones,
+                    "resource_mask": available.detach().cpu().numpy(),
                 })
 
             actions = [
@@ -126,6 +129,7 @@ def collect_rollout(env, model, ignition_point, device, seed):
                 "scalars": flatten_scalars(tick_obs["scalars"]),
                 "actions": tick_actions,
                 "fire_state_target": fire_state_to_class(torch.from_numpy(tick_obs["grid"][-1]).long()),
+                "info": info,
                 "reward": reward,
             })
             total_reward += reward
@@ -149,7 +153,7 @@ def update_policy(model, optimizer, steps, device, normalizer):
     returns = normalizer.normalize(raw_returns)
     normalizer.update(raw_returns)
     optimizer.zero_grad()
-    sums = [0.0] * 6
+    sums = [0.0] * 7
     for step, g_t in zip(steps, returns):
         grid = torch.from_numpy(step["grid"]).unsqueeze(0).to(device)
         scalars = torch.from_numpy(step["scalars"]).unsqueeze(0).to(device)
@@ -160,17 +164,24 @@ def update_policy(model, optimizer, steps, device, normalizer):
         features_np = resolve_relative_targets_from_state(step["grid"], step["scalars"], target_zones_np)
         features = torch.from_numpy(features_np).unsqueeze(0).to(device)
         logits, value, classification = model(grid, scalars, zones, features)
-        resource_dist = Categorical(logits=logits["resource_type"][0])
         log_prob = torch.tensor(0.0, device=device)
-        entropy = resource_dist.entropy()
+        entropy = torch.tensor(0.0, device=device)
+        target_entropy = torch.tensor(0.0, device=device)
+        resource_entropy = torch.tensor(0.0, device=device)
         aux_loss = torch.tensor(0.0, device=device)
         for action_data in step["actions"]:
             resource_idx = action_data["resource_idx"]
             target_idx = action_data["target_idx"]
+            resource_logits = logits["resource_type"][0].clone()
+            resource_mask = torch.from_numpy(action_data["resource_mask"]).to(device)
+            resource_logits[~resource_mask] = -1e9
+            resource_dist = Categorical(logits=resource_logits)
             target_dist = Categorical(logits=logits["target"][0, resource_idx])
             log_prob = log_prob + resource_dist.log_prob(torch.tensor(resource_idx, device=device)) \
                 + target_dist.log_prob(torch.tensor(target_idx, device=device))
             entropy = entropy + target_dist.entropy()
+            target_entropy = target_entropy + target_dist.entropy()
+            resource_entropy = resource_entropy + resource_dist.entropy()
             aux_idx = _aux_target(resource_idx, target_zones_np)
             aux_loss = aux_loss + F.cross_entropy(
                 logits["target"][0, resource_idx].unsqueeze(0),
@@ -185,7 +196,7 @@ def update_policy(model, optimizer, steps, device, normalizer):
         loss = policy_loss + 0.5 * value_loss + CLASSIFICATION_LOSS_COEFF * classification_loss + AUX_TARGET_LOSS_COEFF * aux_loss - ENTROPY_COEFF * entropy
         loss.backward()
         sums[0] += policy_loss.item(); sums[1] += value_loss.item(); sums[2] += classification_loss.item()
-        sums[3] += aux_loss.item(); sums[4] += entropy.item(); sums[5] += target_dist.entropy().item()
+        sums[3] += aux_loss.item(); sums[4] += entropy.item(); sums[5] += resource_entropy.item(); sums[6] += target_entropy.item()
     torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP_NORM)
     optimizer.step()
     n = len(steps)
@@ -254,6 +265,7 @@ def save_checkpoint(model, episode):
     latest = os.path.join(CHECKPOINT_DIR, "latest.pt")
     torch.save(model.state_dict(), checkpoint)
     torch.save(model.state_dict(), latest)
+    return checkpoint
 
 
 def main():
@@ -267,21 +279,40 @@ def main():
     holdout = np.array(list(VALIDATION_IGNITION_POINTS.values()), dtype=np.float32)
     distances = np.sqrt(((pool[:, None, :].astype(np.float32) - holdout[None, :, :]) ** 2).sum(axis=2)).min(axis=1)
     pool = pool[distances >= 30.0]
-    print(f"[relative_v8] device={device} episodes={N_EPISODES} ignition_pool={len(pool)}")
+    logger = RunLogger(PROJECT_ROOT, RUN_TAG, {
+        "episodes": N_EPISODES, "device": str(device), "traffic_mode": env.traffic_mode,
+        "delay_config": env.delay_config, "max_dispatch_slots": MAX_DISPATCH_SLOTS,
+        "learning_rate": LEARNING_RATE, "gamma": GAMMA, "scalar_keys": SCALAR_KEYS,
+        "resource_counts": {rtype: len(env.resources[rtype]) for rtype in RESOURCE_TYPES},
+    }, trace_every=TRACE_EVERY)
+    print(f"[relative_v10] device={device} episodes={N_EPISODES} ignition_pool={len(pool)} run={RUN_TAG}")
     rng = np.random.default_rng(BASE_SEED + 1)
-    for episode in range(1, N_EPISODES + 1):
-        point = tuple(int(x) for x in pool[rng.integers(len(pool))])
-        steps, reward, destroyed, contained = collect_rollout(env, model, point, device, BASE_SEED + episode)
-        losses = update_policy(model, optimizer, steps, device, normalizer)
-        if episode % STATUS_EVERY == 0:
-            print(f"[relative_v8 @ {episode}] reward={reward:.1f} destroyed={destroyed} contained={contained} "
-                  f"policy={losses[0]:.3f} aux={losses[3]:.3f} entropy={losses[4]:.3f}", flush=True)
-        if episode % EVAL_EVERY == 0:
-            for name, point in [("anchor", TRAINING_IGNITION_POINT), *VALIDATION_IGNITION_POINTS.items()]:
-                result = evaluate(model, env, point, device)
-                print(f"  eval {name}: reward={result[0]:.1f} destroyed={result[1]:.1f} containment={result[2]:.0%}", flush=True)
-        if episode % CHECKPOINT_EVERY == 0:
-            save_checkpoint(model, episode)
+    try:
+        for episode in range(1, N_EPISODES + 1):
+            point = tuple(int(x) for x in pool[rng.integers(len(pool))])
+            steps, reward, destroyed, contained = collect_rollout(env, model, point, device, BASE_SEED + episode)
+            losses = update_policy(model, optimizer, steps, device, normalizer)
+            for tick, step in enumerate(steps):
+                logger.log_tick(episode, tick, point, step, device)
+            logger.log_episode(summarize_episode(steps, episode, point, device, losses))
+            if episode % STATUS_EVERY == 0:
+                print(f"[relative_v10 @ {episode}] reward={reward:.1f} destroyed={destroyed} contained={contained} "
+                      f"policy={losses[0]:.3f} aux={losses[3]:.3f} entropy={losses[4]:.3f}", flush=True)
+            if episode % EVAL_EVERY == 0:
+                for name, eval_point in [("anchor", TRAINING_IGNITION_POINT), *VALIDATION_IGNITION_POINTS.items()]:
+                    result = evaluate(model, env, eval_point, device)
+                    logger.log_eval({
+                        "checkpoint_episode": episode, "scenario": name,
+                        "ignition_row": eval_point[0], "ignition_col": eval_point[1],
+                        "evaluation_seed": BASE_SEED, "avg_reward": result[0],
+                        "avg_buildings_destroyed": result[1], "containment_rate": result[2],
+                    })
+                    print(f"  eval {name}: reward={result[0]:.1f} destroyed={result[1]:.1f} containment={result[2]:.0%}", flush=True)
+            if episode % CHECKPOINT_EVERY == 0:
+                checkpoint = save_checkpoint(model, episode)
+                logger.log_checkpoint(episode, checkpoint)
+    finally:
+        logger.close()
 
 
 if __name__ == "__main__":
