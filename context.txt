@@ -1,0 +1,496 @@
+Here's the full context excerpt — everything up to date, ready to paste into your doc:
+
+InfernoTactics AI — Full Project Context
+Course & Requirements
+UCLA ML/neural-network course final project. Must fuse 4 core ML concepts: CNN, MLP, Classification, RL. Timeline: 2 weeks.
+The Project
+A live-interactive AI agent that learns to combat wildfires, built on a real 3D model of the LA Westside (Topanga → Brentwood/Bel-Air → Westwood/UCLA), grounded in the real Palisades Fire (Jan 7–31, 2025 — ~23,400 acres burned, ~6,800 structures destroyed, 12 deaths).
+Architecture (locked)
+Pure Python grid/graph simulation, NOT Unity. The RL agent trains on a grid/graph sim; the eventual pydeck/Streamlit 3D view is a rendering layer only, built last (Day 9 per original plan), after training produces real results to show.
+[Real grid: fire state, fuel, elevation, roads, population] --CNN--\
+                                                                      --> [Fused state] --> Actor-Critic (RL) --> Resource deployment
+[Wind, humidity, resources, time] --MLP--/
+
+Concept
+Role
+CNN
+Spatial grid: fire spread, terrain, roads, buildings, population density
+MLP
+Global scalars: wind, humidity, resource levels, time
+Classification
+Auxiliary head: labels every cell 0 Safe / 1 Fuel / 2 Threat / 3 Blaze
+RL (Actor-Critic)
+Resource deployment strategy; critic's TD-error ties to dopamine/RPE lecture
+
+Project Structure
+infernotactics/
+├── data/                  # real data + generated grid/sim outputs
+├── src/
+│   ├── data_pipeline/     # real data pulling scripts (done)
+│   ├── env/               # grid/graph sim + fire physics + RL env (done)
+│   ├── models/            # CNN, MLP, classification head, actor-critic (done, verified)
+│   ├── train/              # training loop + heuristic baseline (built, real run in progress)
+│   └── viz/               # pydeck/Streamlit visualization (NOT started - Day 9 per plan)
+├── notebooks/
+└── requirements.txt
+
+Venv: infernotactics/.venv, Python 3.14 (Homebrew python@3.12 is broken on this Mac). MPS confirmed working, ~10.33 episodes/min vs ~2.19 on CPU.
+Bbox (src/data_pipeline/config.py): north=34.150, south=34.030, east=-118.440, west=-118.605.
+Real Data Sources Used
+Data
+Source
+Notes
+Roads
+OSMnx (OpenStreetMap)
+roads.graphml — 3,760 nodes, 9,523 edges
+Buildings
+LA GeoHub LARIAC4 (ArcGIS FeatureServer)
+buildings.geojson — 46,585 footprints w/ heights, capped at 150m (LiDAR outlier fix)
+Elevation
+USGS 3DEP 10m DEM (via owslib/WMS, py3dep had a Python 3.14 bug)
+elevation.tif, 1783×948px, 0–686m
+Weather
+NOAA ASOS station KSMO (Santa Monica Airport)
+Real Jan 7–8 2025 hourly data — humidity crashed to 0.67%, sustained wind to 25.3mph, textbook Santa Ana signature
+Population
+US Census/ACS block-group data
+New 9th grid layer, normalized 0–1
+Resource depots
+Geocoded real LAFD station addresses
+Station 69 (Palisades/water), Station 19 (Brentwood/trench), Station 23 (Palisades Highlands/rescue), Station 114 Air Ops Van Nuys (helicopter)
+Real fire perimeter (future validation)
+WFIGS 2025 / LA GeoHub Palisades Perimeter
+Not yet numerically compared to sim output
+Real structure damage (future validation)
+CAL FIRE DINS
+Not yet used
+
+Grid (src/env/grid_builder.py)
+data/grid_static.npy, shape (9, 316, 595) — 595×316 cells @ 30m resolution, CRS EPSG:5070 (reprojected from elevation.tif's native CRS for pixel-perfect alignment across all layers).
+Layers: elevation, slope, building_density, building_height, road_mask, fuel_density (placeholder heuristic, pending real LANDFIRE data), water_mask (coastline heuristic), population_density (real Census data).
+Visually verified: terrain/roads/buildings correctly co-registered (roads follow canyon drainages, buildings cluster in developed areas, Topanga core empty, dense population in Westwood Village vs sparse in Topanga).
+Fire-Spread Simulation (src/env/fire_sim.py) — deterministic, NOT ML
+States: Safe / Fuel / Threat / Blaze / Burned Out. step(wind_speed_mph, wind_direction_deg, humidity_pct) — weather as live args.
+Spread rule: ignition probability per Fuel cell = base rate × flammability × directional slope factor × directional wind factor × road resistance × humidity suppression, combined across 8 neighbors.
+Ember spotting (spot fires): Blaze cells have a wind-scaled chance of igniting a Fuel cell 4–12 cells downwind, bypassing adjacency/road-resistance — can jump roads at high wind (26/30 trials at 45mph, 0/30 at 5mph in synthetic test). Ties to the real Palisades Fire's documented containment-line jumps.
+Validated: uphill spread ~35% wider than downhill; road corridor cuts crossing 4–5x; buildings ignite only from adjacent burning vegetation; water cells never ignite. A directional bug (slope/wind vectors computed backwards) was caught via numeric burn-centroid drift checks, not visual inspection alone, and fixed.
+RL Environment (src/env/inferno_env.py)
+Gym-style InfernoEnv, reset()/step().
+Observation: {'grid': 9-channel CNN input (static layers + fire state), 'scalars': MLP input via flatten_scalars()}.
+Macro-zones: 32 zones (80-cell blocks) — separate, coarser abstraction purely for the action space.
+Resources (4 types, real depots, fixed small rosters, cycle back to available after dispatch/return):
+Water team — Station 69, road routing
+Trench crew — Station 19, road routing, can't place on already-burning cell
+Rescue vehicle — Station 23, road routing, effect weighted by population_density
+Helicopter (2 units) — Station 114/Van Nuys, straight-line air routing (bypasses roads — can reach zones ground units can't, e.g. zone 18), reload trip required
+Ignition scenarios:
+TRAINING_IGNITION_POINT — Skull Rock trailhead (real documented Palisades Fire origin)
+VALIDATION_IGNITION_POINTS — mandeville_canyon, getty_view_park (both real, chaparral/WUI-adjacent, held out from training for generalization checks)
+MULTI_IGNITION_TRAINING_SCENARIO — Topanga ridge (Trippet Ranch), Sullivan Canyon (Brentwood), Stone Canyon (Bel-Air) — same Santa Ana corridor, for later curriculum stage
+Weather: real Jan 7–8 2025 KSMO data drives wind/humidity via use_real_weather=True (default on), step-hold lookup by elapsed sim time; old fixed 45mph placeholder still available via flag for reproducing early debug tests.
+Reward function:
++50   fire extinguished
+-100 × (1 + population_weight, capped)   building destroyed — now population-weighted, not flat
+-10   resource wasted (late arrival / already extinguished / invalid busy-unit action)
+-λ·travel_time
+-μ·congestion_created  (Tier 3, not implemented)
+
+Bug fixed: resource effects were originally pinned to a zone's fixed geometric centroid; fixed to target the actual active-fire centroid within the zone (falls back to geometric centroid when no fire yet — correct for pre-emptive trenching).
+Timing: ~122 ticks/sec, env init ~0.85s one-time. 1 of 32 zones unreachable by all ground resources via road graph — reachable by helicopter (280s straight-line flight), a genuine real advantage of air routing.
+Model Architecture (src/models/) — PyTorch, verified via forward pass, NOT yet meaningfully trained
+cnn_branch.py — stride-1 convs keep full-res per-cell feature map (for classification) + pooled 128-dim vector (MPS-compatible pooling via dynamic zero-padding fix)
+mlp_branch.py — scalars → 128-dim vector
+classification_head.py — 1×1 conv, 4-class per-cell logits (Burned Out collapsed into Safe, matching the plan's 4-class spec)
+actor_critic.py — factored actor (resource_type: 4-way, zone: 32-way, sampled independently) + scalar critic
+inferno_model.py — fuses CNN+MLP, returns (action_logits, value, classification_logits)
+~240K+ params (lightweight, by design). Verified: correct shapes against real InfernoEnv observations, ~49ms/forward pass on CPU.
+Training (src/train/train_actor_critic.py)
+PPO-style actor-critic. Key fixes applied after a diagnosed bug:
+Bug found in first smoke test: value_loss was ~10^6x larger than policy_loss/classification_loss, so global gradient clipping starved the actor/classifier's learning signal — policy collapsed toward deterministic (policy_loss hit exactly 0.000) with no entropy term to prevent it.
+Fixes:
+Return normalization via RunningMeanStd (Welford's online mean/variance)
+Entropy bonus (coefficient 0.01)
+Separate gradient clipping for value head vs. actor/CNN/classifier
+MPS pooling fix (dynamic zero-padding before AdaptiveAvgPool2d, since 79×148 doesn't evenly divide into 4×4 target)
+25-episode diagnostic re-run confirmed the mechanism is healthy: losses bounded and comparable in scale, entropy stable near theoretical max (4.48–4.58 of ~4.85, no collapse), classification loss decreasing and stabilizing, grad norms converging. MPS working, ~10.33 episodes/min (~5.8s/episode) vs ~2.19 on CPU.
+Heuristic Baseline (src/train/heuristic_policy.py)
+Rule-based policy for comparison: water/helicopter → nearest active-fire zone; trench → nearest fire-adjacent fuel zone with no fire yet; rescue → zone maximizing threatened-population-density / travel-time. Uses real road/air routing, same interface as the RL policy (drop-in compatible with eval_policy()).
+Baseline results (5 episodes each, real weather, deterministic):
+Scenario
+avg_reward
+avg_buildings_destroyed
+containment_rate
+single_training (Skull Rock)
+-29,410.9
+98.4
+80%
+validation: mandeville_canyon
++30.5
+0.0
+100%
+validation: getty_view_park
++46.1
+0.0
+100%
+multi_ignition
+-59,049.6
+228.2
+0%
+
+Note: the training scenario is meaningfully harder than the validation points — consistent with it being calibrated against the real, severe Palisades Fire conditions, not an artificially easy benchmark.
+Current Status (as of this doc)
+No real training run has completed yet. Only a 25-episode diagnostic has run (confirmed the mechanism is sound, not meant to produce a good policy). The actual 2000-episode training run on scenario='single' with real weather is the immediate next/current step — tracking reward, entropy, losses, and comparison against the heuristic baseline live as it trains.
+Not Yet Built
+Real training run results (in progress)
+Multi-ignition curriculum training stage (environment supports it, not yet trained on)
+Numerical validation of simulated fire spread vs. real WFIGS perimeter data
+3D visualization (pydeck/Streamlit) — intentionally deferred to after training, per original Day 9 plan
+Tier 3 stretch items: congestion modeling, judge-drawn road blockages
+Known Limitations (honest, for presentation)
+fuel_density is a placeholder heuristic, not real LANDFIRE FBFM40 data
+Resource-to-station assignment (which real LAFD station handles which resource type) is a modeling choice, not a verified real apparatus-roster fact
+1 of 32 zones unreachable by ground resources (helicopter-only)
+Simulated fire spread has not yet been numerically validated against the real historical perimeter (visually/conceptually calibrated only so far)
+Here's a concise addition for the doc — a new section capturing where things are right now:
+
+Training Run — Status Update (In Progress)
+The full 2000-episode training run (scenario='single', Skull Rock, real weather, MPS) has started. Being monitored live for anomalies via status/eval/checkpoint log lines.
+As of episode 20 (early checkpoint):
+Checkpoint saved successfully at ep 20, as designed.
+Deterministic policy eval vs. heuristic baseline: -90,554.8 delta (far behind baseline of -29,410.9 reward on single_training). Expected at this stage — the agent hasn't learned anything meaningful yet; this is noise/random-ish behavior from an early policy, not a red flag.
+Validation-point eval (held-out ignition) also far below baseline at ep 20 — same expected pattern for an untrained policy.
+No anomalies (no NaN losses, no entropy collapse, no gradient blowups) detected so far.
+Monitoring continues; watching specifically for the reward gap vs. heuristic to close over subsequent checkpoints as the real signal of learning, not just "no errors."
+Not yet available: final training results, learning curve shape, whether the agent surpasses the heuristic baseline, final containment/buildings-destroyed numbers. Training run is still in progress — this is a mechanism/health check at ep 20, not a result.
+
+Want me to also add a placeholder table (episode, avg_reward, entropy, policy/value/classification loss, delta-vs-baseline) so you can drop in numbers as later checkpoints come in, rather than rewriting prose each time?
+
+What to add to the doc first
+Replace the "Training Run — Status Update (In Progress)" section with this final version, plus a new section after it:
+
+Training Run — Results (Complete)
+2000/2000 episodes finished, ~2h 20m wall time (14.36 episodes/min avg), no crashes, no MPS errors.
+Reward curve: deterministic training-point reward went from -96,560.8 (ep 1) to +45.0 (ep 2000); 20-episode moving average improved from -98,744.6 to -62,629.7. Stochastic rollout reward trended up overall but oscillated heavily rather than converging monotonically (bistable — see limitations).
+Final losses/entropy (full-run range, all moved, no NaN):
+Policy loss: -1.85e+05 → 17.6
+Value loss: 0.00138 → 2.06e9 (huge upper bound reflects rare early spikes, e.g. the ep20 instability tracked live)
+Classification loss: 0.000509 → 7.45
+Entropy: 1.07 → 4.81 (never collapsed to 0; low dips always recovered)
+Final eval (ep 2000) vs. heuristic baseline:
+Scenario
+RL reward
+RL destroyed
+RL containment
+Heuristic reward
+Delta
+single_training
++32.1
+0.0
+100%
+-29,410.9
++29,443.0
+mandeville_canyon
+-17,489.7
+66.7
+0%
++30.5
+-17,520.2
+getty_view_park
+-81,554.1
+276.0
+0%
++46.1
+-81,600.2
+
+Checkpoint choice: best.pt (ep 260) selected as the deliverable over latest.pt (ep 2000) — equivalent on single_training, but best.pt is the stronger/more consistent pick on both validation scenarios (mandeville_canyon -17,255 vs -17,489.7; getty_view_park -81,315 vs -81,554.1) and isn't dependent on run-to-run luck the way the final episode's "good mode" landing was.
+Headline result: RL beats the heuristic baseline by +29,443 reward on the real, severe Palisades training scenario (100% containment, 0 buildings lost). This result is real and reproducible.
+Honest limitation, stated plainly: the policy does not generalize to the held-out ignition points — it performs far worse than even the simple heuristic there. This is overfitting/memorization to the single training ignition point, not a training failure — the mechanism (losses, entropy, gradients) is healthy throughout. Root cause: the agent trained on exactly one ignition scenario for all 2000 episodes.
+
+Next Step — Multi-Ignition Training (Generalization Fix)
+To address the generalization gap, the plan is to retrain using MULTI_IGNITION_TRAINING_SCENARIO (Topanga ridge, Sullivan Canyon, Stone Canyon — same Santa Ana corridor) so the policy learns transferable fire-response behavior rather than memorizing one location's fixed sequence. mandeville_canyon and getty_view_park remain held out as validation, unchanged. This directly targets the known limitation above rather than treating it as unavoidable — planned as the next real training run before the writeup is finalized.
+
+Here's what to add, replacing the "Next Step — Multi-Ignition Training (Generalization Fix)" section (since that's now been attempted) with the actual outcome, plus new sections for what came after:
+
+Multi-Ignition Training — Results (v1)
+3500-episode run planned, stopped early at ep 1000 after sustained monitoring showed no trend. Mechanism stayed healthy throughout (no NaN, entropy stable, classification loss steady) — this was a data/dynamics problem, not a training-pipeline bug.
+Findings across all 5 scenarios (single_training + 3 multi-ignition + tracking toward validation):
+No scenario showed sustained improvement over 1000 episodes (~29% of planned run)
+One apparent breakthrough on mandeville_canyon (+33.1, 100% containment) recurred 5 times between ep 680–820, then vanished for the next several evals — reproducible but not stable/consolidating
+stone_canyon had one breakthrough (ep 720) that never recurred in ~290 subsequent episodes
+Combined avg oscillated in a fixed band (-53k to -62k) the entire run — bistable, not converging
+Decision: stopped at ep 1000 (best.pt at ep 720) rather than run the full 3500, since the data showed no directional trend and further episodes were unlikely to change that on their own.
+
+Generalization Fix Attempts (v2, v3) — Both Negative Results
+Diagnosis before v2/v3: reward-scale conflict between scenarios sharing one global return normalizer and one scalar critic (scenario reward magnitudes ranged from +32 to -142,000) was hypothesized as the root cause.
+v2 — three targeted fixes, warm-started from the single-scenario checkpoint:
+Per-scenario return normalization (separate running mean/std per scenario, confirmed diverging in smoke test and throughout the run)
+Scenario identity as explicit MLP input (5-slot one-hot: 4 training scenarios + 1 dedicated "unseen" slot for validation points)
+Curriculum warm-start (80/20 → 50/50 → uniform schedule, partial weight-load from existing best.pt)
+Ran full 1000 episodes. Result: single_training held its solved state throughout (+32.1, 100% containment — no catastrophic forgetting, confirming the warm-start worked). All other scenarios (topanga_ridge, sullivan_canyon, stone_canyon, mandeville_canyon, getty_view_park) landed back in the same bands as v1 — no sustained trend. best.pt at ep 200; 800 further episodes produced no improvement.
+v3 — added separate value heads per scenario (shared CNN/MLP trunk + actor, separate critics), warm-started from v2's best.pt. Value heads verifiably diverged early (peak divergence ~0.09 around ep 40–80) then re-converged to 0.041 by the end of the run — the critics tried to specialize and couldn't sustain it. Same flat result as v1/v2 on every scenario except the anchor.
+Conclusion: three separate, principled architectural fixes targeting reward-scale/critic-sharing conflict all failed to produce a trend. This rules out that hypothesis as the primary cause. Mechanism was healthy throughout all three runs (no NaN, stable entropy) — this is a legitimate negative result, not an unresolved bug.
+
+Current Working Hypothesis — Credit Assignment, Not Task Conflict
+Since scenario-conflict-targeted fixes didn't work, the leading remaining hypothesis is that the underlying policy-gradient credit assignment itself is too high-variance for this long-horizon, sparse-reward task — independent of which scenario is involved. Specifically under audit:
+Whether the actor-critic implementation actually uses GAE (Generalized Advantage Estimation) or is closer to full-episode REINFORCE-with-baseline
+Whether PPO's multi-epoch/clipped-ratio update is meaningfully engaging, or each batch only gets a single gradient step
+Whether harder scenarios have substantially longer episodes than single_training, which would independently support a horizon/credit-assignment explanation
+Planned next: audit these three points, then (if warranted) implement proper GAE + multi-epoch PPO updates, add potential-based dense reward shaping, and replace the 4 fixed multi-ignition points with continuously randomized ignition locations for a stronger generalization pressure than curriculum sampling among a small fixed set.
+
+WFIGS Perimeter Validation — Completed, Strong Result
+Independent of the RL generalization work: built fetch_perimeter.py + wfigs_perimeter_validation.py to numerically compare the calibrated fire-spread simulation against the real historical Palisades Fire perimeter (LA County ArcGIS WFIGS data).
+Result: IoU 0.636, recall 90.7%, precision 68.1%, area_ratio 1.33 — strong for an untuned cellular automaton. Robustness-checked across 4 random seeds (stable) and validated against a second independent real timestamp (Jan 11, confirming the result isn't date-specific). fire_sim.py parameters were never tuned against this validation data — the number is honest, not circular.
+Error pattern analysis: ~52% of "missed" area sits on road cells with reduced fuel density (explained by existing modeling choices, not a flaw). Over-prediction area is best explained by the simulation not modeling suppression — ruled out distance/slope/fuel as alternative explanations.
+This closes the "not yet numerically validated" item from Known Limitations — now a real, defensible, positive result for the writeup.
+
+Want me to now also draft the "Known Limitations" section update (the generalization gap needs to move from "not yet built" language to "attempted, honest negative result" language) before we move to the GAE audit prompt?
+
+
+Add: Resource Model — Overhaul (Superseding the Original 4-Depot Model)
+The original single-depot-per-type resource model was found to be a simplification (each of 4 types sourced from exactly one fixed station). A research pass grounded this in real LAFD data and rebuilt it:
+Real station audit (LAFD Fire Station Directory): confirmed Station 69/19/23 run real Engine/Brush-Patrol/Ambulance apparatus, not literal "water_team/trench_crew/rescue_vehicle" — Brush Patrol (BP) is the real analog to trench_crew. Found 2 additional real stations (37 – Westwood/UCLA, 71 – Bel-Air) that plausibly serve the corridor, later 2 more (99, 109) after a follow-up search.
+Final resource model: 8 real LAFD stations, 15 total units (up from 4 stations/11 units):
+ RESOURCE_COUNTS = {water_team: 3, trench_crew: 4, rescue_vehicle: 3, helicopter: 5}
+ (helicopter bumped 2→5 to match LAFD's real confirmed AW139 fleet — flagged as the most conservative/understated parameter in the original model).
+Routing/dispatch restructured: _prepare_routing() now builds one Dijkstra tree per station (not per type); _try_dispatch() picks the nearest available unit of a type across all stations carrying it. Action space, reward function, and model architecture unchanged.
+Re-baselined heuristic on the new environment (all single-fire scenarios improved; multi_ignition got ~2x worse — root-caused to a real, interesting mechanism: the heuristic's greedy one-dispatch-per-tick rule now lets the faster/more numerous trench_crew crowd out water_team/rescue_vehicle in the 3-simultaneous-fire scenario — a heuristic-tie-breaking limitation, not an environment flaw).
+Environment frozen and signed off as of this point — anything trained from here is v5, not comparable to v1–v4.
+Two real, findable stations (99, 109) with Brush Patrol were found but not pursued for inclusion until later — later added after bbox/road-graph checks passed, bringing trench_crew to 4.
+AE/ALF apparatus codes, previously flagged "unconfirmed," now confirmed via the directory's own legend (Assessment Engine / Assessment Light Force).
+Add: v4/v5 — Credit-Assignment Investigation (Extended, Still Unresolved)
+Building on the "Current Working Hypothesis — Credit Assignment" section already in the doc:
+GAE + multi-epoch PPO implemented and unit-verified. Per-minibatch KL-clipping added and confirmed engaging.
+Attempt 1 (no entropy floor): entropy collapsed to true zero at ep~104-135, no recovery. Root-caused to KL-based early-stopping having a blind spot — KL≈0 between two already-near-deterministic distributions even as their underlying logits diverge unboundedly.
+Attempt 2 (entropy-floor added): floor triggered too early/too often (ep24+), freezing the policy at 1 minibatch/episode before real learning could happen — a "no escape mechanism" design gap.
+Attempt 3 (combined entropy-floor + gradient-norm-spike stop): passed a clean 25-episode dry run; real run launched. Separately caught and fixed a genuine anchor-conflict bug first (single shared actor logits couldn't represent both the anchor point's helicopter-favoring optimum and the broader trench/rescue-favoring optimum simultaneously — fixed with a minimal binary anchor-identity flag, not the full v2/v3 apparatus).
+v4 real run (old environment) collapsed at ep170-189, true entropy near-zero, no recovery, no detectable pre-collapse gradient buildup (checked explicitly, twice) — ruling out "catch it early" as a viable strategy.
+Systematic follow-up testing (on the new, frozen 8-station environment, now called v5):
+PPO_EPOCHS_PER_UPDATE: tested 4 (collapses), 2 (dips but recovers in short smoke test), 1 (cleanest smoke test — no safety-net triggers at all). Real 500-episode run at EPOCHS=1 launched — also collapsed, at ep170-189, proving epoch count delays but does not prevent the collapse.
+Gradient clip magnitude: tested 0.5 (baseline) vs. 0.05 (10x tighter) — tighter clip collapsed faster and deeper (ep20-29 vs ep170), ruling out clip magnitude as the lever and suggesting the issue is update direction/Adam-adaptivity, not overall gradient size.
+Coverage-density exploration: computed real numbers — true exhaustive ignition-point coverage (99,657 WUI-filtered candidates) would take ~302 hours for 1x coverage; ruled impractical. Not pursued further given the underlying collapse risk was unresolved regardless of sampling density.
+Two more cheap, untested levers identified (lower learning rate; direct advantage-estimate clipping) — prompted, results pending as of the end of this record.
+Working conclusion, pending those last two tests: if both fail, the credit-assignment hypothesis is considered exhausted via six independently-tested variants (4/2/1 epochs, 2 clip magnitudes, plus the original v1/v2/v3 task-conflict line) — the honest remaining option would be a full multi-trajectory-batching rebuild (large effort, uncertain payoff) or writing up v4/v5 as a rigorous, well-evidenced negative result alongside v1-v3.
+Add: Known Limitations — Updated Language
+Replace "not yet numerically validated" (already resolved) and the flat "generalization gap" bullet with:
+Generalization gap — attempted exhaustively, honest negative result. Nine independently diagnosed hypotheses tested across two hypothesis families (task-conflict: v1/v2/v3; credit-assignment: v4/v5 across epoch-count and gradient-clip variants) — all ruled out with real mechanistic evidence, no hand-waving. Root cause of the specific v4/v5 collapse mechanism narrowed to trajectory-variance/update-direction, not magnitude or epoch count. Remaining untested lever (multi-trajectory batching) would require a rebuild comparable in scope to the entire v4/v5 effort, with uncertain payoff, and was assessed against project time constraints.
+Helicopter fleet size: sim models 5 units (bumped from 2, matching LAFD's real confirmed AW139 firefighting fleet) — this was the single most conservative parameter in the original model, now corrected.
+Resource-to-station mapping: now grounded in real LAFD apparatus data (8 real stations, real apparatus types where determinable) rather than an arbitrary single-depot-per-type assumption — see Resource Model section for full sourcing.
+
+Your doc currently stops at "results pending" for the last two levers. Here's everything to add after that point.
+
+Replace the "Working conclusion, pending those last two tests" paragraph with:
+Final two levers — both negative. Lower learning rate (3e-5, 10x reduction): entropy slid from 4.42 to 0.027 by ep50, still declining; degenerate eval locked in by ep10. Advantage-estimate clipping (±3σ): smooth monotonic decline to true zero by ep31. Notably, advantage clipping worked as designed (bounding each tick's contribution produced a smooth decline rather than a cliff) yet did not stop the aggregate drift — early-stopping fired in 50% of episodes versus 22% for the LR test, indicating the safety net was fighting a steady current, not catching rare events. Both configs collapsed within the 50-episode window, making these cleaner negatives than the earlier delayed-collapse pattern.
+Critically, lower learning rate and tighter gradient clip both collapsed faster than baseline — two independent axes of step-size reduction producing the same inverted result. This ruled out "the update step is too large" and pointed at update direction.
+
+Add: v6 — Multi-Trajectory Batching (Negative)
+Rebuilt the training loop to collect multiple independent episodes before each GAE computation and PPO update, so no single trajectory could dominate. A minibatch-mixing probe confirmed the mechanism worked as intended (2.0–4.0 unique episodes per minibatch throughout).
+It collapsed anyway — smoothly and monotonically, fully by ep48, faster than the v4/v5 single-trajectory baseline (ep104–189). KL early-stopping fired in 12/13 batches (92%, the highest rate of any config). Peak RSS ~2GB, 8.38 eps/min — resources were not the constraint.
+This directly falsified the hypothesis the rebuild was built to test. Combined with the six single-trajectory levers, it exhausted the entire "aggregation and step-size of the update" space.
+
+Add: The Bisect — Regression Localized to the v4 Rewrite
+A fact left unexploited through seven negative results: the original 2000-episode run never collapsed (entropy 1.07 → 4.81, dipping and recovering throughout). Every configuration since the v4 rewrite collapsed, including at PPO_EPOCHS_PER_UPDATE=1, which should be near-equivalent to the old loop's single update per episode. Two implementations that should behave similarly behaved completely differently — suggesting the seven levers had all been tuning knobs on top of broken code.
+Test: run the unmodified pre-v4 training loop on the frozen v5 8-station environment, 300 episodes, scenario='single'. Nothing ported, nothing modernized.
+Result — decisive:
+Entropy healthy across all 300 episodes. Per-head logging (added for this run): resource_entropy 1.05–1.38 of max 1.386; zone_entropy 3.13–3.45 of max 3.466 — above 90% of theoretical max throughout, with the normal dip-and-recover pattern.
+The policy solved single_training: ep260/280/300 all at avg_reward +42.4, 0 buildings destroyed, 100% containment — +29,453.3 vs. heuristic, essentially reproducing the original run's +29,443.0 headline on the new environment.
+Deterministic eval converged to ('helicopter', 18) at 100% of ticks — a confident, correct answer for a fixed scenario, reached while training-time entropy stayed above 90%. This is the healthy signature: broad exploration during training, deterministic commitment at eval.
+Held-out validation still failed (mandeville_canyon -17,734; getty_view_park -81,621) — the generalization gap is unchanged; this test wasn't checking it.
+Conclusion: the frozen v5 environment and the model architecture are both exonerated. The collapse is a regression inside the v4 rewrite (GAE, multi-epoch PPO, per-minibatch KL early-stopping, minibatching, advantage-normalization scope). This converts an apparently fundamental RL instability into a bounded, diffable code defect.
+
+Add: Collapsed-Policy Action Probe
+Loaded surviving collapsed checkpoints and read out both heads' softmax probabilities across genuinely different fire states (ticks 0/5/10/20/40 of a rollout):
+Run
+Locked resource_type
+Locked zone
+Max prob
+State-invariant
+tight_grad_clip
+rescue_vehicle
+14
+1.000 / 1.000
+yes
+low_lr (3e-5)
+rescue_vehicle
+14
+0.999 / 0.997
+yes
+adv_clip
+rescue_vehicle
+14
+1.000 / 1.000
+yes
+v6_multi_trajectory
+trench_crew
+14
+—
+yes
+
+(v4_baseline and the plain EPOCHS=1 run were unrecoverable — both wrote to unsuffixed checkpoint directories that were later overwritten. All runs now use INFERNO_RUN_TAG.)
+Three of four locked onto rescue_vehicle (second-worst type) and one onto trench_crew (worst); none onto helicopter, the only type that actually works. All four locked onto zone 14, regardless of which resource type they landed on, across different hyperparameters and different runs.
+That shared zone is the telling detail: the resource heads disagreed, so these weren't independent optimizations converging on a shared insight. A run-configuration-independent attractor in the zone head indicates a pathology in the update mechanism, not a policy discovering a real (if boring) optimum.
+
+Add: Resource-Type Effectiveness Sweep — Two Corrections
+Fixed-policy sweep on scenario='single', 5 episodes each, no learning:
+Mode
+avg_reward
+buildings destroyed
+containment
+helicopter-only
+-24,068.8
+82.0
+80%
+random-type
+-70,904.3
+240.6
+40%
+water_team-only
+-115,608.0
+390.2
+0%
+rescue_vehicle-only
+-129,988.5
+442.6
+0%
+trench_crew-only
+-133,196.0
+443.0
+0%
+
+Correction 1 — the 73% trench_crew effect-success figure was conditional, not intrinsic. Measured in isolation it is 8%. The mechanism: with only trench_crew dispatching, nothing suppresses active fire, so the front outruns the crew — targets that were "fire-adjacent, no active fire" at dispatch time have active fire by arrival, and _apply_trench fails on any footprint containing Threat/Blaze. The 73% figure was measured inside a mixed policy where water/helicopter suppression kept trench targets from going stale. This propagates back to the heuristic re-baselining root-cause, which described trench's 73%-vs-4-8% as "a genuine mechanical asymmetry" — that section needs revising to note the dependency.
+Correction 2 — helicopter dominates, and mixing hurts. Helicopter-only beats every other single type by ~5x and beats the mixed random policy. Straight-line air routing plus the 5-unit fleet reaches fire fast enough to suppress it; the three ground types arrive too late. Diluting dispatches across ineffective types actively costs reward.
+This also explains why collapse-to-trench_crew or -rescue_vehicle can't be read as the policy finding a real optimum — it converged toward the worst available choices.
+
+Replace the "Generalization gap" bullet in Known Limitations with:
+Generalization gap — attempted exhaustively across two hypothesis families, still open. Task-conflict (v1/v2/v3): per-scenario return normalization, scenario-ID input, per-scenario value heads — all negative. Credit-assignment (v4/v5/v6): PPO epochs 4/2/1, gradient-clip magnitude 0.5/0.05, learning rate 3e-5, advantage clipping ±3σ, and multi-trajectory batching — all negative, all with mechanistic evidence rather than hand-waving. A bisect run subsequently localized the v4-onward entropy collapse to a regression in the rewritten training loop, exonerating both the environment and the architecture. The generalization gap itself remains unresolved; the collapse bug that blocked every attempt to fix it is now bounded and diagnosable.
+Diagnostic caveat worth recording: the degenerate ~-119,981 / 0%-containment eval value was treated as corroborating evidence of collapse across several runs. The bisect showed it appears in healthy runs too (present at ep20 with entropy at 94% of max) — it is the reward floor for "this scenario burns uncontrolled," not a collapse signature. Entropy logs remain valid; the eval-lock timestamps cited alongside them were not independent confirmation.
+
+Want me to draft the feature-toggle-diff section as a placeholder for when that experiment runs?
+
+
+Your doc ends at the toggle-diff placeholder question. Here's everything after that point.
+
+Add: Feature-Toggle Diff — Collapse Localized to GAE
+With the bisect proving the regression lived in the v4 rewrite, features were re-enabled on the healthy old loop one at a time, 100 episodes each, distinct run tags.
+An inspection before running corrected the experiment's framing. Feature E (advantage normalization) was not per-minibatch as assumed — v4 z-scores advantages once per episode using only that episode's own ~150 values, then reuses that array across all minibatches. The old loop had no advantage z-scoring at all; it used normalized_return − V(s), where returns pass through a slow cross-episode RunningMeanStd. The risk is therefore loss of cross-episode scale, not small-sample minibatch noise.
+Run
+Config
+Result
+1
+E
+Healthy all 100 episodes, entropy >90% of max both heads
+2
+E+D
+Real monotonic decline: resource_entropy 96%→57%, zone_entropy healthy
+3
+E+D+A
+Full collapse. Both heads exactly 0.000 by ep20, locked to (trench_crew, 17) at prob 1.000
+
+Run 3 was the fastest, most total collapse in the entire investigation — every prior config took ep104–189. GAE is the load-bearing change; minibatching and per-episode z-scoring produce only slow erosion on their own.
+
+Add: GAE Isolation and the Critic Diagnostic
+GAE alone (no minibatching, no z-scoring): entropy declined to 0.12 by ep100, but the deterministic eval sat at the known-good solution — +42.4, 100% containment, (helicopter, 18) — at every checkpoint but one, with confidence rising to 0.99. This is benign convergence, categorically different from the pathological lock onto wrong actions. GAE's arithmetic is not defective; test_gae.py's asserts were never going to catch this because the defect isn't in compute_gae().
+Staleness hypothesis, tested and rejected. Advantages are computed once per episode and reused across ~10 sequential minibatch gradient steps while the weights move underneath them. Recomputing advantages fresh before each minibatch collapsed faster — ep15 versus Run 3's ep20 — and sign agreement with a Monte-Carlo shadow stayed at 36–70% with no trend.
+The critic diagnostic explained why. Explained variance on 200 episodes of the old loop, split by episode regime:
+Regime
+Share
+Result
+Long/uncontained episodes
+155/200 (77.5%)
+EV +0.56 to +0.78, correlation mean +0.875, stable across the run
+Near-instantly-contained
+45/200 (22.5%)
+Correlation negative in 93.3% of cases, mean −0.78, no improvement with training
+
+The critic is strong in the common case and reliably anti-correlated in the rare one — and the rare regime grows with training: 12 of the first 100 episodes versus 33 of the last 100, as a better policy increasingly lands in its own optimum.
+GAE's per-tick residual δ_t = r_t + γV(s_{t+1}) − V(s_t) depends on the critic tracking value tick-to-tick. It does so reliably while fires burn, and points the wrong way during exactly the short, already-winning trajectories a good policy needs reinforced. An aggregate explained-variance number would look net-positive and mask this entirely. Monte-Carlo returns are immune — they never need a per-tick estimate, only the final discounted return.
+This closes the causal chain: v4 rewrite → GAE → critic anti-correlated in near-terminal states → collapse. It also explains the inverted step-size results: reducing learning rate or gradient clip removed the noise that had been accidentally protecting the policy from a consistently wrong signal.
+
+Add: v7 — Multi-Scenario on the Repaired Loop
+1500-episode run on the old loop (no GAE, no minibatching, no z-scoring), four training scenarios plus two held out, stopped at ep460.
+At ep100, one encouraging signal: every scenario, training and held-out alike, converged on helicopter rather than scenario-specific resource types — consistent with the effectiveness sweep, and reducing the problem to zone selection.
+But the zone column disproved the initial "bistable trade-off" reading. At every checkpoint, single_training and stone_canyon showed the same zone (19/19, 28/28) — one shared global zone preference drifting under the combined gradient of four scenarios, not two optima competing. stone_canyon's apparent 67% containment was collateral: it has a wide tolerance window and benefits from whichever zone the shared logits currently favor. single_training only works at exactly zone 18.
+single_training stayed degraded for 320 consecutive episodes (ep140–460) with no recovery. topanga_ridge and sullivan_canyon remained flat throughout. Stopped early — curriculum warm-start was declined since v2 had already established that outcome.
+
+Add: Action-Space Capacity Analysis — A Structural Limit
+TICK_DURATION_MINUTES = 2.0. Diagnostic on HeuristicPolicy, frozen v5:
+
+
+single
+stone_canyon
+Mean episode length
+33.6 ticks
+81.4 ticks
+Successful dispatches
+23.8 (90.3%)
+71.2 (87.7%)
+Dispatched but no effect
+11.6/ep (49%)
+41.8/ep (59%)
+Tick Blaze exceeds 8-unit fleet
+tick 2
+tick 2–4
+Helicopter concurrent-active
+4.4 of 5
+5.0 of 5
+
+Busy cycles: ground types 9.5–12.4 ticks (DEPLOYED_BUSY_TICKS=5); helicopter 14.4–15 ticks, of which only 2.4–3.0 is travel — HELICOPTER_RELOAD_TICKS=12 dominates. Mean available units per tick: helicopter 0.83–0.87 of 5 (83–91% utilization), trench_crew 3.33 of 4 (barely used, consistent with its 8% isolated effect-success).
+The 88–90% dispatch rate initially suggests the one-per-tick cap isn't binding, but the heuristic self-gates and never proposes an unavailable type — that is the policy avoiding the question, not evidence of slack.
+The binding arithmetic: fire exceeds the 8-unit suppression fleet by tick 2–4, but committing 8 units requires 8 ticks minimum under a one-per-tick cap, before travel. Each helicopter is then locked ~15 ticks (~30 min sim time, ~24 of it reloading), yielding roughly 27 total sorties across an 81-tick episode. The 49–59% no-effect rate is the visible symptom.
+Implication for prior results: stone_canyon's 67% ceiling and the −121k floor are partly capacity results, not purely learning results. Some scenarios may be uncontainable by any policy, which means they offer no successful behavior to learn from. HELICOPTER_RELOAD_TICKS=12 is an unsourced modeling parameter and turns out to be the single most outcome-determining number in the environment.
+
+Add: Zone-Head Diagnostic — The Actor Was Ignoring Fire Location
+A pooling-resolution test — ADAPTIVE_POOL_SIZE (4,4)→(8,8), 300 episodes — produced no zone differentiation: all six scenarios locked to the same zone at all 15 checkpoints. Giving the zone head explicit per-zone features plus reward shaping also failed, freezing at (helicopter, zone 30) for 240 consecutive episodes with bit-identical evals — while zone_entropy stayed at 96–99.9% of max. High entropy with state-invariant argmax is the anomaly that prompted a direct probe.
+Forward passes on 20 varied observations (mixed scenarios, mixed ticks, active fire 5→297 cells):
+Quantity
+Result
+Zone logit variance
+mean 0.0039
+Resource logit variance (control)
+mean 0.102 — 26x larger
+Zone logits vs real per-zone fire
+r = −0.05 flat, −0.11 per-obs
+CNN pooled 128-d vector
+variance 1.5e-7, 119/128 components exactly zero
+MLP output
+variance 6.0 — carries weather/time, not fire location
+Fused 256-d vector
+variance essentially all MLP; CNN half contributes nothing
+zone_pooled per-zone features
+r = 0.97 vs real per-zone fire counts
+
+The global average pool diluted a handful of fire cells across ~188,000 grid cells to the point of erasure. But zone_pooled — the same convs, different pooling — delivered excellent zone-specific signal directly to the zone head.
+The diagnosis inverted: not "the zone head lacks information to discriminate zones," but "the zone head isn't learning to use the excellent information it already receives." A learning-dynamics problem localized to one head, not an architecture or input-resolution limit.
+
+Add: Zone-Head Repair — First Mechanically Successful Fix
+Three changes: (1) per-zone scorer — each zone's logit computed from its own features through a shared small MLP, making a constant output hard to represent; (2) auxiliary supervised loss training zone logits toward the real per-zone active-fire distribution each tick, giving dense gradient instead of episode-end only; (3) cold-start the zone head so it couldn't fall back on its state-independent bias.
+2000 episodes, ~4.5h, clean completion. Zero NaN, no collapse (zone_entropy 3.38→1.72, specializing not collapsing; resource_entropy stable ~93%), aux loss 3.55→1.76.
+The leading indicator moved and held:
+Episode range
+Flat corr
+Per-obs corr
+25
+0.056
+0.072
+200–500
+0.15–0.26
+0.20–0.32
+600–1000
+0.19–0.27
+0.27–0.37
+1500–2000
+0.22–0.31
+0.31–0.39
+
+From −0.05 to a sustained 0.31/0.39 plateau. The zone head now genuinely reads its input.
+Outcomes, mixed and honest:
+single_training became substantially more reliable — solved at the majority of checkpoints from ep700, and critically it loses and re-finds the solution rather than forgetting it permanently, unlike every prior run (v7 lost it for good at ep140).
+Whole-rollout behavior differentiated by scenario from ~ep500: single_training → (helicopter, 18), stone_canyon → (water_team, 21). First genuine scenario-specific behavior in the project.
+stone_canyon got worse — mostly 0% containment versus its previous reliable 67%. Read as the fix removing a crutch: that 67% came from the shared-zone attractor, not learned behavior. Losing a collateral result is not a regression.
+Measurement correction: the pre-registered test used tick-0 argmax, which is a weak test — at tick 0 both scenarios are a ~3-cell disk in a 188,000-cell grid and are genuinely near-identical, so identical argmax is correct behavior. Whole-rollout dominant action is the valid measure, and it does differentiate.
+
+Replace the Generalization Gap bullet in Known Limitations with:
+Generalization gap — extensively investigated, partially advanced, still open. Twelve-plus configurations across three hypothesis families. Task-conflict (v1/v2/v3): all negative. Credit-assignment (v4/v5/v6): all negative, and subsequently explained — a bisect localized the collapse to the v4 rewrite, a toggle diff isolated it to GAE, and a critic diagnostic identified the mechanism (explained variance strong in long episodes, anti-correlated in near-terminal states, with that regime growing as the policy improves). Representation (pooling resolution, per-zone features, zone-head repair): the zone head was found to be ignoring fire location entirely (r=−0.05 despite input at r=0.97), and repairing it raised correlation to 0.31–0.39 and produced the first scenario-specific behavior — but did not close the outcome gap on held-out points.
+Structural capacity limit. Fire exceeds the 8-unit suppression fleet by tick 2–4, while the one-dispatch-per-tick action space requires 8 ticks to commit that fleet and helicopters reload for 12 ticks. Some scenarios may be uncontainable by any policy, meaning they supply no successful behavior to learn from. Achievable containment on the harder scenarios is capped by the environment, not only by the policy.
+Future work — relative action space. Absolute zone indices (0–31) are inherently memorizable; "dispatch to zone 18" cannot transfer to a fire elsewhere. A fire-relative action space — "dispatch to the zone with most active fire," "to the highest threatened population," "to the fire-adjacent zone furthest downwind" — would be transferable by construction and would shrink the action space from 32 to ~6–8, increasing gradient signal per option. This is the most promising untested direction, and was scoped out because it constitutes a new action space (v8), breaking comparability with all v1–v7 results.
+
+

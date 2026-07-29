@@ -1,0 +1,134 @@
+"""Deterministic inference/evaluation for a saved v8 relative-action model."""
+
+import argparse
+import collections
+import os
+import sys
+
+import numpy as np
+import torch
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from data_pipeline.config import PROJECT_ROOT  # noqa: E402
+from env.inferno_env import (  # noqa: E402
+    RESOURCE_TYPES,
+    TRAINING_IGNITION_POINT,
+    VALIDATION_IGNITION_POINTS,
+    InfernoEnv,
+    SCALAR_KEYS,
+)
+from models.relative_model import RelativeInfernoModel  # noqa: E402
+from train.relative_actions import TARGET_TYPES, decode_action  # noqa: E402
+from train.train_relative import _forward  # noqa: E402
+
+
+def evaluate(model, env, name, point, device, episodes):
+    rewards, destroyed, contained, ticks = [], [], [], []
+    actions = collections.Counter()
+    dispatched = collections.Counter()
+    max_active = collections.Counter()
+    model.eval()
+    with torch.no_grad():
+        for episode in range(episodes):
+            obs = env.reset(ignition_point=point, seed=9100 + episode, use_real_weather=True)
+            total_reward = 0.0
+            total_destroyed = 0
+            done = False
+            episode_dispatched = collections.Counter()
+            episode_max_active = collections.Counter()
+            while not done:
+                logits, _value, _classification, target_zones = _forward(model, obs, env, device)
+                resource_logits = logits["resource_type"][0].clone()
+                available = torch.tensor(
+                    [obs["scalars"][f"{rtype}_available"] > 0 for rtype in RESOURCE_TYPES],
+                    dtype=torch.bool,
+                    device=device,
+                )
+                resource_logits[~available] = -1e9
+                if bool(available.any()):
+                    resource_idx = int(torch.argmax(resource_logits))
+                else:
+                    resource_idx = 0
+                target_idx = int(torch.argmax(logits["target"][0, resource_idx]))
+                action = decode_action(resource_idx, target_idx, target_zones)
+                if action is not None:
+                    actions[(RESOURCE_TYPES[resource_idx], TARGET_TYPES[target_idx])] += 1
+                obs, reward, done, info = env.step(action)
+                dispatch = info.get("dispatch") or {}
+                if dispatch.get("status") == "dispatched":
+                    episode_dispatched[dispatch["resource_type"]] += 1
+                for rtype in RESOURCE_TYPES:
+                    active = sum(unit["state"] != "available" for unit in env.resources[rtype])
+                    episode_max_active[rtype] = max(episode_max_active[rtype], active)
+                total_reward += reward
+                total_destroyed += info["buildings_destroyed"]
+            rewards.append(total_reward)
+            destroyed.append(total_destroyed)
+            contained.append(bool(info["contained"]))
+            ticks.append(info["tick"])
+            dispatched.update(episode_dispatched)
+            for rtype in RESOURCE_TYPES:
+                max_active[rtype] = max(max_active[rtype], episode_max_active[rtype])
+    result = {
+        "scenario": name,
+        "episodes": episodes,
+        "avg_reward": float(np.mean(rewards)),
+        "rewards": rewards,
+        "avg_buildings_destroyed": float(np.mean(destroyed)),
+        "containment_rate": float(np.mean(contained)),
+        "avg_ticks": float(np.mean(ticks)),
+        "semantic_actions": actions,
+    }
+    print(f"{name}: reward={result['avg_reward']:.1f}  destroyed={result['avg_buildings_destroyed']:.1f}  "
+          f"containment={result['containment_rate']:.0%}  avg_ticks={result['avg_ticks']:.1f}")
+    print(f"  rewards={rewards}")
+    print(f"  roster={{{', '.join(f'{r}: {len(env.resources[r])}' for r in RESOURCE_TYPES)}}}")
+    print(f"  dispatched={dict(dispatched)}  max_concurrent={dict(max_active)}")
+    print(f"  actions={actions}")
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--episodes", type=int, default=5)
+    parser.add_argument("--random-points", type=int, default=0,
+                        help="Evaluate this many fresh WUI ignition points instead of named scenarios.")
+    args = parser.parse_args()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    env = InfernoEnv(seed=9100)
+    obs = env.reset(seed=9100)
+    model = RelativeInfernoModel(
+        n_grid_channels=obs["grid"].shape[0],
+        n_scalars=len(SCALAR_KEYS),
+        n_resources=len(RESOURCE_TYPES),
+        n_zones=env.n_zones,
+    ).to(device)
+    state = torch.load(args.checkpoint, map_location=device, weights_only=True)
+    model.load_state_dict(state)
+    print(f"checkpoint={os.path.abspath(args.checkpoint)} device={device} episodes_per_scenario={args.episodes}")
+    if args.random_points > 0:
+        candidates = env._ignition_candidates.astype(np.float32)
+        holdouts = np.array(list(VALIDATION_IGNITION_POINTS.values()), dtype=np.float32)
+        distances = np.sqrt(((candidates[:, None, :] - holdouts[None, :, :]) ** 2).sum(axis=2)).min(axis=1)
+        candidates = candidates[distances >= 30.0]
+        rng = np.random.default_rng(9317)
+        count = min(args.random_points, len(candidates))
+        selected = candidates[rng.choice(len(candidates), size=count, replace=False)]
+        results = []
+        for index, point in enumerate(selected, 1):
+            results.append(evaluate(model, env, f"random_{index:03d}", tuple(map(int, point)), device, args.episodes))
+        print("random aggregate: "
+              f"reward={np.mean([r['avg_reward'] for r in results]):.1f}  "
+              f"destroyed={np.mean([r['avg_buildings_destroyed'] for r in results]):.1f}  "
+              f"containment={np.mean([r['containment_rate'] for r in results]):.0%}")
+    else:
+        scenarios = [("anchor", TRAINING_IGNITION_POINT)] + list(VALIDATION_IGNITION_POINTS.items())
+        for name, point in scenarios:
+            evaluate(model, env, name, point, device, args.episodes)
+
+
+if __name__ == "__main__":
+    main()
