@@ -11,3 +11,22 @@
 [zonehead_randign:zonehead_randign_v1] Warm-started from /Users/ameygarg/COSMOS_FINAL/infernotactics/models/checkpoints_zonehead_zonehead_fix1_2k/episode_2000.pt -- exact match, every key loaded unchanged.
 [status @ ep    20/2000] ignition=(174,391)  avg_reward(last20)=  -59528.3  aux_zone_loss=1.7240  resource_entropy=1.353/1.386  zone_entropy=2.092/3.466  device=mps
 [status @ ep    40/2000] ignition=(193,310)  avg_reward(last20)=  -39977.9  aux_zone_loss=3.6222  resource_entropy=1.344/1.386  zone_entropy=2.164/3.466  device=mps
+
+[zonehead_randign:zonehead_randign_v1] ===== eval @ ep 50 =====
+    [eval @ ep 50] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  dominant=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 50] mandeville_canyon [HELD-OUT]: avg_reward=-18983.4  destroyed=74.3  containment=0%  dominant=('water_team', 18) (42.9%)  vs heuristic: -19013.9 (heuristic: 30.5)
+    [eval @ ep 50] getty_view_park [HELD-OUT]: avg_reward=-77832.5  destroyed=266.0  containment=0%  dominant=('water_team', 21) (63.3%)  vs heuristic: -77878.6 (heuristic: 46.1)
+    [CORR PROBE @ ep 50] zone_logit-vs-real-fire corr: flat=0.2135  per_obs_mean=0.2765
+[zonehead_randign:zonehead_randign_v1] ===== end eval =====
+
+[status @ ep    60/2000] ignition=(1,446)  avg_reward(last20)=  -45799.4  aux_zone_loss=4.0709  resource_entropy=1.370/1.386  zone_entropy=2.633/3.466  device=mps
+[status @ ep    80/2000] ignition=(166,158)  avg_reward(last20)=  -63328.5  aux_zone_loss=3.8465  resource_entropy=1.345/1.386  zone_entropy=2.410/3.466  device=mps
+[status @ ep   100/2000] ignition=(54,475)  avg_reward(last20)=  -32612.9  aux_zone_loss=3.1584  resource_entropy=1.342/1.386  zone_entropy=3.063/3.466  device=mps
+
+[zonehead_randign:zonehead_randign_v1] ===== eval @ ep 100 =====
+    [eval @ ep 100] single_training: avg_reward=42.4  destroyed=0.0  containment=100%  dominant=('helicopter', 18) (100.0%)  vs heuristic: +19124.4 (heuristic: -19082.0)
+    [eval @ ep 100] mandeville_canyon [HELD-OUT]: avg_reward=-20240.8  destroyed=80.0  containment=0%  dominant=('water_team', 12) (43.6%)  vs heuristic: -20271.3 (heuristic: 30.5)
+    [eval @ ep 100] getty_view_park [HELD-OUT]: avg_reward=-78548.7  destroyed=270.0  containment=0%  dominant=('water_team', 21) (78.2%)  vs heuristic: -78594.8 (heuristic: 46.1)
+    [CORR PROBE @ ep 100] zone_logit-vs-real-fire corr: flat=0.2631  per_obs_mean=0.2623
+[zonehead_randign:zonehead_randign_v1] ===== end eval =====
+
