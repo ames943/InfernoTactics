@@ -171,7 +171,7 @@ and 0 buildings destroyed. That result is real, reproducible, and not
 cherry-picked — see the limitations section for exactly where it stops
 holding.
 
-## The research journey — training this thing was not simple
+## The research journey
 
 This section exists so nobody has to rediscover what's already been ruled
 out. The short version: getting from "a model that can forward-pass" to
@@ -225,7 +225,7 @@ of training quality, not a hidden training failure.
 The best checkpoint produced by this whole line of work is what's packaged
 in [`best_model/`](best_model/).
 
-## Known limitations, stated honestly
+## Known limitations
 
 - **Generalization to new ignition points is unsolved.** The model performs
   far worse than a simple heuristic on ignition points it wasn't trained
