@@ -19,12 +19,12 @@ if best_model_src not in sys.path:
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
-from env.inferno_env import InfernoEnv, TRAINING_IGNITION_POINT, RESOURCE_TYPES
-from models.inferno_model import InfernoModel
+from env.inferno_env import InfernoEnv, TRAINING_IGNITION_POINT, RESOURCE_TYPES, SCALAR_KEYS
+from models.relative_model import RelativeInfernoModel
+from train.relative_actions import TARGET_TYPES, decode_action, resolve_relative_targets
 
 app = FastAPI(title="Palisades 3D Fire Simulator API")
 
-# Mount static files if needed
 app.mount("/static", StaticFiles(directory=current_dir), name="static")
 
 # Global simulation & model state
@@ -37,7 +37,6 @@ is_done = False
 coord_grid = None # (316, 595, 2) [lat, lon]
 zone_centers = {} # zone_idx -> {lat, lon, bounds}
 
-# Initialize coordinate transformation
 transformer = Transformer.from_crs("EPSG:5070", "EPSG:4326", always_xy=True)
 
 def precompute_coordinates(meta):
@@ -46,7 +45,6 @@ def precompute_coordinates(meta):
     width = meta["width"]
     transform = meta["transform"]
     
-    # transform: [dx, 0, x0, 0, dy, y0]
     dx, x0 = transform[0], transform[2]
     dy, y0 = transform[4], transform[5]
     
@@ -56,7 +54,7 @@ def precompute_coordinates(meta):
     rows = np.arange(height)
     
     xs = x0 + (cols + 0.5) * dx
-    ys = y0 + (rows + 0.5) * dy # dy is -30.0
+    ys = y0 + (rows + 0.5) * dy
     
     grid_x, grid_y = np.meshgrid(xs, ys)
     lons, lats = transformer.transform(grid_x, grid_y)
@@ -64,7 +62,6 @@ def precompute_coordinates(meta):
     coord_grid[:, :, 0] = lats
     coord_grid[:, :, 1] = lons
     
-    # Precompute zone centers (32 zones = 4 rows x 8 cols)
     n_rows, n_cols = 4, 8
     r_step = height / n_rows
     c_step = width / n_cols
@@ -102,8 +99,13 @@ def init_environment():
     precompute_coordinates(env.meta)
     
     n_grid_channels = env.grid_static.shape[0] + 1
-    model = InfernoModel(n_grid_channels=n_grid_channels)
-    model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
+    model = RelativeInfernoModel(
+        n_grid_channels=n_grid_channels,
+        n_scalars=len(SCALAR_KEYS),
+        n_resources=len(RESOURCE_TYPES),
+        n_zones=env.n_zones
+    )
+    model.load_state_dict(torch.load(checkpoint_path, map_location="cpu", weights_only=True))
     model.eval()
     
     reset_simulation()
@@ -131,8 +133,7 @@ async def reset_api():
     fire_state = env.sim.state
     blaze_coords = []
     
-    # Collect initial burning cells
-    rows, cols = np.where((fire_state == 2) | (fire_state == 3)) # THREAT or BLAZE
+    rows, cols = np.where((fire_state == 2) | (fire_state == 3))
     for r, c in zip(rows, cols):
         blaze_coords.append({
             "r": int(r),
@@ -163,22 +164,29 @@ async def step_api():
         return JSONResponse({"is_done": True, "tick": tick_count, "total_reward": total_reward})
         
     with torch.no_grad():
-        grid_t, scalars_t = InfernoModel.obs_to_tensors(obs)
-        action_logits, value, _ = model(grid_t, scalars_t)
+        grid_t, scalars_t = RelativeInfernoModel.obs_to_tensors(obs)
+        target_zones, target_features = resolve_relative_targets(env, obs)
+        zones_t = torch.from_numpy(target_zones).unsqueeze(0)
+        features_t = torch.from_numpy(target_features).unsqueeze(0)
         
-        resource_idx = action_logits["resource_type"].argmax(dim=-1).item()
-        zone_idx = action_logits["zone"].argmax(dim=-1).item()
+        logits, value, _ = model(grid_t, scalars_t, zones_t, features_t)
         
-        resource_type = RESOURCE_TYPES[resource_idx] if resource_idx < len(RESOURCE_TYPES) else None
+        resource_logits = logits["resource_type"][0].clone()
+        available = torch.tensor(
+            [obs["scalars"][f"{r}_available"] > 0 for r in RESOURCE_TYPES], dtype=torch.bool
+        )
+        resource_logits[~available] = -1e9
+        resource_idx = int(torch.argmax(resource_logits)) if bool(available.any()) else 0
+        target_idx = int(torch.argmax(logits["target"][0, resource_idx]))
         
-        # Step env
-        obs, reward, is_done, info = env.step((resource_type, zone_idx))
+        action = decode_action(resource_idx, target_idx, target_zones)
+        
+        obs, reward, is_done, info = env.step(action)
         total_reward += reward
         tick_count += 1
         
     fire_state = env.sim.state
     
-    # Sample active fire cells (BLAZE=3, THREAT=2, BURNED_OUT=4)
     active_rows, active_cols = np.where((fire_state == 2) | (fire_state == 3))
     burned_rows, burned_cols = np.where(fire_state == 4)
     
@@ -192,7 +200,6 @@ async def step_api():
             "state": int(fire_state[r, c])
         })
         
-    # Sample subset of burned cells for performance in 3D rendering
     burned_cells = []
     if len(burned_rows) > 0:
         step = max(1, len(burned_rows) // 150)
@@ -206,7 +213,8 @@ async def step_api():
                 "state": 4
             })
             
-    target_info = zone_centers.get(zone_idx, {"lat": 34.0725, "lon": -118.5425})
+    res_type, z_idx = action if action else ("noop", 0)
+    target_info = zone_centers.get(z_idx, {"lat": 34.0725, "lon": -118.5425})
     
     return JSONResponse({
         "tick": tick_count,
@@ -214,8 +222,8 @@ async def step_api():
         "reward": float(reward),
         "total_reward": float(total_reward),
         "action": {
-            "resource_type": resource_type,
-            "zone_idx": int(zone_idx),
+            "resource_type": res_type,
+            "zone_idx": int(z_idx),
             "target_lat": target_info["lat"],
             "target_lon": target_info["lon"]
         },

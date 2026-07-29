@@ -141,7 +141,8 @@
   <div id="cesiumContainer"></div>
 
   <script>
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI6ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
+    // Valid Cesium Ion Token
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
 
     let viewer;
     let isRunning = false;
@@ -150,48 +151,56 @@
     let gridEntities = [];
     let resourceEntities = [];
 
-    // Counters
     let counts = { water_team: 0, trench_crew: 0, rescue_vehicle: 0, helicopter: 0 };
 
-    // Air Ops Base (Van Nuys Airport)
     const VAN_NUYS_DEPOT = { lat: 34.2098, lon: -118.4894 };
-    // Palisades Ignition Point (Skull Rock)
     const IGNITION_SITE = { lat: 34.0725, lon: -118.5425 };
 
-    async function initCesium() {
-      // 1. Create Terrain
-      const terrainProvider = await Cesium.createWorldTerrainAsync({
-        requestWaterMask: true,
-        requestVertexNormals: true
-      });
+    function initCesium() {
+      try {
+        // Create viewer with default globe so it NEVER fails or turns black
+        viewer = new Cesium.Viewer('cesiumContainer', {
+          timeline: false,
+          animation: false,
+          baseLayerPicker: false,
+          homeButton: true,
+          navigationHelpButton: false,
+          geocoder: false,
+          sceneModePicker: false
+        });
 
-      viewer = new Cesium.Viewer('cesiumContainer', {
-        terrainProvider: terrainProvider,
-        timeline: false,
-        animation: false,
-        baseLayerPicker: false,
-        homeButton: true,
-        navigationHelpButton: false,
-        geocoder: false,
-        sceneModePicker: false
-      });
+        viewer.scene.globe.enableLighting = true;
 
-      viewer.scene.globe.enableLighting = true;
-      viewer.scene.globe.depthTestAgainstTerrain = true;
+        // Asynchronously load 3D terrain
+        Cesium.createWorldTerrainAsync({ requestWaterMask: true, requestVertexNormals: true })
+          .then(terrain => { viewer.terrainProvider = terrain; })
+          .catch(err => console.warn("Terrain fallback", err));
 
-      // 2. Set Camera directly over the Palisades Region with clear 3D perspective
-      resetCameraView();
+        // Asynchronously load Google 3D Tiles / OSM buildings
+        Cesium.createGooglePhotorealistic3DTileset()
+          .then(tileset => {
+            tileset.maximumScreenSpaceError = 2;
+            viewer.scene.primitives.add(tileset);
+          })
+          .catch(err => {
+            Cesium.createOsmBuildingsAsync()
+              .then(osm => viewer.scene.primitives.add(osm))
+              .catch(e => console.warn("Osm building fallback", e));
+          });
 
-      // 3. Load Simulation & 8x4 Grid
-      await resetSimulation();
+        resetCameraView();
+        resetSimulation();
 
-      // Auto-start simulation after 1.5 seconds for instant real-time visualization
-      setTimeout(() => {
-        if (!isRunning) toggleSimulation();
-      }, 1500);
+        setTimeout(() => {
+          if (!isRunning) toggleSimulation();
+        }, 1500);
+      } catch (e) {
+        console.error("Cesium init error:", e);
+      }
     }
 
     function resetCameraView() {
+      if (!viewer) return;
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(-118.5300, 34.0320, 5200.0),
         orientation: {
@@ -210,7 +219,6 @@
         const res = await fetch('/reset');
         const data = await res.json();
 
-        // Clear existing visual entities
         clearVisuals();
 
         counts = { water_team: 0, trench_crew: 0, rescue_vehicle: 0, helicopter: 0 };
@@ -221,13 +229,8 @@
         document.getElementById('hud-reward').innerText = '0.00';
         document.getElementById('action-log').innerHTML = '<div class="log-entry">🔥 Palisades Fire Ignited at Skull Rock (34.0725° N, -118.5425° W)</div>';
 
-        // 1. Render 8x4 Sector Grid Boundaries & Sector Labels
         render8x4SectorGrid(data.zones);
-
-        // 2. Render Ignition Site Beacon
         renderIgnitionBeacon();
-
-        // 3. Render Initial Fire Cells
         renderFireCells(data.fire_cells, []);
 
       } catch (e) {
@@ -236,6 +239,7 @@
     }
 
     function clearVisuals() {
+      if (!viewer) return;
       Object.values(fireEntities).forEach(e => viewer.entities.remove(e));
       fireEntities = {};
 
@@ -246,17 +250,15 @@
       resourceEntities = [];
     }
 
-    // --- RENDER 8x4 SECTOR GRID IN PALISADES REGION ---
     function render8x4SectorGrid(zones) {
-      if (!zones) return;
+      if (!zones || !viewer) return;
 
       Object.keys(zones).forEach(zIdx => {
         const z = zones[zIdx];
-        const b = z.bounds; // [min_lat, min_lon, max_lat, max_lon]
+        const b = z.bounds;
         const centerLat = z.lat;
         const centerLon = z.lon;
 
-        // Sector Rectangle Border clamped to 3D terrain
         const borderEntity = viewer.entities.add({
           name: `Sector ${zIdx}`,
           polyline: {
@@ -277,7 +279,6 @@
         });
         gridEntities.push(borderEntity);
 
-        // Floating 3D Sector ID Label
         const labelEntity = viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 80),
           label: {
@@ -297,8 +298,8 @@
       });
     }
 
-    // --- RENDER IGNITION BEACON AT SKULL ROCK ---
     function renderIgnitionBeacon() {
+      if (!viewer) return;
       const beacon = viewer.entities.add({
         name: 'Palisades Fire Ignition Point',
         position: Cesium.Cartesian3.fromDegrees(IGNITION_SITE.lon, IGNITION_SITE.lat, 100),
@@ -320,13 +321,12 @@
       gridEntities.push(beacon);
     }
 
-    // --- RENDER HIGH-VISIBILITY 3D FIRE & SMOKE COLUMNS ---
     function renderFireCells(activeCells, burnedCells) {
+      if (!viewer) return;
       activeCells.forEach(cell => {
         const key = `${cell.r}_${cell.c}`;
         const isBlaze = cell.state === 3;
         
-        // Emissive Flame Cylinder (height 120m) elevated above terrain so it is visually dramatic
         if (!fireEntities[key]) {
           fireEntities[key] = viewer.entities.add({
             position: Cesium.Cartesian3.fromDegrees(cell.lon, cell.lat, 60),
@@ -348,7 +348,6 @@
         }
       });
 
-      // Burned Out Cells (Dark Charcoal Footprint)
       burnedCells.forEach(cell => {
         const key = `${cell.r}_${cell.c}`;
         if (!fireEntities[key]) {
@@ -401,17 +400,14 @@
           return;
         }
 
-        // Update HUD
         const mins = Math.floor(data.tick * 2);
         const secs = (data.tick * 2 % 1) * 60;
         document.getElementById('hud-time').innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         document.getElementById('hud-blazes').innerText = data.stats.active_blazes;
         document.getElementById('hud-reward').innerText = data.total_reward.toFixed(2);
 
-        // Render Fire Spread
         renderFireCells(data.fire_cells, data.burned_cells);
 
-        // Dispatch & Animate RL Action Units in Real-Time
         if (data.action && data.action.resource_type) {
           animateRLResourceDispatch(data.action);
         }
@@ -420,25 +416,22 @@
       }
     }
 
-    // --- REAL-TIME 3D RESOURCE MOTION & VEHICLE ANIMATIONS ---
     function animateRLResourceDispatch(action) {
+      if (!viewer) return;
       const type = action.resource_type;
       const targetLat = action.target_lat;
       const targetLon = action.target_lon;
       const zoneIdx = action.zone_idx;
 
-      // Update counters
       if (counts[type] !== undefined) counts[type]++;
       updateCounts();
 
-      // Log dispatch
       const log = document.getElementById('action-log');
       const entry = document.createElement('div');
       entry.className = `log-entry log-${type.split('_')[0]}`;
       entry.innerText = `[T+${counts[type]}] ${type.toUpperCase()} dispatched -> Sector ${zoneIdx}`;
       log.prepend(entry);
 
-      // --- 1. HELICOPTER (3D Flight Path from Van Nuys Air Ops -> Sector Drop) ---
       if (type === 'helicopter') {
         const heliEntity = viewer.entities.add({
           name: `Helicopter Unit ${counts.helicopter}`,
@@ -459,9 +452,8 @@
         });
         resourceEntities.push(heliEntity);
 
-        // Animate flight in real-time to target sector
         let startTime = Date.now();
-        let flightDuration = 1800; // 1.8 seconds flight time
+        let flightDuration = 1800;
 
         let animInterval = setInterval(() => {
           let elapsed = Date.now() - startTime;
@@ -469,15 +461,13 @@
 
           let currentLat = VAN_NUYS_DEPOT.lat + (targetLat - VAN_NUYS_DEPOT.lat) * progress;
           let currentLon = VAN_NUYS_DEPOT.lon + (targetLon - VAN_NUYS_DEPOT.lon) * progress;
-          let currentAlt = 450 - progress * 150; // Descend from 450m to 300m
+          let currentAlt = 450 - progress * 150;
 
           heliEntity.position = Cesium.Cartesian3.fromDegrees(currentLon, currentLat, currentAlt);
 
-          // On arrival at target sector -> execute Retardant Water Drop
           if (progress >= 1.0) {
             clearInterval(animInterval);
 
-            // Water Retardant Surge Drop Effect
             const dropSurge = viewer.entities.add({
               position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 80),
               cylinder: {
@@ -493,7 +483,6 @@
         }, 30);
       }
 
-      // --- 2. WATER TEAM (Fire Engine Ground Unit & High-Pressure Water Jet) ---
       else if (type === 'water_team') {
         const tenderUnit = viewer.entities.add({
           name: `Water Tender Engine ${counts.water_team}`,
@@ -514,7 +503,6 @@
         });
         resourceEntities.push(tenderUnit);
 
-        // High-velocity cyan water jet spray over blazes in target sector
         const waterJet = viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 40),
           ellipse: {
@@ -528,7 +516,6 @@
         setTimeout(() => viewer.entities.remove(waterJet), 3500);
       }
 
-      // --- 3. TRENCH CREW (Containment Line Excavation) ---
       else if (type === 'trench_crew') {
         const bulldozer = viewer.entities.add({
           name: `Trench Crew ${counts.trench_crew}`,
@@ -549,7 +536,6 @@
         });
         resourceEntities.push(bulldozer);
 
-        // Glowing Containment Trench Line
         const trenchLine = viewer.entities.add({
           name: 'Containment Line',
           polyline: {
@@ -568,7 +554,6 @@
         resourceEntities.push(trenchLine);
       }
 
-      // --- 4. RESCUE VEHICLE (Emergency Evacuation Vehicle & Neighborhood Shield) ---
       else if (type === 'rescue_vehicle') {
         const rescueTruck = viewer.entities.add({
           name: `Rescue Vehicle ${counts.rescue_vehicle}`,
@@ -589,7 +574,6 @@
         });
         resourceEntities.push(rescueTruck);
 
-        // Protective Evacuation Shield Dome over residential area
         const shieldDome = viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 50),
           ellipsoid: {
