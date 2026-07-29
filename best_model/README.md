@@ -1,6 +1,6 @@
-# InfernoTactics — Best Model (self-contained release)
+# InfernoTactics — Best Model (self-contained release, v8: fire-relative actions)
 
-A trained reinforcement-learning agent that dispatches real LAFD-style fire
+A reinforcement-learning agent that dispatches real LAFD-style fire
 resources (water tenders, brush-patrol/trench crews, rescue vehicles,
 helicopters) against a physically simulated wildfire on a real 30m-resolution
 grid of the LA Westside (Topanga → Brentwood/Bel-Air → Westwood/UCLA),
@@ -10,7 +10,9 @@ and the exact real-world data both depend on — nothing else from the parent
 repo is required.
 
 Everything below is accurate as of this checkpoint. Read the **Honest
-performance & limitations** section before quoting numbers from it anywhere.
+performance & limitations** section before quoting numbers from it anywhere
+— this checkpoint is an early-stage result, not a finished, fully-trained
+policy (see that section for exactly what that means).
 
 ## Quick start
 
@@ -22,121 +24,121 @@ python run_example.py
 
 This resets the environment on the real Palisades Fire ignition point
 (the Skull Rock trailhead, the fire's actual documented origin), loads the
-model, and runs one deterministic rollout — printing the resource/zone
-dispatched each tick and the final outcome (reward, buildings destroyed,
-contained or not). This was run from a clean copy of this exact folder
-before it was pushed, so it is verified working, not just assumed to.
+model, and runs one deterministic rollout — printing the resource/semantic
+target dispatched each tick and the final outcome (reward, buildings
+destroyed, contained or not). This was run from a clean copy of this exact
+folder before it was pushed, so it is verified working, not just assumed to.
+
+## What changed: fire-relative actions (v8)
+
+Every earlier version of this project (through v7) used an **absolute**
+action space: the policy picked one of 32 fixed macro-zone ids directly.
+That meant "dispatch to zone 18" had to be memorized per ignition point —
+it could not transfer to a fire starting anywhere else, and every
+architecture through v7 failed hard on held-out ignition points as a result
+(see the project's other write-ups for the full investigation: task-conflict
+fixes, credit-assignment fixes, a GAE regression bisect — all real, all
+insufficient, because the action space itself was the bottleneck).
+
+This checkpoint instead uses **fire-relative** actions
+(`src/train/relative_actions.py`). Every tick, the current fire state is
+resolved into a small set of semantic candidates *wherever they currently
+are*, not fixed geographic locations:
+
+- `active_fire` — the zone with the most currently-burning cells
+- `downwind_fire_front` — unburned fuel scored by wind alignment + distance
+  to active fire (where the fire is *about to* spread)
+- `adjacent_fuel` — unburned fuel directly bordering active fire (a firebreak
+  candidate)
+- `threatened_population` — the zone with the highest population density
+  under active threat
+- `nearest_reachable_fire` — the active-fire zone with the shortest real
+  travel time for the resource type being considered (routing-aware, so it
+  differs by resource type)
+- `noop` — always valid, dispatch nothing this tick
+
+The model (`src/models/relative_model.py`, `RelativeInfernoModel`) never
+outputs an absolute zone. It picks a `resource_type` (4-way) and then scores
+these ≤6 candidates for that resource, using each candidate's own resolved
+features (local fire/fuel/population/travel-time stats) rather than a fixed
+zone embedding. "Dispatch the helicopter to the fire" means the same thing
+regardless of where the fire started.
 
 ## How the model works
 
-Four ML concepts are fused into one ~247K-parameter model
-(`src/models/inferno_model.py`):
-
-1. **CNN branch** (`cnn_branch.py`) — reads the 9-channel spatial grid
-   (elevation, slope, building density/height, road mask, fuel density,
-   water mask, population density, and the live fire state) at full 30m
-   resolution. It produces two things from the same convolutional trunk:
-   a full-resolution per-cell feature map (for the classification head)
-   and a pooled 128-dim vector (for fusion with the MLP branch). It also
-   exposes a *per-zone* pooled feature (`zone_pooled`) — each of the 32
-   macro-zones' own local features, kept separate rather than averaged
-   away — which turned out to matter a lot (see below).
-2. **MLP branch** (`mlp_branch.py`) — reads the global scalars: wind speed
-   and direction, humidity, how many units of each resource type are
-   currently available, and elapsed time.
-3. **Classification head** (`classification_head.py`) — a 1×1 conv over
-   the CNN's per-cell features, predicting a 4-class fire state
-   (Safe / Fuel / Threat / Blaze) for every single grid cell.
-4. **Actor-critic** (`actor_critic.py`) — a factored policy: a
-   `resource_type` head (4-way) and a `zone` head (32-way), sampled
-   independently, plus a scalar critic. The action space is deliberately
-   *not* one flat 128-way distribution — resource type and target zone are
-   different questions with different failure modes.
-
-One architectural detail worth knowing if you dig into the code: the zone
-head does **not** read the same shared fused trunk the resource-type head
-and critic use. It reads the raw MLP output plus each zone's own
-`zone_pooled` features directly. This was a deliberate fix, not the
-original design — see "Why the zone head is special" below.
+1. **CNN branch** (`cnn_branch.py`) — same as prior versions: reads the
+   9-channel spatial grid at full 30m resolution, producing a per-cell
+   feature map (for classification) and both a globally-pooled and a
+   *per-zone*-pooled feature vector.
+2. **MLP branch** (`mlp_branch.py`) — global scalars: wind, humidity,
+   resource availability, elapsed time.
+3. **Classification head** (`classification_head.py`) — per-cell 4-class
+   fire-state prediction (course-project requirement; not load-bearing for
+   dispatch decisions).
+4. **Target head** (new in v8) — scores each of the ≤6 resolved semantic
+   candidates using that candidate's own local features plus a learned
+   resource-type embedding, rather than emitting a fixed 32-way zone
+   distribution.
 
 ## The environment it was trained against
 
 `src/env/inferno_env.py` (`InfernoEnv`) + `src/env/fire_sim.py`
 (`FireSim`) implement a deterministic, non-ML cellular-automaton fire
-spread model, wrapped in a Gym-style RL environment:
+spread model, wrapped in a Gym-style RL environment — unchanged from prior
+versions:
 
 - **Fire spread**: per-cell ignition probability = base rate × flammability
   × directional slope factor × directional wind factor × road resistance
   × humidity suppression, combined across all 8 neighbors, plus
   wind-scaled **ember spotting** (burning cells can ignite fuel 4–12 cells
-  downwind, bypassing roads — this is how real fires jump containment
-  lines, and it's in the simulation).
+  downwind, bypassing roads).
 - **Resources**: real LAFD station addresses and apparatus — 8 stations,
-  15 total units (`src/data_pipeline/real_depots.json`). Ground units
-  (water_team, trench_crew, rescue_vehicle) route via real road-network
-  Dijkstra shortest paths (`data/roads.graphml`); helicopters route via
-  straight-line air distance and can reach a zone (zone 18) that is
-  unreachable by any ground unit via the real road graph.
+  15 total units (`src/data_pipeline/real_depots.json`). Ground units route
+  via real road-network Dijkstra shortest paths (`data/roads.graphml`);
+  helicopters route via straight-line air distance.
 - **Weather**: real hourly Jan 7–8, 2025 KSMO (Santa Monica Airport) ASOS
-  data — the actual Santa Ana event that drove the real fire, including
-  humidity crashing to 0.67% and sustained 25.3 mph wind
-  (`data/palisades_weather_jan2025.csv`).
-- **Reward**: +50 for extinguishing fire, up to −200 per building
-  destroyed (population-density-weighted, since not all buildings sit in
-  equally populated areas), −10 for a wasted dispatch, and a travel-time
-  penalty.
+  data (`data/palisades_weather_jan2025.csv`).
+- **Reward**: +50 for extinguishing fire, up to −200 per building destroyed
+  (population-density-weighted), −10 for a wasted dispatch, and a
+  travel-time penalty.
 - **Validation**: the bare, unsuppressed fire-spread simulation was checked
   numerically against the real historical fire perimeter (LA County WFIGS
-  data) — IoU 0.636, recall 90.7% against where the real fire actually
-  burned, robust across 4 random seeds and 2 independent real timestamps.
-  This is a real, if imperfect, physical simulation, not just a
-  plausible-looking toy.
+  data) — IoU 0.636, recall 90.7%.
 
-## Why the zone head is special (worth knowing before you trust its zone choices)
-
-A direct diagnostic found that in earlier versions of this model, the zone
-head was effectively **ignoring fire location entirely** — its output
-correlated at r=-0.05 with where the fire actually was, even though the
-exact same CNN features, pooled per-zone instead of globally averaged,
-correlated at r=0.97. Global average pooling was diluting a handful of
-burning cells across ~188,000 total grid cells to the point of erasure
-before the zone head ever saw them.
-
-The fix (baked into this checkpoint): the zone head now scores each zone
-from its own `zone_pooled` features through a small per-zone MLP (shared
-weights across zones), trained with an auxiliary supervised loss pulling
-its output toward the real per-zone fire distribution every tick, and
-cold-started so it can't fall back on a constant bias. After 2000 episodes
-of training with this fix, zone-logit-to-real-fire correlation rose to a
-sustained 0.31–0.39 — the zone head genuinely reads its input now, and this
-checkpoint is the first in the project to show scenario-specific dispatch
-behavior (different scenarios genuinely produce different chosen zones,
-not one fixed global favorite).
+Environment version: **v5** (8 real LAFD stations, 15 units, frozen as of
+2026-07-28).
 
 ## Using it in your own code
 
 ```python
 import sys
-sys.path.insert(0, "best_model/src")   # or wherever this folder lives
+sys.path.insert(0, "best_model/src")
 
 import torch
-from env.inferno_env import InfernoEnv, TRAINING_IGNITION_POINT, RESOURCE_TYPES
-from models.inferno_model import InfernoModel
+from env.inferno_env import InfernoEnv, TRAINING_IGNITION_POINT, RESOURCE_TYPES, SCALAR_KEYS
+from models.relative_model import RelativeInfernoModel
+from train.relative_actions import TARGET_TYPES, decode_action, resolve_relative_targets
 
 env = InfernoEnv()
 obs = env.reset(ignition_point=TRAINING_IGNITION_POINT, scenario="single", seed=0)
 
-model = InfernoModel(n_grid_channels=obs["grid"].shape[0])
-model.load_state_dict(torch.load("best_model/inferno_best_model.pt", map_location="cpu"))
+model = RelativeInfernoModel(
+    n_grid_channels=obs["grid"].shape[0], n_scalars=len(SCALAR_KEYS),
+    n_resources=len(RESOURCE_TYPES), n_zones=env.n_zones,
+)
+model.load_state_dict(torch.load("best_model/inferno_best_model.pt", map_location="cpu", weights_only=True))
 model.eval()
 
-grid_t, scalars_t = InfernoModel.obs_to_tensors(obs)
-action_logits, value, classification_logits = model(grid_t, scalars_t)
-resource_idx = action_logits["resource_type"].argmax(dim=-1).item()
-zone_idx = action_logits["zone"].argmax(dim=-1).item()
-resource_type = RESOURCE_TYPES[resource_idx]
+grid_t, scalars_t = RelativeInfernoModel.obs_to_tensors(obs)
+target_zones, target_features = resolve_relative_targets(env, obs)
+logits, value, classification_logits = model(
+    grid_t, scalars_t, torch.from_numpy(target_zones).unsqueeze(0), torch.from_numpy(target_features).unsqueeze(0)
+)
+resource_idx = logits["resource_type"].argmax(dim=-1).item()
+target_idx = logits["target"][0, resource_idx].argmax(dim=-1).item()
+action = decode_action(resource_idx, target_idx, target_zones)  # (resource_type, zone_id) or None
 
-obs, reward, done, info = env.step((resource_type, zone_idx))
+obs, reward, done, info = env.step(action)
 ```
 
 Other real ignition points already wired into the environment:
@@ -149,42 +151,44 @@ from env.inferno_env import VALIDATION_IGNITION_POINTS, MULTI_IGNITION_TRAINING_
 real, held-out chaparral/WUI-adjacent locations never trained on.
 `MULTI_IGNITION_TRAINING_SCENARIO` (Topanga ridge / Sullivan Canyon /
 Stone Canyon) are additional real locations along the same Santa Ana
-corridor. **Both of these are exactly the scenarios the limitations
-section below is about — read that before drawing conclusions from running
-on them.**
-
-To read the per-cell fire-state classification instead of just acting:
-
-```python
-predicted_class = classification_logits.argmax(dim=1)  # (B, H, W), 0-3
-# 0=Safe, 1=Fuel, 2=Threat, 3=Blaze  (see src/models/classification_head.py)
-```
+corridor.
 
 ## Honest performance & limitations — read before quoting this anywhere
 
-This is episode 1550 from the zone-head-repair training run
-(`train_zonehead_fix.py`, run tag `zonehead_fix1_2k`) — the best
-combined-performing checkpoint found across that entire run, evaluated
-deterministically over 5 episodes/scenario:
+**This checkpoint is from episode 10 of a 2000-episode training run — a
+smoke test, not a finished/converged policy.** It is included here because,
+even at this very early stage, it demonstrates the structural benefit of the
+fire-relative action space, which is the actual point of v8. It is not yet
+a "the model is done" result.
+
+Deterministic eval, 2–3 episodes/scenario:
 
 | Scenario | Reward | Buildings destroyed | Containment |
 |---|---|---|---|
-| `single_training` (Skull Rock, the real Palisades ignition point) | +44.2 | 0 | **100%** |
-| `stone_canyon` (a Santa Ana-corridor multi-ignition point) | −43,161 | 150 | 66.7% |
+| `single_training` (Skull Rock) | +27.6 | 0 | 100% |
+| `mandeville_canyon` (held out) | +39.7 | 0 | 100% |
+| `getty_view_park` (held out) | +31.0 | 0 | 100% |
+| `stone_canyon` (multi-ignition, hard) | −182.7 (high variance: +38 to −637 across 3 eps) | 0.7 avg | 100%* |
 
-For context, a simple rule-based heuristic policy (nearest-fire dispatch,
-same real routing) gets **−29,411** reward and 80% containment on the exact
-same `single_training` scenario — this model beats that heuristic by
-roughly +29,400 reward there. That comparison is real and reproducible.
+*Every prior architecture (v1–v7) scored strongly negative on both held-out
+validation points (roughly −17k and −81k reward). Getting positive reward
+and full containment there after just 10 episodes of training is a real,
+structural result: the semantic action space makes "dispatch to wherever
+the fire actually is" available from episode 1, instead of requiring
+hundreds of episodes to memorize a fixed zone id per location.
 
-**What it does NOT do:** it has not been shown to generalize to ignition
-points it wasn't trained on. On both held-out validation points
-(`mandeville_canyon`, `getty_view_park`), this family of models performs
-*far worse than the simple heuristic above* — this is diagnosed as the
-policy specializing to its training scenario(s) rather than learning a
-transferable "how to fight any fire" strategy. If you run this checkpoint
-on an arbitrary new ignition point, treat the result as an experiment, not
-a guarantee, and expect it may perform badly.
+**But an unbiased 20-point random-ignition sweep tells a more honest
+story:** across 20 randomly sampled unseen WUI ignition points (2 episodes
+each), containment was 100%, but **aggregate reward was −244.6, not
+positive** — 7 of 20 points suffered real building loss (1–4 buildings each).
+Traced tick-by-tick, this is not a bug: the policy dispatches a helicopter
+to the active fire immediately and correctly every time, but this
+checkpoint has only learned that one reflex — it has not yet learned to
+also send a faster-arriving ground unit as backup when a fire starts near
+buildings and the helicopter's travel time (which can be several minutes)
+would arrive too late to prevent structure loss. The two curated validation
+points above happened to be easy draws (small fires, no nearby buildings in
+the fire's path); the random sweep shows that isn't representative.
 
 **A structural ceiling, independent of training quality:** a capacity
 analysis found the real fire in some scenarios (e.g. `stone_canyon`)
@@ -192,36 +196,46 @@ exceeds the entire 8-unit resource fleet by tick 2–4 of the episode, while
 the environment's one-dispatch-per-tick action space needs 8 ticks just to
 commit that whole fleet, and each helicopter is then locked for ~15 ticks
 (mostly reload time) before it can be redeployed. Some scenarios may not be
-containable by *any* policy under this resource model — a low score there
-isn't necessarily a policy failure.
+containable by *any* policy under this resource model.
 
-**Model-quality caveats, for full transparency:**
+**What this checkpoint does NOT show:** whether the generalization
+advantage holds up after real training (hundreds–thousands of episodes),
+whether the model learns to mix resource types rather than defaulting to
+helicopter-only, and how it performs on the full multi-ignition training
+scenarios once trained. Treat every number above as an early, promising
+signal — not a finished result.
+
+**A training-loop bug was found and fixed before this checkpoint's later
+episodes:** the gradient update recomputed the resource-type action
+distribution without re-masking it by which resource types were actually
+available that tick (the rollout that generated the action *did* mask it).
+This caused a rollout/update distribution mismatch on the majority of ticks
+in any scenario with resource congestion (confirmed: 135 of ~171 steps in a
+`stone_canyon` rollout) — the same class of bug that caused catastrophic
+policy collapse in earlier (pre-v8) architectures. It's fixed in the code
+shipped here.
+
+**Model-quality caveats, unchanged from prior versions:**
 - `fuel_density`, one of the 9 grid layers, is a placeholder heuristic, not
   real LANDFIRE fuel-model data.
 - 1 of the 32 macro-zones is unreachable by any ground resource via the
   real road graph — only a helicopter can reach it. This is intentional
   (a real asymmetry of air vs. ground response), not a bug.
-- The classification head's own auxiliary loss is a course-project
-  requirement (fusing a "Classification" concept into the model) — it
-  is not load-bearing for the dispatch policy's decisions.
-
-Environment version: **v5** (8 real LAFD stations, 15 units, frozen as of
-2026-07-28 — anything trained before this environment version is not
-numerically comparable to this checkpoint).
 
 ## File manifest
 
 ```
-inferno_best_model.pt         trained weights (PyTorch state_dict, ~1MB, ~247K params)
-run_example.py                minimal, verified-working example
-requirements.txt              the packages needed to run it
+inferno_best_model.pt          trained weights (PyTorch state_dict, episode 10 of a 2000-ep run)
+run_example.py                 minimal, verified-working example
+requirements.txt               the packages needed to run it
 src/
   models/
-    inferno_model.py           ties CNN + MLP + classification + actor-critic together
-    cnn_branch.py               spatial grid -> per-cell features + pooled vector + per-zone features
+    relative_model.py           RelativeInfernoModel: CNN + MLP + classification + fire-relative actor-critic
+    cnn_branch.py                spatial grid -> per-cell features + pooled vector + per-zone features
     mlp_branch.py                global scalars -> feature vector
     classification_head.py      per-cell 4-class fire-state prediction
-    actor_critic.py              factored (resource_type, zone) policy + critic
+  train/
+    relative_actions.py          resolves fire-relative semantic candidates from the current observation
   env/
     inferno_env.py               the Gym-style RL environment (resources, reward, action space)
     fire_sim.py                  deterministic cellular-automaton fire-spread physics
@@ -240,13 +254,10 @@ data/
 
 - **`osmnx`/`geopandas` install issues**: these pull in compiled geospatial
   dependencies (GDAL, GEOS, PROJ). If `pip install` fails, try a conda/mamba
-  environment instead of plain pip — geospatial packages are usually far
-  less painful there.
-- **Shape mismatch on `load_state_dict`**: make sure you're constructing
-  `InfernoModel` with `n_grid_channels` taken from an actual
-  `env.reset()["grid"].shape[0]` call (currently 9), not a hardcoded
-  guess — and don't pass a custom `adaptive_pool_size` or `n_value_heads`,
-  this checkpoint was trained with the defaults.
+  environment instead of plain pip.
+- **Shape mismatch on `load_state_dict`**: construct `RelativeInfernoModel`
+  with `n_grid_channels`/`n_scalars` taken from a real `env.reset()` call
+  and `SCALAR_KEYS`, not hardcoded guesses.
 - **Slow first run**: `InfernoEnv()` builds a routing tree over the full
   road graph once per station on construction (roughly one second total);
   this is a one-time cost per process, not per episode.
