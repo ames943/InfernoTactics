@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Palisades 3D Wildfire Simulator - RL Tactical Dispatch</title>
+  <!-- CesiumJS 1.115 -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <!-- Modern Font & Styling -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #0b0f19; color: #fff; }
+    #cesiumContainer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+
+    /* Floating Header HUD */
+    #header-bar {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 30px;
+      padding: 10px 24px; display: flex; align-items: center; gap: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); z-index: 10;
+    }
+    .hud-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; color: #ff5722; text-shadow: 0 0 10px rgba(255,87,34,0.4); }
+    .hud-stat { display: flex; flex-direction: column; align-items: center; }
+    .hud-label { font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
+    .hud-value { font-weight: 700; font-size: 1.05rem; color: #f8fafc; }
+    .hud-value.highlight { color: #38bdf8; }
+    .hud-value.alert { color: #ef4444; }
+
+    /* Left Control Panel */
+    #ui-panel {
+      position: absolute; top: 80px; left: 20px; width: 320px;
+      background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px;
+      padding: 18px; z-index: 10; box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    h3 { font-size: 1rem; font-weight: 700; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; display: flex; justify-content: space-between; }
+    
+    .btn-group { display: flex; gap: 10px; margin-top: 4px; }
+    button.action-btn {
+      flex: 1; padding: 10px 14px; border: none; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+      cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+    .btn-primary:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+    /* Resource Legend */
+    .resource-legend { display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem; margin-top: 6px; }
+    .legend-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.04); border-radius: 6px; border-left: 4px solid transparent; }
+    .legend-water { border-color: #38bdf8; }
+    .legend-trench { border-color: #f59e0b; }
+    .legend-rescue { border-color: #10b981; }
+    .legend-heli { border-color: #a855f7; }
+
+    /* Action Log Feed */
+    #action-log {
+      max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+      font-size: 0.78rem; font-family: monospace; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px;
+    }
+    .log-entry { padding: 4px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); }
+    .log-water { color: #7dd3fc; }
+    .log-trench { color: #fcd34d; }
+    .log-rescue { color: #6ee7b7; }
+    .log-heli { color: #c084fc; }
+
+    /* Custom Scrollbar */
+    #action-log::-webkit-scrollbar { width: 4px; }
+    #action-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <!-- Header HUD -->
+  <div id="header-bar">
+    <div class="hud-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 0-7 6.5-7 12a7 7 0 0 0 14 0c0-5.5-7-12-7-12z"/></svg>
+      PALISADES FIRE 3D
+    </div>
+    <div class="hud-stat">
+      <span class="hud-label">Sim Time</span>
+      <span class="hud-value" id="hud-time">00:00</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-label">Active Blazes</span>
+      <span class="hud-value alert" id="hud-blazes">0</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-label">Wind</span>
+      <span class="hud-value highlight" id="hud-wind">25.3 mph NE</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-label">RL Total Reward</span>
+      <span class="hud-value" id="hud-reward">0.00</span>
+    </div>
+  </div>
+
+  <!-- Left Control Panel -->
+  <div id="ui-panel">
+    <h3>
+      <span>Tactical Dispatch</span>
+      <span id="status-badge" style="font-size: 0.75rem; color: #10b981; font-weight: 600;">READY</span>
+    </h3>
+    
+    <div class="btn-group">
+      <button id="btn-start" class="action-btn btn-primary" onclick="toggleSimulation()">▶ Start Simulation</button>
+      <button class="action-btn btn-secondary" onclick="resetSimulation()">↺ Reset</button>
+    </div>
+
+    <div class="resource-legend">
+      <div style="font-weight: 600; color: #94a3b8; font-size: 0.75rem; margin-bottom: 2px;">RL RESOURCE TYPES</div>
+      <div class="legend-item legend-water">
+        <span>🌊 Water Team (Tender)</span>
+        <span id="count-water" style="font-weight: 700;">0</span>
+      </div>
+      <div class="legend-item legend-trench">
+        <span>🚜 Trench Crew (Line)</span>
+        <span id="count-trench" style="font-weight: 700;">0</span>
+      </div>
+      <div class="legend-item legend-rescue">
+        <span>🚑 Rescue Vehicle (Evac)</span>
+        <span id="count-rescue" style="font-weight: 700;">0</span>
+      </div>
+      <div class="legend-item legend-heli">
+        <span>🚁 Helicopter (Air Drop)</span>
+        <span id="count-heli" style="font-weight: 700;">0</span>
+      </div>
+    </div>
+
+    <div style="font-weight: 600; color: #94a3b8; font-size: 0.75rem; margin-top: 4px;">LIVE RL ACTION STREAM</div>
+    <div id="action-log">
+      <div class="log-entry">Waiting for simulation launch...</div>
+    </div>
+  </div>
+
+  <div id="cesiumContainer"></div>
+
+  <script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
+
+    let viewer;
+    let isRunning = false;
+    let simInterval = null;
+    let fireEntities = {};
+    let resourceEntities = [];
+    let particleSystems = [];
+
+    // Resource action counters
+    let counts = { water_team: 0, trench_crew: 0, rescue_vehicle: 0, helicopter: 0 };
+
+    // Air Ops Van Nuys Depot coordinates
+    const VAN_NUYS_DEPOT = { lat: 34.2098, lon: -118.4894 };
+
+    async function initCesium() {
+      const terrain = await Cesium.createWorldTerrainAsync();
+      
+      viewer = new Cesium.Viewer('cesiumContainer', {
+        terrainProvider: terrain,
+        timeline: false,
+        animation: false,
+        baseLayerPicker: false,
+        homeButton: true,
+        navigationHelpButton: false,
+        geocoder: false,
+        sceneModePicker: false
+      });
+
+      // Photorealistic 3D Tiles & OSM fallback
+      try {
+        const tileset = await Cesium.createGooglePhotorealistic3DTileset();
+        tileset.maximumScreenSpaceError = 2;
+        viewer.scene.primitives.add(tileset);
+      } catch (e) {
+        console.warn("Google 3D Tiles fallback to OSM");
+        const osm = await Cesium.createOsmBuildingsAsync();
+        viewer.scene.primitives.add(osm);
+      }
+
+      viewer.scene.globe.enableLighting = true;
+      
+      // Focus camera on Palisades Highlands / Skull Rock ignition site
+      resetCameraView();
+      
+      // Load initial simulation state
+      resetSimulation();
+    }
+
+    function resetCameraView() {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-118.5425, 34.0500, 3800.0),
+        orientation: {
+          heading: Cesium.Math.toRadians(0.0),
+          pitch: Cesium.Math.toRadians(-32.0),
+          roll: 0.0
+        },
+        duration: 1.5
+      });
+    }
+
+    async function resetSimulation() {
+      if (isRunning) toggleSimulation();
+      
+      try {
+        const res = await fetch('/reset');
+        const data = await res.json();
+        
+        // Clear entities
+        clearVisuals();
+        
+        // Reset counters
+        counts = { water_team: 0, trench_crew: 0, rescue_vehicle: 0, helicopter: 0 };
+        updateCounts();
+        
+        document.getElementById('hud-time').innerText = '00:00';
+        document.getElementById('hud-blazes').innerText = data.fire_cells.length;
+        document.getElementById('hud-reward').innerText = '0.00';
+        document.getElementById('action-log').innerHTML = '<div class="log-entry">Initialized at Palisades Ignition (Skull Rock)</div>';
+        
+        // Render initial ignition fire
+        renderFireCells(data.fire_cells, []);
+        
+        // Render Zone Boundaries
+        renderZoneGrid(data.zones);
+      } catch(e) {
+        console.error("Error resetting sim:", e);
+      }
+    }
+
+    function clearVisuals() {
+      Object.values(fireEntities).forEach(e => viewer.entities.remove(e));
+      fireEntities = {};
+      
+      resourceEntities.forEach(e => viewer.entities.remove(e));
+      resourceEntities = [];
+      
+      particleSystems.forEach(ps => viewer.scene.primitives.remove(ps));
+      particleSystems = [];
+    }
+
+    function renderZoneGrid(zones) {
+      if (!zones) return;
+      Object.keys(zones).forEach(zIdx => {
+        const z = zones[zIdx];
+        const b = z.bounds; // [min_lat, min_lon, max_lat, max_lon]
+        viewer.entities.add({
+          name: `Zone ${zIdx}`,
+          rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(b[1], b[0], b[3], b[2]),
+            fill: false,
+            outline: true,
+            outlineColor: Cesium.Color.WHITE.withAlpha(0.15),
+            outlineWidth: 1.5
+          }
+        });
+      });
+    }
+
+    function renderFireCells(activeCells, burnedCells) {
+      // Update active fire cells (Blaze / Threat)
+      activeCells.forEach(cell => {
+        const key = `${cell.r}_${cell.c}`;
+        const color = cell.state === 3 ? Cesium.Color.RED.withAlpha(0.85) : Cesium.Color.ORANGE.withAlpha(0.75);
+        
+        if (!fireEntities[key]) {
+          fireEntities[key] = viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(cell.lon, cell.lat, 15),
+            ellipse: {
+              semiMinorAxis: 25.0,
+              semiMajorAxis: 25.0,
+              material: new Cesium.ColorMaterialProperty(color),
+              height: 10
+            }
+          });
+        } else {
+          fireEntities[key].ellipse.material = color;
+        }
+      });
+
+      // Render burned out cells
+      burnedCells.forEach(cell => {
+        const key = `${cell.r}_${cell.c}`;
+        if (!fireEntities[key]) {
+          fireEntities[key] = viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(cell.lon, cell.lat, 5),
+            ellipse: {
+              semiMinorAxis: 22.0,
+              semiMajorAxis: 22.0,
+              material: Cesium.Color.BLACK.withAlpha(0.6),
+              height: 5
+            }
+          });
+        }
+      });
+    }
+
+    function toggleSimulation() {
+      const btn = document.getElementById('btn-start');
+      const badge = document.getElementById('status-badge');
+      
+      if (!isRunning) {
+        isRunning = true;
+        btn.innerText = '⏸ Pause';
+        btn.classList.replace('btn-primary', 'btn-secondary');
+        badge.innerText = 'SIMULATING';
+        badge.style.color = '#ef4444';
+        simInterval = setInterval(stepSimulation, 1400);
+      } else {
+        isRunning = false;
+        btn.innerText = '▶ Resume';
+        btn.classList.replace('btn-secondary', 'btn-primary');
+        badge.innerText = 'PAUSED';
+        badge.style.color = '#f59e0b';
+        clearInterval(simInterval);
+      }
+    }
+
+    async function stepSimulation() {
+      try {
+        const res = await fetch('/step');
+        const data = await res.json();
+        
+        if (data.is_done) {
+          toggleSimulation();
+          document.getElementById('status-badge').innerText = 'CONTAINED';
+          document.getElementById('status-badge').style.color = '#38bdf8';
+          return;
+        }
+
+        // Update HUD
+        const mins = Math.floor(data.tick * 2);
+        const secs = (data.tick * 2 % 1) * 60;
+        document.getElementById('hud-time').innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        document.getElementById('hud-blazes').innerText = data.stats.active_blazes;
+        document.getElementById('hud-reward').innerText = data.total_reward.toFixed(2);
+        
+        // Render Fire Spread
+        renderFireCells(data.fire_cells, data.burned_cells);
+        
+        // Animate RL Action
+        if (data.action && data.action.resource_type) {
+          triggerResourceAnimation(data.action);
+        }
+      } catch(e) {
+        console.error("Error stepping sim:", e);
+      }
+    }
+
+    function triggerResourceAnimation(action) {
+      const type = action.resource_type;
+      const targetLat = action.target_lat;
+      const targetLon = action.target_lon;
+      const zoneIdx = action.zone_idx;
+
+      // Update counters & log
+      if (counts[type] !== undefined) counts[type]++;
+      updateCounts();
+
+      const log = document.getElementById('action-log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type.split('_')[0]}`;
+      entry.innerText = `[T+${counts[type]}] Dispatch ${type.toUpperCase()} -> Zone ${zoneIdx}`;
+      log.prepend(entry);
+
+      // --- ANIMATION 1: WATER TEAM (Water Tender Spray) ---
+      if (type === 'water_team') {
+        const waterUnit = viewer.entities.add({
+          name: 'Water Tender',
+          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 20),
+          cylinder: {
+            length: 12, topRadius: 6, bottomRadius: 6,
+            material: Cesium.Color.DEEPSKYBLUE.withAlpha(0.9)
+          }
+        });
+        resourceEntities.push(waterUnit);
+
+        // Water jet particle spray effect
+        const jet = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 25),
+          ellipse: {
+            semiMinorAxis: 60.0, semiMajorAxis: 60.0,
+            material: Cesium.Color.CYAN.withAlpha(0.4),
+            height: 35
+          }
+        });
+        resourceEntities.push(jet);
+        setTimeout(() => viewer.entities.remove(jet), 2500);
+      }
+
+      // --- ANIMATION 2: TRENCH CREW (Containment Line Excavation) ---
+      else if (type === 'trench_crew') {
+        const trenchLine = viewer.entities.add({
+          name: 'Trench Line',
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray([
+              targetLon - 0.008, targetLat - 0.004,
+              targetLon + 0.008, targetLat + 0.004
+            ]),
+            width: 6,
+            material: new Cesium.PolylineGlowMaterialProperty({
+              glowPower: 0.3,
+              color: Cesium.Color.GOLD
+            }),
+            clampToGround: true
+          }
+        });
+        resourceEntities.push(trenchLine);
+      }
+
+      // --- ANIMATION 3: RESCUE VEHICLE (Structure Evacuation Shield) ---
+      else if (type === 'rescue_vehicle') {
+        const rescueUnit = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 15),
+          box: {
+            dimensions: new Cesium.Cartesian3(14.0, 8.0, 8.0),
+            material: Cesium.Color.LIMEGREEN.withAlpha(0.9)
+          }
+        });
+        resourceEntities.push(rescueUnit);
+
+        // Evacuation protective shield aura
+        const aura = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 10),
+          ellipse: {
+            semiMinorAxis: 120.0, semiMajorAxis: 120.0,
+            material: Cesium.Color.SPRINGGREEN.withAlpha(0.25),
+            outline: true,
+            outlineColor: Cesium.Color.GREEN,
+            height: 15
+          }
+        });
+        resourceEntities.push(aura);
+      }
+
+      // --- ANIMATION 4: HELICOPTER (Air Operations Retardant Drop) ---
+      else if (type === 'helicopter') {
+        const startPos = Cesium.Cartesian3.fromDegrees(VAN_NUYS_DEPOT.lon, VAN_NUYS_DEPOT.lat, 400);
+        const dropPos = Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 250);
+
+        // Helicopter 3D entity
+        const heli = viewer.entities.add({
+          name: 'LAFD Air Ops Heli',
+          position: dropPos,
+          cylinder: {
+            length: 18, topRadius: 3, bottomRadius: 10,
+            material: Cesium.Color.PURPLE.withAlpha(0.95)
+          }
+        });
+        resourceEntities.push(heli);
+
+        // Retardant drop cloud animation (Red/Orange drop surge)
+        const dropCloud = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 80),
+          ellipse: {
+            semiMinorAxis: 90.0, semiMajorAxis: 90.0,
+            material: Cesium.Color.ORANGERED.withAlpha(0.65),
+            height: 40
+          }
+        });
+        resourceEntities.push(dropCloud);
+        setTimeout(() => viewer.entities.remove(dropCloud), 3000);
+      }
+    }
+
+    function updateCounts() {
+      document.getElementById('count-water').innerText = counts.water_team;
+      document.getElementById('count-trench').innerText = counts.trench_crew;
+      document.getElementById('count-rescue').innerText = counts.rescue_vehicle;
+      document.getElementById('count-heli').innerText = counts.helicopter;
+    }
+
+    window.onload = initCesium;
+  </script>
+</body>
+</html>
