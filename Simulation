@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Palisades 3D Fire Sim</title>
+  <title>Palisades 3D Fire Sim - Ultra Detail</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <style>
@@ -14,8 +14,8 @@
       color: white; padding: 15px; font-family: Arial, sans-serif; border-radius: 8px; z-index: 10;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
-    button { margin-top: 10px; padding: 8px 12px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #005999; }
+    button.action-btn { margin-top: 10px; padding: 8px 12px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    button.action-btn:hover { background: #005999; }
   </style>
 </head>
 <body>
@@ -23,25 +23,52 @@
     <h3>Palisades Fire Sim</h3>
     <p>Grid: <b>8x4 Sectors</b></p>
     <p>Status: <span id="sim-status" style="color: #00ff00;">Waiting for RL Model...</span></p>
-    <button onclick="testAction()">Simulate RL Helicopter Drop (Sector 10)</button>
+    <button class="action-btn" onclick="testAction()">Simulate RL Helicopter Drop (Sector 10)</button>
   </div>
-  
+
   <div id="cesiumContainer"></div>
 
   <script>
-    // 1. Assign Cesium Access Token
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
 
     async function initSim() {
-      // Viewer initialization (globe is enabled by default when omitted)
+      // 1. Base Setup with Terrain
+      const worldTerrain = await Cesium.createWorldTerrainAsync();
+
       const viewer = new Cesium.Viewer('cesiumContainer', {
+        terrainProvider: worldTerrain,
         timeline: false,
         animation: false,
-        baseLayerPicker: false
+        baseLayerPicker: false,
+        homeButton: true,
+        navigationHelpButton: true,
+        geocoder: false,
+        sceneModePicker: false
       });
 
-      // Enable lighting for realistic daylight shadows
+      // 2. DEFINE THE 8x4 GRID BOUNDS
+      const south = 34.030, north = 34.070;
+      const west = -118.550, east = -118.500;
+      const centerLon = (west + east) / 2.0;
+
+      // 3. TIGHTLY CONSTRAIN MAP (Just slightly larger than the grid)
+      // This eliminates the rest of California/Earth to save massive GPU power
+      const limitWest = west - 0.010;
+      const limitEast = east + 0.010;
+      const limitSouth = south - 0.010;
+      const limitNorth = north + 0.010;
+      
+      const limitRectangle = Cesium.Rectangle.fromDegrees(limitWest, limitSouth, limitEast, limitNorth);
+      viewer.scene.globe.cartographicLimitRectangle = limitRectangle;
+      
+      if (viewer.scene.skyAtmosphere) {
+        viewer.scene.skyAtmosphere.show = false;
+      }
       viewer.scene.globe.enableLighting = true;
+
+      // Lock camera zoom so user stays in the simulation box
+      viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100.0;
+      viewer.scene.screenSpaceCameraController.maximumZoomDistance = 15000.0;
 
       // Trackpad controls
       viewer.scene.screenSpaceCameraController.tiltEventTypes = [
@@ -53,27 +80,55 @@
         }
       ];
 
-      // 2. Define Pacific Palisades Coordinates
-      const south = 34.030, north = 34.070;
-      const west = -118.550, east = -118.500;
-      const centerLon = (west + east) / 2.0;
+      // Reset view function mapped to Home Button
+      function flyToPalisades() {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(centerLon, south - 0.005, 800.0),
+          orientation: { heading: 0.0, pitch: Cesium.Math.toRadians(-20.0), roll: 0.0 },
+          duration: 1.5
+        });
+      }
+      viewer.homeButton.viewModel.command.beforeExecute.addEventListener(function(e) {
+        e.cancel = true;
+        flyToPalisades();
+      });
+      flyToPalisades();
 
-      // 3. LAYER 1: Load Google Photorealistic 3D Tiles
+      // 4. LAYER 1: GOOGLE PHOTOREALISTIC 3D TILES (Max Detail)
       try {
         const googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
-        googleTileset.maximumMemoryUsage = 1024;
-        googleTileset.maximumScreenSpaceError = 16;
+        
+        // --- THE FIX FOR FLAT BUILDINGS ---
+        // A lower Screen Space Error (2) forces max 3D geometry everywhere.
+        // Because the map is now so tiny, your computer can handle this without crashing.
+        googleTileset.maximumScreenSpaceError = 2; 
+        googleTileset.maximumMemoryUsage = 4096;   
+
+        // Clip 3D tileset strictly to our tight bounding box
+        const clippingPolygon = new Cesium.ClippingPolygon({
+          positions: Cesium.Cartesian3.fromDegreesArray([
+            limitWest, limitSouth,
+            limitEast, limitSouth,
+            limitEast, limitNorth,
+            limitWest, limitNorth
+          ])
+        });
+        
+        googleTileset.clippingPolygons = new Cesium.ClippingPolygonCollection({
+          polygons: [clippingPolygon],
+          inverse: false
+        });
+
         viewer.scene.primitives.add(googleTileset);
       } catch (e) {
         console.error("Error loading Google 3D Tiles:", e);
       }
 
-      // 4. LAYER 2: Load OSM 3D Buildings (Light Grey inside grid)
+      // 5. LAYER 2: OSM 3D BUILDINGS (Fallback for missing Google 3D data)
       try {
         const osmBuildings = await Cesium.createOsmBuildingsAsync();
-        
         osmBuildings.style = new Cesium.Cesium3DTileStyle({
-          show: `\${feature["cesium#longitude"]} >= ${west} && \${feature["cesium#longitude"]} <= ${east} && \${feature["cesium#latitude"]} >= ${south} && \${feature["cesium#latitude"]} <= ${north}`,
+          show: `\${feature["cesium#longitude"]} >= ${limitWest} && \${feature["cesium#longitude"]} <= ${limitEast} && \${feature["cesium#latitude"]} >= ${limitSouth} && \${feature["cesium#latitude"]} <= ${limitNorth}`,
           color: 'color("#d1d5db", 0.9)',
           height: {
             conditions: [
@@ -83,23 +138,12 @@
             ]
           }
         });
-
         viewer.scene.primitives.add(osmBuildings);
       } catch (e) {
         console.error("Error loading OSM Buildings:", e);
       }
 
-      // 5. Fly Camera Target
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(centerLon, south - 0.010, 1100.0),
-        orientation: {
-          heading: Cesium.Math.toRadians(0.0),
-          pitch: Cesium.Math.toRadians(-25.0),
-          roll: 0.0
-        }
-      });
-
-      // 6. CREATE 8x4 SECTOR GRID LINES PROJECTED ON EARTH
+      // 6. CREATE 8x4 SECTOR GRID
       const gridEntities = {};
       const latStep = (north - south) / 4;
       const lonStep = (east - west) / 8;
@@ -115,13 +159,7 @@
           gridEntities[sectorId] = viewer.entities.add({
             name: `Sector ${sectorId}`,
             polyline: {
-              positions: Cesium.Cartesian3.fromDegreesArray([
-                w, s,
-                e, s,
-                e, n,
-                w, n,
-                w, s
-              ]),
+              positions: Cesium.Cartesian3.fromDegreesArray([ w, s, e, s, e, n, w, n, w, s ]),
               width: 3,
               material: Cesium.Color.WHITE.withAlpha(0.9),
               clampToGround: true
@@ -130,7 +168,7 @@
         }
       }
 
-      // Helper to update sector line colors
+      // Action Handlers
       window.setSectorColor = function(sectorId, color, width = 6) {
         const entity = gridEntities[sectorId];
         if (!entity) return;
@@ -138,10 +176,8 @@
         entity.polyline.width = width;
       };
 
-      // Set Sector 10 on Fire initially
       window.setSectorColor(10, Cesium.Color.RED, 6);
 
-      // Action Handler
       window.applyRLAction = function(actionIdx, resourceType) {
         if (resourceType === 'helicopter' || resourceType === 'water_team') {
           window.setSectorColor(actionIdx, Cesium.Color.BLUE, 6);
@@ -152,7 +188,7 @@
         }
       };
 
-      // Poll Python Server for Incoming RL Actions
+      // Python Server Polling
       setInterval(async () => {
         try {
           const res = await fetch('/get_latest_action');
