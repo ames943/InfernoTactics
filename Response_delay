@@ -1,0 +1,425 @@
+import requests
+import pandas as pd
+import folium
+import math
+import json
+import numpy as np
+from shapely.geometry import Point, Polygon, mapping
+
+# ==========================================
+# 1. FETCH ALL CAMERAS FROM OFFICIAL OPENAPI
+# ==========================================
+OFFICIAL_API_URL = "https://api.cdn.prod.alertwest.com/api/firecams/v0/cameras"
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "application/json"
+}
+
+print("Connecting to official ALERTCalifornia / ALERTWest API...")
+try:
+    response = requests.get(OFFICIAL_API_URL, headers=headers, timeout=20)
+    response.raise_for_status()
+    raw_cameras = response.json()
+    print(f"Successfully retrieved {len(raw_cameras)} total cameras from network.")
+except Exception as e:
+    print(f"Error connecting to official API: {e}")
+    raw_cameras = []
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371
+    dlat, dlon = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+def calculate_destination_point(lat, lon, bearing_deg, distance_km):
+    R = 6371.0
+    lat_rad = math.radians(lat)
+    lon_rad = math.radians(lon)
+    bearing_rad = math.radians(bearing_deg)
+
+    dest_lat_rad = math.asin(
+        math.sin(lat_rad) * math.cos(distance_km / R) +
+        math.cos(lat_rad) * math.sin(distance_km / R) * math.cos(bearing_rad)
+    )
+
+    dest_lon_rad = lon_rad + math.atan2(
+        math.sin(bearing_rad) * math.sin(distance_km / R) * math.cos(lat_rad),
+        math.cos(distance_km / R) - math.sin(lat_rad) * math.sin(dest_lat_rad)
+    )
+
+    return [math.degrees(dest_lat_rad), math.degrees(dest_lon_rad)]
+
+CENTER_LAT, CENTER_LON = 34.0500, -118.5250
+
+# Target region bounds
+SOUTH, NORTH = 34.030, 34.070
+WEST, EAST = -118.550, -118.500
+
+palisades_cams = []
+
+# Filter to keep only nearby or relevant cameras (e.g., within 50 km to catch Wilshire, local lookouts, etc.)
+NEARBY_RADIUS_KM = 50.0
+
+for idx, cam in enumerate(raw_cameras):
+    try:
+        site = cam.get("site", {})
+        lat_val = site.get("latitude") or cam.get("latitude")
+        lon_val = site.get("longitude") or cam.get("longitude")
+
+        if lat_val is None or lon_val is None:
+            continue
+
+        lat, lon = float(lat_val), float(lon_val)
+        dist = haversine(CENTER_LAT, CENTER_LON, lat, lon)
+
+        if dist > NEARBY_RADIUS_KM:
+            continue
+
+        pos = cam.get("position", {})
+        pan_val = pos.get("pan") if isinstance(pos, dict) else cam.get("pan")
+        pan = float(pan_val) if pan_val is not None else 0.0
+        tilt = pos.get("tilt", "N/A") if isinstance(pos, dict) else "N/A"
+
+        img_info = cam.get("image", {}) if isinstance(cam.get("image"), dict) else {}
+        img_url = img_info.get("url", "") or cam.get("image_url", "")
+
+        cam_id = str(cam.get("id") or f"cam_{idx}")
+
+        fov_deg = 60.0
+        if dist <= 12.0:
+            range_km = 18.0
+        else:
+            range_km = dist + 15.0
+
+        start_angle = pan - (fov_deg / 2.0)
+        end_angle = pan + (fov_deg / 2.0)
+
+        sector_points = [[lat, lon]]
+        num_steps = 16
+        for i in range(num_steps + 1):
+            angle = start_angle + (end_angle - start_angle) * (i / num_steps)
+            pt = calculate_destination_point(lat, lon, angle, range_km)
+            sector_points.append(pt)
+        sector_points.append([lat, lon])
+
+        sector_poly = Polygon([(pt[1], pt[0]) for pt in sector_points])
+
+        palisades_cams.append({
+            "id": cam_id,
+            "name": cam.get("name") or site.get("description") or "ALERTCalifornia Camera",
+            "county": site.get("county", "N/A"),
+            "lat": lat,
+            "lon": lon,
+            "pan": pan,
+            "tilt": tilt,
+            "img_url": img_url,
+            "dist_km": round(dist, 2),
+            "range_km": round(range_km, 1),
+            "sector_points": sector_points,
+            "shapely_poly": sector_poly
+        })
+    except (ValueError, TypeError):
+        continue
+
+print(f"Loaded {len(palisades_cams)} nearby regional cameras.")
+
+# ==========================================
+# 2. BUILD MAP & HIGH-DENSITY PIXEL GRID
+# ==========================================
+m = folium.Map(
+    location=[CENTER_LAT, CENTER_LON],
+    zoom_start=12,
+    tiles="CartoDB positron"
+)
+
+palisades_bounds = [
+    [SOUTH, WEST],
+    [SOUTH, EAST],
+    [NORTH, EAST],
+    [NORTH, WEST]
+]
+
+outer_world = [
+    [90.0, -180.0],
+    [90.0, 180.0],
+    [-90.0, 180.0],
+    [-90.0, -180.0]
+]
+
+# Dark translucent mask for the outer world
+folium.Polygon(
+    locations=[outer_world, palisades_bounds],
+    color="#000000",
+    weight=0,
+    fill=True,
+    fill_color="#1a1a1a",
+    fill_opacity=0.68
+).add_to(m)
+
+# Highlight boundary frame for the rectangular region
+folium.Polygon(
+    locations=palisades_bounds,
+    color="#000000",
+    weight=2,
+    fill=True,
+    fill_color="#FFFFFF",
+    fill_opacity=0.10,
+    tooltip="Pacific Palisades Region"
+).add_to(m)
+
+def get_custom_color_spec(count):
+    if count == 11:
+        return {"color": "#22c55e", "opacity": 0.35, "label": "Green (11 Cams)"}
+    elif 9 <= count <= 10:
+        return {"color": "#eab308", "opacity": 0.35, "label": "Yellow (9–10 Cams)"}
+    elif 5 <= count <= 8:
+        return {"color": "#f97316", "opacity": 0.40, "label": "Orange (5–8 Cams)"}
+    else:  # Everything else (0–4 and 12+)
+        return {"color": "#ef4444", "opacity": 0.40, "label": "Red (Everything Else)"}
+
+# 4 rows by 8 columns macro structure (32 cells total)
+MACRO_ROWS = 4
+MACRO_COLS = 8
+
+PIXELS_PER_MACRO_ROW = 16
+PIXELS_PER_MACRO_COL = 16
+
+TOTAL_ROWS = MACRO_ROWS * PIXELS_PER_MACRO_ROW
+TOTAL_COLS = MACRO_COLS * PIXELS_PER_MACRO_COL
+
+lats = np.linspace(SOUTH, NORTH, TOTAL_ROWS + 1)
+lons = np.linspace(WEST, EAST, TOTAL_COLS + 1)
+
+grid_features = []
+
+for r in range(TOTAL_ROWS):
+    for c in range(TOTAL_COLS):
+        lat_min_cell = lats[r]
+        lat_max_cell = lats[r + 1]
+        lon_min_cell = lons[c]
+        lon_max_cell = lons[c + 1]
+
+        cell_poly = Polygon([
+            (lon_min_cell, lat_min_cell),
+            (lon_max_cell, lat_min_cell),
+            (lon_max_cell, lat_max_cell),
+            (lon_min_cell, lat_max_cell),
+            (lon_min_cell, lat_min_cell)
+        ])
+
+        # Check strict intersection/touching against camera sectors
+        covering_cams = [cam["name"] for cam in palisades_cams if cam["shapely_poly"].intersects(cell_poly)]
+        cov_count = len(covering_cams)
+
+        spec = get_custom_color_spec(cov_count)
+        cam_list_str = "⚠️ BLINDSPOT - 0 Cameras" if cov_count == 0 else "<br/>• " + "<br/>• ".join(covering_cams)
+
+        grid_features.append({
+            "type": "Feature",
+            "geometry": mapping(cell_poly),
+            "properties": {
+                "coverage_status": f"{cov_count} Camera(s) - {spec['label']}",
+                "camera_details": cam_list_str,
+                "color": spec["color"],
+                "opacity": spec["opacity"]
+            }
+        })
+
+geojson_grid = {"type": "FeatureCollection", "features": grid_features}
+
+grid_tooltip = folium.GeoJsonTooltip(
+    fields=["coverage_status", "camera_details"],
+    aliases=["Coverage Level:", "Touching Cameras:"],
+    style="""
+        background-color: #0f172a;
+        color: #f8fafc;
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 8px;
+    """,
+    sticky=True
+)
+
+folium.GeoJson(
+    geojson_grid,
+    name="High-Density Sub-Pixels",
+    style_function=lambda feature: {
+        'fillColor': feature['properties']['color'],
+        'color': '#000000',
+        'weight': 0.05,
+        'fillOpacity': feature['properties']['opacity']
+    },
+    tooltip=grid_tooltip
+).add_to(m)
+
+# Macro grid outlines
+macro_lats = np.linspace(SOUTH, NORTH, MACRO_ROWS + 1)
+macro_lons = np.linspace(WEST, EAST, MACRO_COLS + 1)
+
+for mr in range(MACRO_ROWS):
+    for mc in range(MACRO_COLS):
+        m_lat_min = macro_lats[mr]
+        m_lat_max = macro_lats[mr + 1]
+        m_lon_min = macro_lons[mc]
+        m_lon_max = macro_lons[mc + 1]
+
+        macro_bounds = [
+            [m_lat_min, m_lon_min],
+            [m_lat_min, m_lon_max],
+            [m_lat_max, m_lon_max],
+            [m_lat_max, m_lon_min],
+            [m_lat_min, m_lon_min]
+        ]
+
+        folium.Polygon(
+            locations=macro_bounds,
+            color="#000000",
+            weight=2.2,
+            fill=False,
+            interactive=False
+        ).add_to(m)
+
+# ==========================================
+# 3. HELPER: ROTATED SVG ARROW ICON
+# ==========================================
+def create_arrow_icon(angle_deg, color="#38bdf8", size=24):
+    svg_html = f"""
+    <div style="transform: rotate({angle_deg}deg); transform-origin: center center; width: {size}px; height: {size}px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="{color}" stroke="#000000" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+    </div>
+    """
+    return folium.DivIcon(
+        html=svg_html,
+        icon_size=(size, size),
+        icon_anchor=(size // 2, size // 2)
+    )
+
+# ==========================================
+# 4. PLOT NEARBY CAMERAS & INTERACTIVE SECTORS
+# ==========================================
+cam_data_json = []
+
+for cam in palisades_cams:
+    cname = cam["name"]
+    cid = cam["id"]
+    pan_angle = cam["pan"]
+    tilt_angle = cam["tilt"]
+    img_url = cam["img_url"]
+    dist = cam["dist_km"]
+    range_km = cam["range_km"]
+
+    arrow_color = "#38bdf8" if dist <= 20 else "#fbbf24"
+    arrow_icon = create_arrow_icon(pan_angle, color=arrow_color, size=24)
+
+    popup_html = f"""
+    <div style="font-family: Arial, sans-serif; width: 250px; background: #111; color: #fff; padding: 10px; border-radius: 6px;">
+        <h4 style="margin: 0 0 4px 0; color: {arrow_color}; font-size: 13px;">{cname}</h4>
+        <p style="font-size: 11px; margin: 2px 0; color: #ccc;">Distance: <b>{dist} km</b></p>
+        <p style="font-size: 11px; margin: 2px 0; color: #ccc;">Current Pan: <b>{pan_angle}°</b> | Tilt: <b>{tilt_angle}°</b></p>
+        <p style="font-size: 10px; margin: 2px 0; color: #38bdf8;">FOV: 60° Angle | Range: {range_km} km</p>
+        {'<img src="' + img_url + '" style="width: 100%; border-radius: 4px; margin-top: 6px;" />' if img_url else ''}
+        <br/>
+        <button onclick="toggleCamSector('{cid}')"
+                style="margin-top: 8px; width: 100%; background: #0284c7; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">
+            📐 Toggle Blue Coverage Sector
+        </button>
+        <br/>
+        <a href="https://ops.alertcalifornia.org/cam-console/{cid}" target="_blank"
+           style="display: inline-block; margin-top: 6px; color: #38bdf8; font-size: 11px;">Open Live Console ↗</a>
+    </div>
+    """
+
+    folium.Marker(
+        location=[cam["lat"], cam["lon"]],
+        popup=folium.Popup(popup_html, max_width=270),
+        tooltip=f"📷 {cname} (Click arrow to view coverage sector)",
+        icon=arrow_icon
+    ).add_to(m)
+
+    cam_data_json.append({
+        "id": cid,
+        "lat": cam["lat"],
+        "lon": cam["lon"],
+        "sector_points": cam["sector_points"]
+    })
+
+# ==========================================
+# 5. INJECT CLIENT-SIDE LEAFLET SECTOR SCRIPT
+# ==========================================
+js_template = """
+<script>
+(function initSectors() {
+    var cameraData = CAMERA_DATA_PLACEHOLDER;
+
+    function attachMapLogic() {
+        var mapObj = null;
+        for (var key in window) {
+            if (typeof key === 'string' && key.startsWith('map_')) {
+                mapObj = window[key];
+                break;
+            }
+        }
+
+        if (!mapObj && typeof L !== 'undefined') {
+            for (var k in window) {
+                if (window[k] instanceof L.Map) {
+                    mapObj = window[k];
+                    break;
+                }
+            }
+        }
+
+        if (!mapObj) {
+            setTimeout(attachMapLogic, 100);
+            return;
+        }
+
+        window.cameraSectors = window.cameraSectors || {};
+
+        cameraData.forEach(function(cam) {
+            if (!window.cameraSectors[cam.id]) {
+                var polygon = L.polygon(cam.sector_points, {
+                    color: '#0284c7',
+                    weight: 2,
+                    fillColor: '#38bdf8',
+                    fillOpacity: 0.45,
+                    opacity: 0.95,
+                    interactive: false
+                });
+
+                window.cameraSectors[cam.id] = {
+                    polygon: polygon,
+                    visible: false
+                };
+            }
+        });
+
+        window.toggleCamSector = function(camId) {
+            var entry = window.cameraSectors[camId];
+            if (entry) {
+                if (entry.visible) {
+                    mapObj.removeLayer(entry.polygon);
+                    entry.visible = false;
+                } else {
+                    entry.polygon.addTo(mapObj);
+                    entry.visible = true;
+                }
+            }
+        };
+    }
+
+    attachMapLogic();
+})();
+</script>
+"""
+
+js_code = js_template.replace("CAMERA_DATA_PLACEHOLDER", json.dumps(cam_data_json))
+m.get_root().html.add_child(folium.Element(js_code))
+
+m

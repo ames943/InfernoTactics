@@ -963,7 +963,8 @@ class InfernoEnv:
                     elif not success:
                         reward -= RESOURCE_WASTED_PENALTY
                     events.append({"resource_type": rtype, "zone": unit["target_zone"],
-                                   "cells_affected": n_affected, "success": success})
+                                   "cells_affected": n_affected, "success": success,
+                                   "row": int(row), "col": int(col)})
                     unit["effect_tick"] = self.tick_count
                     unit["state"] = "deployed"
                     unit["remaining_ticks"] = self.delay_config[rtype]["post_effect_busy_ticks"] \
@@ -985,7 +986,8 @@ class InfernoEnv:
                     elif not success:
                         reward -= RESOURCE_WASTED_PENALTY
                     events.append({"resource_type": rtype, "zone": unit["target_zone"],
-                                   "cells_affected": n_affected, "success": success})
+                                   "cells_affected": n_affected, "success": success,
+                                   "row": int(row), "col": int(col)})
                     unit["effect_tick"] = self.tick_count
                     unit["state"] = "deployed"
                     unit["remaining_ticks"] = self.delay_config[rtype]["post_effect_busy_ticks"]

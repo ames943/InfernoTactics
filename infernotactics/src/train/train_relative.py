@@ -1,8 +1,10 @@
-"""V8 training loop: randomized ignitions with fire-relative actions.
+"""V8/v10 training loop: randomized ignitions with fire-relative actions
+and policy-decided list-only multi-dispatch per simulation tick.
 
-This deliberately uses the proven pre-v4 Monte-Carlo loop.  The experiment
-changes the action representation and training distribution, not the unstable
-GAE/PPO rewrite.
+Uses the proven pre-v4 Monte Carlo loop.  The action representation is
+fire-relative (semantic targets), the dispatch count per tick is chosen
+by the policy, and the environment runs in synthetic-traffic mode with
+configurable per-resource delays.
 """
 
 import math
@@ -33,16 +35,59 @@ from train.relative_actions import (  # noqa: E402
     decode_action,
     resolve_relative_targets,
 )
-from train.train_actor_critic import (  # noqa: E402
-    CLASSIFICATION_LOSS_COEFF,
-    ENTROPY_COEFF,
-    GAMMA,
-    GRAD_CLIP_NORM,
-    RunningMeanStd,
-    compute_returns,
-    get_device,
-)
 from train.run_logger import RunLogger, summarize_episode  # noqa: E402
+
+
+# Hyperparameters (previously in train_actor_critic.py; inlined here after that
+# file was removed in the v10 reorganization to keep only the active pipeline).
+CLASSIFICATION_LOSS_COEFF = 0.3
+ENTROPY_COEFF = 0.01
+GAMMA = 0.99
+GRAD_CLIP_NORM = 0.5
+
+
+class RunningMeanStd:
+    """Welford's online mean/variance, used to normalize returns before they
+    hit the loss. epsilon-initialized count so the very first episode doesn't
+    divide by zero; normalize() is called BEFORE update() each episode so an
+    episode's own returns don't bias the statistics used to normalize it.
+    """
+
+    def __init__(self, epsilon=1e-4):
+        self.mean = 0.0
+        self.var = 1.0
+        self.count = epsilon
+
+    def update(self, values):
+        batch_mean = float(np.mean(values))
+        batch_var = float(np.var(values))
+        batch_count = len(values)
+        delta = batch_mean - self.mean
+        total_count = self.count + batch_count
+        new_mean = self.mean + delta * batch_count / total_count
+        m_a = self.var * self.count
+        m_b = batch_var * batch_count
+        m2 = m_a + m_b + delta ** 2 * self.count * batch_count / total_count
+        self.mean = new_mean
+        self.var = m2 / total_count
+        self.count = total_count
+
+    def normalize(self, values):
+        return [(v - self.mean) / (math.sqrt(self.var) + 1e-8) for v in values]
+
+
+def compute_returns(rewards, gamma):
+    returns = [0.0] * len(rewards)
+    running = 0.0
+    for t in reversed(range(len(rewards))):
+        running = rewards[t] + gamma * running
+        returns[t] = running
+    return returns
+
+
+def get_device():
+    return torch.device("cpu")
+
 
 
 N_EPISODES = int(os.environ.get("INFERNO_N_EPISODES", 2000))

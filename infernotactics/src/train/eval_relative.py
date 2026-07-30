@@ -17,11 +17,95 @@ from env.inferno_env import (  # noqa: E402
     VALIDATION_IGNITION_POINTS,
     InfernoEnv,
     SCALAR_KEYS,
+    flatten_scalars,
 )
 from models.relative_model import RelativeInfernoModel  # noqa: E402
 from train.relative_actions import TARGET_TYPES, decode_action  # noqa: E402
 from train.train_relative import _forward  # noqa: E402
 from train.train_relative import MAX_DISPATCH_SLOTS  # noqa: E402
+
+
+def _select_action_argmax(logits, available):
+    resource_logits = logits["resource_type"][0].clone()
+    mask = torch.tensor(
+        [available[rtype] > 0 for rtype in RESOURCE_TYPES],
+        dtype=torch.bool,
+        device=resource_logits.device,
+    )
+    resource_logits[~mask] = -1e9
+    if not bool(mask.any()):
+        return None
+    r_idx = int(torch.argmax(resource_logits))
+    t_idx = int(torch.argmax(logits["target"][0, r_idx]))
+    return r_idx, t_idx
+
+
+def eval_policy(policy, env, n_episodes=5, use_real_weather=True, deterministic=True,
+               seed=0, ignition_point=None, ignition_points=None, scalars_fn=None):
+    """Run any policy (model or heuristic with __call__ returning logits) against InfernoEnv.
+
+    Returns dict with avg_reward, avg_buildings_destroyed, containment_rate, episode_rewards.
+    """
+    device = next(policy.parameters()).device if hasattr(policy, 'parameters') else torch.device('cpu')
+    episode_rewards, episode_destroyed, episode_contained = [], [], []
+    for ep in range(n_episodes):
+        obs = env.reset(ignition_point=ignition_point, ignition_points=ignition_points,
+                        seed=seed + ep, use_real_weather=use_real_weather)
+        total_reward = 0.0
+        total_destroyed = 0
+        done = False
+        contained = False
+        while not done:
+            local_available = {
+                rtype: int(obs["scalars"][f"{rtype}_available"])
+                for rtype in RESOURCE_TYPES
+            }
+            tick_actions = []
+            grid_np = obs["grid"]
+            scalars_np = flatten_scalars(obs["scalars"])
+            grid_t = torch.from_numpy(np.ascontiguousarray(grid_np)).unsqueeze(0).to(device)
+            scalars_t = torch.from_numpy(scalars_np).unsqueeze(0).to(device)
+            with torch.no_grad():
+                for _ in range(MAX_DISPATCH_SLOTS):
+                    if hasattr(policy, '_forward') or hasattr(policy, 'forward'):
+                        logits, _, _, zones = _forward(policy, obs, env, device)
+                        sel = _select_action_argmax(logits, local_available)
+                        if sel is None:
+                            break
+                        r_idx, t_idx = sel
+                        action = decode_action(r_idx, t_idx, zones)
+                    else:
+                        action_logits, _, _ = policy(grid_t, scalars_t)
+                        resource_logits = action_logits["resource_type"][0].clone()
+                        mask = torch.tensor(
+                            [local_available[rtype] > 0 for rtype in RESOURCE_TYPES],
+                            dtype=torch.bool, device=device,
+                        )
+                        resource_logits[~mask] = -1e9
+                        if not bool(mask.any()):
+                            break
+                        r_idx = int(torch.argmax(resource_logits))
+                        t_idx = int(torch.argmax(action_logits["target"][0, r_idx]))
+                        from train.relative_actions import resolve_relative_targets
+                        zones_np, _ = resolve_relative_targets(env, obs)
+                        action = decode_action(r_idx, t_idx, zones_np)
+                    if action is None:
+                        break
+                    local_available[action[0]] -= 1
+                    tick_actions.append(action)
+            obs, reward, done, info = env.step(tick_actions)
+            total_reward += reward
+            total_destroyed += info["buildings_destroyed"]
+            contained = info["contained"]
+        episode_rewards.append(total_reward)
+        episode_destroyed.append(total_destroyed)
+        episode_contained.append(contained)
+    return {
+        "avg_reward": sum(episode_rewards) / n_episodes,
+        "avg_buildings_destroyed": sum(episode_destroyed) / n_episodes,
+        "containment_rate": sum(episode_contained) / n_episodes,
+        "episode_rewards": episode_rewards,
+    }
 
 
 def evaluate(model, env, name, point, device, episodes):
