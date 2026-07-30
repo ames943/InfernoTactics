@@ -59,7 +59,7 @@
     }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     
-    #btn-home { position: absolute; top: 16px; right: 24px; z-index: 10; }
+    #top-right-controls { position: absolute; top: 16px; right: 24px; z-index: 10; display: flex; gap: 12px; }
     
     /* Left Panel - Dashboard */
     #dashboard {
@@ -145,6 +145,29 @@
       display: none;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Help Modal */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      z-index: 100; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: auto; }
+    .modal-content {
+      background: var(--bg-dark); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; width: 400px; max-width: 90%;
+      box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+      transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .modal-overlay.show .modal-content { transform: translateY(0); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px; }
+    .modal-header h3 { margin: 0; font-size: 1.2rem; font-weight: 700; color: #ffeb3b; }
+    .btn-close { background: none; border: none; color: white; cursor: pointer; opacity: 0.7; transition: 0.2s; padding: 4px; display: flex; }
+    .btn-close:hover { opacity: 1; background: rgba(255,255,255,0.1); border-radius: 4px; }
+    .modal-body ul { list-style: none; padding: 0; margin: 0; }
+    .modal-body li { margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; }
+    .modal-body li:last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -160,10 +183,16 @@
     </div>
   </div>
   
-  <button id="btn-home" class="btn" onclick="goHome()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    Home View
-  </button>
+  <div id="top-right-controls">
+    <button id="btn-home" class="btn" onclick="goHome()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home View
+    </button>
+    <button id="btn-info" class="btn" onclick="showHelp()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      Help
+    </button>
+  </div>>
 
   <!-- Left Dashboard -->
   <div id="dashboard">
@@ -316,44 +345,74 @@
       
       try {
         const bldgs = await Cesium.createOsmBuildingsAsync();
+        bldgs.maximumScreenSpaceError = 2; // Force high detail
+        bldgs.maximumMemoryUsage = 8192;   // 8GB max memory
+        bldgs.foveatedScreenSpaceError = false; 
+        bldgs.cullWithChildrenBounds = false;
+        bldgs.cullRequestsWhileMoving = false; // Don't cancel network requests when zooming
+        bldgs.skipLevelOfDetail = true; // Skip intermediate LODs
         viewer.scene.primitives.add(bldgs);
         
-        // Restore true mathematical center
-        const centerLon = (gridBounds.w + gridBounds.e) / 2.0;
-        const centerLat = (gridBounds.s + gridBounds.n) / 2.0;
+        // Use exact geometric corners from backend
+        const nw = Cesium.Cartesian3.fromDegrees(-118.62922, 34.11241);
+        const ne = Cesium.Cartesian3.fromDegrees(-118.44000, 34.14986);
+        const sw = Cesium.Cartesian3.fromDegrees(-118.60490, 34.03024);
+        const se = Cesium.Cartesian3.fromDegrees(-118.41587, 34.06766);
         
-        const centerCartesian = Cesium.Cartesian3.fromDegrees(centerLon, centerLat);
-        const westCartesian = Cesium.Cartesian3.fromDegrees(gridBounds.w, centerLat);
-        const northCartesian = Cesium.Cartesian3.fromDegrees(centerLon, gridBounds.n);
+        const centerCartesian = Cesium.Cartesian3.lerp(nw, se, 0.5, new Cesium.Cartesian3());
         
-        // Calculate half-width and half-height in meters, add 5km padding
-        const halfWidth = Cesium.Cartesian3.distance(centerCartesian, westCartesian) + 5000.0;
-        const halfHeight = Cesium.Cartesian3.distance(centerCartesian, northCartesian) + 5000.0;
+        // Strict distances for the rotated rectangle
+        const strictHalfWidth = Cesium.Cartesian3.distance(nw, ne) / 2.0;
+        const strictHalfHeight = Cesium.Cartesian3.distance(nw, sw) / 2.0;
         
-        const planes = [
-          new Cesium.ClippingPlane(new Cesium.Cartesian3( 1.0,  0.0, 0.0), halfWidth + 2000.0), // West (slightly extended)
-          new Cesium.ClippingPlane(new Cesium.Cartesian3(-1.0,  0.0, 0.0), halfWidth),          // East 
-          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0,  1.0, 0.0), halfHeight),         // South (restored to original ocean view)
-          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0, -1.0, 0.0), halfHeight + 10000.0) // North (massively extended by 10km to push grid down)
+        // Map extends beyond the grid
+        const mapPlanes = [
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 1.0,  0.0, 0.0), strictHalfWidth + 3000.0), // West
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(-1.0,  0.0, 0.0), strictHalfWidth + 2000.0), // East 
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0,  1.0, 0.0), strictHalfHeight + 6000.0), // South (shifted downwards/south)
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0, -1.0, 0.0), strictHalfHeight + 3000.0)  // North (shifted downwards/south)
+        ];
+        
+        // Buildings are strictly bounded to the 8x4 grid, shrunk by 40 meters
+        // to prevent edge buildings from poking past the green lines due to Earth curvature/projection warping
+        const bldgPlanes = [
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 1.0,  0.0, 0.0), strictHalfWidth - 40.0),
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(-1.0,  0.0, 0.0), strictHalfWidth - 40.0),
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0,  1.0, 0.0), strictHalfHeight - 40.0),
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0, -1.0, 0.0), strictHalfHeight - 40.0)
         ];
         
         let localTransform = Cesium.Transforms.eastNorthUpToFixedFrame(centerCartesian);
         
-        // Rotate clipping box by 11 degrees to match the grid's geographic rotation
-        const rotationAngle = Cesium.Math.toRadians(11.0);
+        // Calculate the true geographic rotation angle of the grid (relative to due East)
+        const dLat = 34.14986 - 34.11241;
+        const dLon = -118.44000 - -118.62922;
+        const avgLat = Cesium.Math.toRadians(34.1311);
+        const dx = dLon * Math.cos(avgLat);
+        const dy = dLat;
+        const rotationAngle = Math.atan2(dy, dx);
+        
         const rotationQuat = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, rotationAngle);
         const rotationMat3 = Cesium.Matrix3.fromQuaternion(rotationQuat);
         const rotationMat4 = Cesium.Matrix4.fromRotationTranslation(rotationMat3, Cesium.Cartesian3.ZERO);
         localTransform = Cesium.Matrix4.multiply(localTransform, rotationMat4, new Cesium.Matrix4());
         
-        const clippingPlanes = new Cesium.ClippingPlaneCollection({
-          planes: planes,
+        const mapClippingCollection = new Cesium.ClippingPlaneCollection({
+          planes: mapPlanes,
           modelMatrix: localTransform,
           edgeWidth: 0.0,
-          unionClippingRegions: true // TRUE means clipped if outside ANY plane (creates a bounding box)
+          unionClippingRegions: true
         });
-        bldgs.clippingPlanes = clippingPlanes;
-        viewer.scene.globe.clippingPlanes = clippingPlanes;
+        
+        const bldgClippingCollection = new Cesium.ClippingPlaneCollection({
+          planes: bldgPlanes,
+          modelMatrix: localTransform,
+          edgeWidth: 0.0,
+          unionClippingRegions: true
+        });
+        
+        bldgs.clippingPlanes = bldgClippingCollection;
+        viewer.scene.globe.clippingPlanes = mapClippingCollection;
       } catch(eb) { console.warn('Buildings failed', eb); }
       // 5. Draw Zones
       drawZones();
@@ -763,6 +822,29 @@
 
       await init();
     };
+  </script>
+  <!-- Help Modal -->
+  <div id="help-modal" class="modal-overlay" onclick="if(event.target===this) hideHelp()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Camera Controls</h3>
+        <button class="btn-close" onclick="hideHelp()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <ul>
+          <li><strong>Pan:</strong> Left Click + Drag</li>
+          <li><strong>Zoom:</strong> Right Click + Drag <em>or</em> Scroll Wheel</li>
+          <li><strong>Tilt / Rotate:</strong> Middle Click + Drag <em>or</em> CTRL + Left Click + Drag</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showHelp() { document.getElementById('help-modal').classList.add('show'); }
+    function hideHelp() { document.getElementById('help-modal').classList.remove('show'); }
   </script>
 </body>
 </html>
