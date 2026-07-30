@@ -1029,12 +1029,9 @@ class InfernoEnv:
         return reward, int(len(rows)), n_evacuated, events
 
     def step(self, action):
-        if isinstance(action, list):
-            actions_list = action
-        elif action is None or action == "noop":
-            actions_list = []
-        else:
-            actions_list = [action]
+        if not isinstance(action, list):
+            raise ValueError("actions must be a list of (resource_type, target_zone) pairs")
+        actions_list = action
 
         # Advance units already en route/deployed BEFORE committing this
         # tick's new dispatches.
