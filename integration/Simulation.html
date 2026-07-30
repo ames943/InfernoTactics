@@ -276,16 +276,19 @@
         selectionIndicator: false
       });
 
-      Cesium.createWorldTerrainAsync({
-        requestVertexNormals: true,
-        requestWaterMask: true
-      }).then(terrain => {
-        viewer.terrainProvider = terrain;
-      }).catch(e => console.warn('Terrain failed', e));
+      const padding = 0.05; // ~5km padding to ensure rotated grid is not cut off
+      const viewRect = Cesium.Rectangle.fromDegrees(
+        gridBounds.w - padding,
+        gridBounds.s - padding,
+        gridBounds.e + padding,
+        gridBounds.n + padding
+      );
 
       viewer.scene.globe.showGroundAtmosphere = false;
       viewer.scene.globe.enableLighting = true;
       viewer.scene.globe.depthTestAgainstTerrain = true;
+      // Removed cartographicLimitRectangle in favor of clippingPlanes
+      viewer.scene.skyBox.show = false; // Hide stars so buildings outside terrain blend in
       
       // Dark visual style
       viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#020202');
@@ -294,7 +297,8 @@
       try {
         viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
           url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          maximumLevel: 19
+          maximumLevel: 19,
+          rectangle: viewRect
         }));
       } catch(ei) { console.warn('Imagery failed', ei); }
 
@@ -303,10 +307,9 @@
         viewer.scene.setTerrain(terrain);
         
         // If terrain fails to load (e.g. invalid Ion token), the globe disappears.
-        // We can listen for errors on the terrain provider once it resolves.
         terrain.readyPromise.catch(e => {
-          console.error('Terrain failed to load (likely invalid Ion token):', e);
-          alert('ERROR: 3D Terrain failed to load. Your Cesium Ion token is likely invalid or expired. Falling back to a flat 2D map.');
+          console.error('Terrain failed to load:', e);
+          alert('ERROR: 3D Terrain failed to load. Falling back to a flat 2D map.');
           viewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider();
         });
       } catch(et) { console.warn('Terrain failed', et); }
@@ -314,10 +317,44 @@
       try {
         const bldgs = await Cesium.createOsmBuildingsAsync();
         viewer.scene.primitives.add(bldgs);
+        
+        // Restore true mathematical center
+        const centerLon = (gridBounds.w + gridBounds.e) / 2.0;
+        const centerLat = (gridBounds.s + gridBounds.n) / 2.0;
+        
+        const centerCartesian = Cesium.Cartesian3.fromDegrees(centerLon, centerLat);
+        const westCartesian = Cesium.Cartesian3.fromDegrees(gridBounds.w, centerLat);
+        const northCartesian = Cesium.Cartesian3.fromDegrees(centerLon, gridBounds.n);
+        
+        // Calculate half-width and half-height in meters, add 5km padding
+        const halfWidth = Cesium.Cartesian3.distance(centerCartesian, westCartesian) + 5000.0;
+        const halfHeight = Cesium.Cartesian3.distance(centerCartesian, northCartesian) + 5000.0;
+        
+        const planes = [
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 1.0,  0.0, 0.0), halfWidth + 2000.0), // West (slightly extended)
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(-1.0,  0.0, 0.0), halfWidth),          // East 
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0,  1.0, 0.0), halfHeight),         // South (restored to original ocean view)
+          new Cesium.ClippingPlane(new Cesium.Cartesian3( 0.0, -1.0, 0.0), halfHeight + 10000.0) // North (massively extended by 10km to push grid down)
+        ];
+        
+        let localTransform = Cesium.Transforms.eastNorthUpToFixedFrame(centerCartesian);
+        
+        // Rotate clipping box by 11 degrees to match the grid's geographic rotation
+        const rotationAngle = Cesium.Math.toRadians(11.0);
+        const rotationQuat = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, rotationAngle);
+        const rotationMat3 = Cesium.Matrix3.fromQuaternion(rotationQuat);
+        const rotationMat4 = Cesium.Matrix4.fromRotationTranslation(rotationMat3, Cesium.Cartesian3.ZERO);
+        localTransform = Cesium.Matrix4.multiply(localTransform, rotationMat4, new Cesium.Matrix4());
+        
+        const clippingPlanes = new Cesium.ClippingPlaneCollection({
+          planes: planes,
+          modelMatrix: localTransform,
+          edgeWidth: 0.0,
+          unionClippingRegions: true // TRUE means clipped if outside ANY plane (creates a bounding box)
+        });
+        bldgs.clippingPlanes = clippingPlanes;
+        viewer.scene.globe.clippingPlanes = clippingPlanes;
       } catch(eb) { console.warn('Buildings failed', eb); }
-
-      // 4. Removed cartographicLimitRectangle as it prevented camera from viewing from outside the bounds
-      
       // 5. Draw Zones
       drawZones();
       
