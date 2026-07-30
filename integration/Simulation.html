@@ -281,6 +281,16 @@
       </div>
     </div>
   </div>
+  
+  <!-- Temporary Selection Legend -->
+  <div id="selection-legend" class="panel" style="display: none; position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); width: 450px; z-index: 100; pointer-events: none;">
+    <h3 style="text-align: center; margin-bottom: 12px; color: #fff;">Sector Response Delay (Documentation Coverage)</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold;">
+      <span style="font-size: 0.85rem; color: #ff3333;">Poor Coverage = 12hr AI Delay</span>
+      <span style="font-size: 0.85rem; color: #33cc33;">Good Coverage = 1hr AI Delay</span>
+    </div>
+    <div style="height: 16px; border-radius: 8px; background: linear-gradient(to right, rgba(255,51,51,0.6), rgba(204,204,51,0.6), rgba(51,204,51,0.6)); border: 1px solid rgba(255,255,255,0.3);"></div>
+  </div>
 
   <!-- Delay Banner -->
   <div id="delay-banner">
@@ -310,6 +320,10 @@
     let viewer;
     let worldData = null;
     let timelineData = null;
+    
+    let zoneShadingPrimitives = [];
+    let isSelectingIgnition = false;
+    let clickHandler = null;
     let gridBounds = { n: 34.150, s: 34.030, e: -118.440, w: -118.605 }; // Default fallback
     
     // Rendering collections
@@ -479,10 +493,27 @@
         // Coverage color
         // coverage: 1.0 (good) -> green, 0.0 (bad) -> red
         const c = z.coverage;
-        const color = new Cesium.Color(1.0 - c, c * 0.8, 0.2, 0.15);
+        const color = new Cesium.Color(1.0 - c, c * 0.8, 0.2, 0.55); // increased alpha so it's clearly visible
         const outlineColor = new Cesium.Color(1.0 - c, c * 0.8, 0.2, 0.8);
         
-        // Polygon fill shading removed per user request to keep natural terrain color.
+        // Polygon fill shading based on response delay (coverage)
+        const instance = new Cesium.GeometryInstance({
+          geometry: new Cesium.PolygonGeometry({
+            polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(pts)),
+            height: 0
+          }),
+          attributes: {
+            color: Cesium.ColorGeometryInstanceAttribute.fromColor(color)
+          }
+        });
+        
+        const shadingPrim = viewer.scene.primitives.add(new Cesium.GroundPrimitive({
+          geometryInstances: instance,
+          appearance: new Cesium.PerInstanceColorAppearance({ closed: true }),
+          show: false // Hide initially until selection mode
+        }));
+        zoneShadingPrimitives.push(shadingPrim);
+
         // Add outline polyline (GroundPrimitives don't support true outlines well)
         viewer.entities.add({
           polyline: {
@@ -558,26 +589,81 @@
       const btn = document.getElementById('btn-start');
       const spinner = document.getElementById('btn-spinner');
       
-      btn.disabled = true;
-      btn.querySelector('span').textContent = "Running...";
-      spinner.style.display = "block";
-      
-      try {
-        const res = await fetch('/simulate?scenario=anchor');
-        timelineData = await res.json();
-        
-        btn.querySelector('span').textContent = "Replay";
-        
-        // Start playback
+      if (btn.querySelector('span').textContent === "Replay") {
         playTimeline();
-      } catch (e) {
-        console.error("Simulation failed", e);
-        alert("Simulation failed. Check console.");
-        btn.querySelector('span').textContent = "Run Policy";
-        btn.disabled = false;
-      } finally {
-        spinner.style.display = "none";
+        return;
       }
+      
+      // Enter selection mode
+      isSelectingIgnition = true;
+      btn.querySelector('span').textContent = "Select Ignition...";
+      
+      // Show zone shading and legend
+      zoneShadingPrimitives.forEach(p => p.show = true);
+      document.getElementById('selection-legend').style.display = "block";
+      
+      // Switch to overhead view (pseudo-2D) aligned with the grid
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-118.5225, 34.0900, 19000.0), // Higher up & perfectly centered
+        orientation: {
+          heading: Cesium.Math.toRadians(-13.4), // Counter-rotate to align grid perfectly horizontal with screen
+          pitch: Cesium.Math.toRadians(-90.0),
+          roll: 0.0
+        },
+        duration: 1.5
+      });
+      
+      // Setup click handler
+      if (!clickHandler) {
+        clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      }
+      
+      clickHandler.setInputAction(async function(click) {
+        if (!isSelectingIgnition) return;
+        
+        // Pick position on globe
+        const ray = viewer.camera.getPickRay(click.position);
+        let position = null;
+        if (ray) position = viewer.scene.globe.pick(ray, viewer.scene);
+        if (!position) return; // clicked sky/off-map
+        
+        isSelectingIgnition = false;
+        clickHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        
+        // Hide shading and legend
+        zoneShadingPrimitives.forEach(p => p.show = false);
+        document.getElementById('selection-legend').style.display = "none";
+        
+        // Return to 3D View
+        goHome();
+        
+        // Get Lat Lon
+        const carto = Cesium.Cartographic.fromCartesian(position);
+        const lat = Cesium.Math.toDegrees(carto.latitude);
+        const lon = Cesium.Math.toDegrees(carto.longitude);
+        
+        // Now run the simulation
+        btn.disabled = true;
+        btn.querySelector('span').textContent = "Running...";
+        spinner.style.display = "block";
+        
+        try {
+          const res = await fetch(`/simulate?scenario=anchor&ig_lat=${lat}&ig_lon=${lon}`);
+          timelineData = await res.json();
+          
+          btn.querySelector('span').textContent = "Replay";
+          btn.disabled = false;
+          playTimeline();
+        } catch (e) {
+          console.error("Simulation failed", e);
+          alert("Simulation failed. Check console.");
+          btn.querySelector('span').textContent = "Run Policy";
+          btn.disabled = false;
+        } finally {
+          spinner.style.display = "none";
+        }
+        
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     }
     
     // --- Playback Engine ---

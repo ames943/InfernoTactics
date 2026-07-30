@@ -88,6 +88,7 @@ GRID_CORNERS = {
 env: InfernoEnv = None
 model: RelativeInfernoModel = None
 transformer_to_wgs84: Transformer = None
+transformer_from_wgs84: Transformer = None
 world_cache: dict = None
 
 app = FastAPI(title="InfernoTactics 3D Fire Simulator — v10")
@@ -192,11 +193,31 @@ def epsg5070_to_latlon(x, y):
     lon, lat = transformer_to_wgs84.transform(x, y)
     return float(lat), float(lon)
 
+def latlon_to_epsg5070(lat, lon):
+    x, y = transformer_from_wgs84.transform(lon, lat)
+    return float(x), float(y)
+
+def epsg5070_to_grid(x, y, meta):
+    a, b, c, d, e, f = meta["transform"]
+    x_prime, y_prime = x - c, y - f
+    det = a * e - b * d
+    if det == 0: return 0, 0
+    col = int((e * x_prime - b * y_prime) / det - 0.5)
+    row = int((a * y_prime - d * x_prime) / det - 0.5)
+    return row, col
 
 def grid_to_latlon(row, col, meta):
     """Grid (row, col) → WGS84 (lat, lon), exact via pyproj."""
     x, y = grid_to_epsg5070(row, col, meta)
     return epsg5070_to_latlon(x, y)
+
+def latlon_to_grid(lat, lon, meta):
+    """WGS84 (lat, lon) → Grid (row, col) exact inverse."""
+    x, y = latlon_to_epsg5070(lat, lon)
+    row, col = epsg5070_to_grid(x, y, meta)
+    row = max(0, min(meta["height"] - 1, row))
+    col = max(0, min(meta["width"] - 1, col))
+    return row, col
 
 
 # ===========================================================================
@@ -424,13 +445,15 @@ class UnitTracker:
 # Episode rollout
 # ===========================================================================
 
-def run_episode(env, model, delay_ticks, seed=9100):
+def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100):
     """Run a complete episode with response-delay gate.
 
     Returns the timeline dict matching the spec's §5.2 contract.
     """
+    ig_point = TRAINING_IGNITION_POINT if ig_row is None else (ig_row, ig_col)
+    
     obs = env.reset(
-        ignition_point=TRAINING_IGNITION_POINT,
+        ignition_point=ig_point,
         scenario="single",
         seed=seed,
         use_real_weather=True,
@@ -695,6 +718,7 @@ async def startup():
 
     # Coordinate transformer
     transformer_to_wgs84 = Transformer.from_crs("EPSG:5070", "EPSG:4326", always_xy=True)
+    transformer_from_wgs84 = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True)
 
     # Load model
     print(f"[startup] Loading checkpoint: {CKPT_PATH}")
@@ -771,23 +795,31 @@ async def simulate(
     scenario: str = Query("anchor"),
     seed: int = Query(9100),
     delay: str = Query("auto"),
+    ig_lat: float = Query(None),
+    ig_lon: float = Query(None)
 ):
     """Run the full episode server-side and return the timeline JSON."""
     t0 = time.time()
 
-    # Determine delay
-    ig_zone = (TRAINING_IGNITION_POINT[0] // ZONE_SIZE_CELLS) * 8 + \
-              (TRAINING_IGNITION_POINT[1] // ZONE_SIZE_CELLS)
+    ig_row, ig_col = TRAINING_IGNITION_POINT
+    if ig_lat is not None and ig_lon is not None:
+        ig_row, ig_col = latlon_to_grid(ig_lat, ig_lon, world_cache["grid"])
+
+    # Determine delay based on dynamic ignition zone
+    ig_zone = (ig_row // ZONE_SIZE_CELLS) * 8 + (ig_col // ZONE_SIZE_CELLS)
 
     if delay == "auto":
-        zone_data = next(z for z in world_cache["zones"] if z["id"] == ig_zone)
-        delay_ticks = zone_data["delay_ticks"]
+        try:
+            zone_data = next(z for z in world_cache["zones"] if z["id"] == ig_zone)
+            delay_ticks = zone_data["delay_ticks"]
+        except StopIteration:
+            delay_ticks = 1 # Fallback if out of bounds
     elif delay == "0":
         delay_ticks = 0
     else:
         delay_ticks = int(delay)
 
-    result = run_episode(env, model, delay_ticks, seed=seed)
+    result = run_episode(env, model, delay_ticks, ig_row=ig_row, ig_col=ig_col, seed=seed)
     result["_compute_time_s"] = round(time.time() - t0, 2)
 
     return JSONResponse(result)
