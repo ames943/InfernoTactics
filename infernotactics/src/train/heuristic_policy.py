@@ -207,7 +207,7 @@ def _run_baseline_table():
         VALIDATION_IGNITION_POINTS,
         InfernoEnv,
     )
-    from train.eval import eval_policy
+    from train.eval_relative import eval_policy
 
     print("Building InfernoEnv...")
     env = InfernoEnv(seed=0)

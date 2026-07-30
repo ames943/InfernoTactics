@@ -562,3 +562,36 @@ v10 multi-dispatch 100-episode run:
 - The run is informative but not a solved policy. The logging data should be used to diagnose over-dispatch, poor target/resource matching, and the remaining long-tail fires before extending training.
 
 
+
+Add: Repository Reorganization
+
+Scope of cleanup:
+- Deleted est_model/ (external inference bundle, no longer needed).
+- Deleted Simulation.html (pre-project artifact).
+- Deleted infernotactics/experiments/ (17 historical scripts, not archived).
+- Deleted stale checkpoint directories: checkpoints/, checkpoints_logging_smoke/, checkpoints_relative_v10_multi_dispatch_smoke/, checkpoints_relative_v8_500/.
+- Deleted legacy logs: 	rain_log.csv, val_log.csv, console_zonehead_randign_v1.log, wfigs_validation_report.json, wfigs_validation_jan11_report.json, and all *_zonehead_zonehead_randign_v1.csv files.
+- Deleted infernotactics/src/viz/ (empty package).
+- Deleted infernotactics/src/env/visualize_grid.py and infernotactics/src/env/test_ember_spotting.py (standalone debug plots, no callers).
+- Deleted absolute-zone code: src/models/inferno_model.py, src/models/test_model_forward.py, src/train/train_actor_critic.py, src/train/eval.py.
+
+Kept:
+- infernotactics/data/ left flat (no raw/processed split).
+- logs/runs/ and eports/ per-run artifacts preserved.
+- 
+otebooks/ content replaced (see below).
+
+Replacements:
+- README.md rewritten for the v10 pipeline only. No historical footnote on absolute-zone, zonehead, or PPO experiments.
+- 
+otebooks/train_relative_v8_colab.ipynb replaced by 
+otebooks/v10_relative_actions.ipynb that drives the current 	rain_relative.py with the v10 defaults.
+
+Import updates after deletions:
+- src/train/train_relative.py: removed rom train.train_actor_critic import ...; inlined CLASSIFICATION_LOSS_COEFF, ENTROPY_COEFF, GAMMA, GRAD_CLIP_NORM, RunningMeanStd, compute_returns, get_device into the file.
+- src/train/heuristic_policy.py: replaced rom train.eval import eval_policy with rom train.eval_relative import eval_policy.
+- src/train/eval_relative.py: added a generic val_policy(policy, env, ...) function that works with any policy object exposing a forward pass, replacing the deleted val.py's function. The heuristic policy uses it for the baseline table.
+
+Verification performed:
+- All modified Python files compile cleanly under cosmos-venv.
+- The reorganization is the final step in the v10 pipeline cleanup. Future work should focus on training improvements (longer runs, noop learning, resource-target specialization) rather than further code reorganization.
