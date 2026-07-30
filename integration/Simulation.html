@@ -2,599 +2,232 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Palisades 3D Wildfire Simulator - 8x4 Grid & RL Dispatch</title>
-  <!-- CesiumJS 1.115 -->
+  <title>Palisades 3D Wildfire Simulator</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-  <!-- Google Fonts -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #080c14; color: #fff; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background: #000; color: #fff; }
     #cesiumContainer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
-
-    /* Top Navigation HUD */
+    #leafletContainer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; display: none; }
     #header-bar {
       position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-      background: rgba(10, 15, 30, 0.92); backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 40px;
-      padding: 10px 28px; display: flex; align-items: center; gap: 28px;
-      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6); z-index: 10;
+      background: rgba(10,15,30,0.94); backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.18); border-radius: 40px;
+      padding: 10px 24px; display: flex; align-items: center; gap: 20px;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.6); z-index: 10;
     }
-    .hud-title { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.15rem; color: #ff4500; letter-spacing: 0.5px; text-shadow: 0 0 12px rgba(255,69,0,0.5); }
-    .hud-stat { display: flex; flex-direction: column; align-items: center; }
-    .hud-label { font-size: 0.68rem; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px; font-weight: 600; }
-    .hud-value { font-weight: 700; font-size: 1.1rem; font-family: 'JetBrains Mono', monospace; color: #f8fafc; }
-    .hud-value.highlight { color: #38bdf8; }
-    .hud-value.alert { color: #ff3333; text-shadow: 0 0 8px rgba(255,51,51,0.6); }
-
-    /* Left Control Panel */
-    #ui-panel {
-      position: absolute; top: 84px; left: 20px; width: 340px;
-      background: rgba(10, 15, 30, 0.94); backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px;
-      padding: 20px; z-index: 10; box-shadow: 0 16px 40px rgba(0,0,0,0.7);
-      display: flex; flex-direction: column; gap: 14px;
+    .hud-title { font-weight: 800; font-size: 1.1rem; color: #ff4500; letter-spacing: 0.5px; text-shadow: 0 0 12px rgba(255,69,0,0.5); }
+    .view-toggle { display: flex; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 2px; }
+    .view-btn { padding: 6px 14px; border: none; border-radius: 18px; font-size: 0.78rem; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s; }
+    .view-btn.active { background: #38bdf8; color: #080c14; box-shadow: 0 0 10px rgba(56,189,248,0.5); }
+    #home-btn {
+      position: absolute; top: 16px; right: 20px;
+      background: rgba(10,15,30,0.94); backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 30px;
+      padding: 10px 18px; color: #f8fafc; font-weight: 700; font-size: 0.85rem;
+      cursor: pointer; display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 10; transition: all 0.2s ease;
     }
-    h3 { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-    
-    .btn-group { display: flex; gap: 10px; margin-top: 4px; }
-    button.action-btn {
-      flex: 1; padding: 12px 16px; border: none; border-radius: 10px; font-weight: 700; font-size: 0.88rem;
-      cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .btn-primary { background: linear-gradient(135deg, #ff4500, #dc2626); color: white; box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4); }
-    .btn-primary:hover { background: linear-gradient(135deg, #dc2626, #b91c1c); transform: translateY(-1px); }
-    .btn-secondary { background: rgba(255,255,255,0.12); color: #e2e8f0; }
-    .btn-secondary:hover { background: rgba(255,255,255,0.22); }
-
-    /* Resource Legend */
-    .resource-legend { display: flex; flex-direction: column; gap: 8px; font-size: 0.84rem; margin-top: 4px; }
-    .legend-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 5px solid transparent; }
-    .legend-water { border-color: #00d2ff; }
-    .legend-trench { border-color: #ffb703; }
-    .legend-rescue { border-color: #00f5d4; }
-    .legend-heli { border-color: #9d4edd; }
-
-    /* Live RL Action Stream */
-    #action-log {
-      max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
-      font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.5); padding: 12px; border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-    .log-entry { padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); animation: fadeIn 0.3s ease; }
-    .log-water { color: #7dd3fc; border-left: 3px solid #00d2ff; }
-    .log-trench { color: #fde047; border-left: 3px solid #ffb703; }
-    .log-rescue { color: #6ee7b7; border-left: 3px solid #00f5d4; }
-    .log-heli { color: #e9d5ff; border-left: 3px solid #9d4edd; }
-
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* Custom Scrollbar */
-    #action-log::-webkit-scrollbar { width: 4px; }
-    #action-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 2px; }
+    #home-btn:hover { background: #38bdf8; color: #080c14; transform: translateY(-2px); }
   </style>
 </head>
 <body>
-  <!-- Top Navigation HUD -->
   <div id="header-bar">
-    <div class="hud-title">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 0-7 6.5-7 12a7 7 0 0 0 14 0c0-5.5-7-12-7-12z"/></svg>
-      PALISADES 8x4 SECTOR SIMULATOR
-    </div>
-    <div class="hud-stat">
-      <span class="hud-label">Sim Time</span>
-      <span class="hud-value" id="hud-time">00:00</span>
-    </div>
-    <div class="hud-stat">
-      <span class="hud-label">Active Blazes</span>
-      <span class="hud-value alert" id="hud-blazes">0</span>
-    </div>
-    <div class="hud-stat">
-      <span class="hud-label">Santa Ana Wind</span>
-      <span class="hud-value highlight" id="hud-wind">25.3 mph NE</span>
-    </div>
-    <div class="hud-stat">
-      <span class="hud-label">RL Total Reward</span>
-      <span class="hud-value" id="hud-reward">0.00</span>
+    <div class="hud-title">🔥 PALISADES 3D WILDFIRE SIMULATOR</div>
+    <div class="view-toggle">
+      <button id="btn-3d" class="view-btn active" onclick="switchEngine('3d')">3D Globe</button>
+      <button id="btn-2d" class="view-btn" onclick="switchEngine('2d')">2D Map</button>
     </div>
   </div>
-
-  <!-- Left Control Panel -->
-  <div id="ui-panel">
-    <h3>
-      <span>RL Tactical Dispatch</span>
-      <span id="status-badge" style="font-size: 0.75rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); padding: 3px 8px; border-radius: 12px;">READY</span>
-    </h3>
-    
-    <div class="btn-group">
-      <button id="btn-start" class="action-btn btn-primary" onclick="toggleSimulation()">▶ Start Simulation</button>
-      <button class="action-btn btn-secondary" onclick="resetSimulation()">↺ Reset</button>
-    </div>
-
-    <div class="resource-legend">
-      <div style="font-weight: 700; color: #94a3b8; font-size: 0.72rem; letter-spacing: 0.5px;">ACTIVE RL RESOURCE FLEET</div>
-      <div class="legend-item legend-water">
-        <span>🌊 Water Team (Tender Engine)</span>
-        <span id="count-water" style="font-weight: 700;">0</span>
-      </div>
-      <div class="legend-item legend-trench">
-        <span>🚜 Trench Crew (Containment)</span>
-        <span id="count-trench" style="font-weight: 700;">0</span>
-      </div>
-      <div class="legend-item legend-rescue">
-        <span>🚑 Rescue Vehicle (Evac)</span>
-        <span id="count-rescue" style="font-weight: 700;">0</span>
-      </div>
-      <div class="legend-item legend-heli">
-        <span>🚁 Helicopter (Air Ops Drop)</span>
-        <span id="count-heli" style="font-weight: 700;">0</span>
-      </div>
-    </div>
-
-    <div style="font-weight: 700; color: #94a3b8; font-size: 0.72rem; letter-spacing: 0.5px; margin-top: 4px;">LIVE RL ACTION DISPATCH LOG</div>
-    <div id="action-log">
-      <div class="log-entry">Palisades 8x4 Grid Ready. Click Start to launch.</div>
-    </div>
-  </div>
-
+  <button id="home-btn" onclick="resetCameraView()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Reset View
+  </button>
   <div id="cesiumContainer"></div>
+  <div id="leafletContainer"></div>
 
   <script>
-    // Valid Cesium Ion Token
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI6ZGQ0ZjEwNC1jMjlhLTRlNGUtYjllNi0wNDdiYzcxNjkwZDUiLCJpZCI6NDYxNTk3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODUyNzI5NjF9.oJ2oHETvVIw69GjOaAxuDiron7whJZf9rx4X3Hm6xNE';
+    Cesium.GoogleMaps.defaultApiKey = 'AIzaSyCNM4xw2KhA-EdRWElXl3OX0_NHxB067jA';
 
-    let viewer;
-    let isRunning = false;
-    let simInterval = null;
-    let fireEntities = {};
-    let gridEntities = [];
-    let resourceEntities = [];
+    let viewer = null;
+    let leafletMap = null;
+    let currentEngine = '3d';
+    let gridBounds = null;
 
-    let counts = { water_team: 0, trench_crew: 0, rescue_vehicle: 0, helicopter: 0 };
+    function initMapEngines() {
+      // Use OpenStreetMap as the guaranteed-working base layer
+      viewer = new Cesium.Viewer('cesiumContainer', {
+        imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+          url: 'https://tile.openstreetmap.org/'
+        }),
+        baseLayerPicker: false,
+        timeline: false,
+        animation: false,
+        homeButton: false,
+        navigationHelpButton: false,
+        geocoder: false,
+        sceneModePicker: false
+      });
 
-    const VAN_NUYS_DEPOT = { lat: 34.2098, lon: -118.4894 };
-    const IGNITION_SITE = { lat: 34.0725, lon: -118.5425 };
+      // Disable atmosphere haze (causes blue tint)
+      viewer.scene.skyAtmosphere.show = false;
+      viewer.scene.globe.showGroundAtmosphere = false;
+      viewer.scene.globe.enableLighting = true;
+      viewer.scene.globe.depthTestAgainstTerrain = true;
 
-    function initCesium() {
-      try {
-        // Create viewer with default globe so it NEVER fails or turns black
-        viewer = new Cesium.Viewer('cesiumContainer', {
-          timeline: false,
-          animation: false,
-          baseLayerPicker: false,
-          homeButton: true,
-          navigationHelpButton: false,
-          geocoder: false,
-          sceneModePicker: false
-        });
+      // ─── VERTICAL EXAGGERATION (correct API for CesiumJS 1.85+) ─────────────
+      // scene.verticalExaggeration replaced the old globe.terrainExaggeration.
+      // Set to 2.5 so the Santa Monica mountains rise visibly above the flatlands.
+      viewer.scene.verticalExaggeration = 2.5;
+      viewer.scene.verticalExaggerationRelativeHeight = 0.0; // exaggerate relative to sea level
+      // ─────────────────────────────────────────────────────────────────────────
 
-        viewer.scene.globe.enableLighting = true;
+      // Layer satellite imagery on top of OSM base
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.UrlTemplateImageryProvider({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19
+        })
+      );
 
-        // Asynchronously load 3D terrain
-        Cesium.createWorldTerrainAsync({ requestWaterMask: true, requestVertexNormals: true })
-          .then(terrain => { viewer.terrainProvider = terrain; })
-          .catch(err => console.warn("Terrain fallback", err));
+      // Load Cesium World Terrain (real elevation data for mountains/canyons)
+      Cesium.createWorldTerrainAsync({
+        requestVertexNormals: true,
+        requestWaterMask: true
+      }).then(terrain => {
+        viewer.terrainProvider = terrain;
+        console.log('✅ World Terrain loaded — mountains now have real elevation');
+      }).catch(e => console.warn('Terrain load failed:', e));
 
-        // Asynchronously load Google 3D Tiles / OSM buildings
-        Cesium.createGooglePhotorealistic3DTileset()
-          .then(tileset => {
-            tileset.maximumScreenSpaceError = 2;
-            viewer.scene.primitives.add(tileset);
-          })
-          .catch(err => {
-            Cesium.createOsmBuildingsAsync()
-              .then(osm => viewer.scene.primitives.add(osm))
-              .catch(e => console.warn("Osm building fallback", e));
-          });
+      // Load OSM 3D Buildings for building heights
+      Cesium.createOsmBuildingsAsync().then(buildings => {
+        buildings.maximumScreenSpaceError = 2;
+        viewer.scene.primitives.add(buildings);
+        console.log('✅ OSM 3D Buildings loaded');
+      }).catch(e => console.warn('OSM buildings failed:', e));
 
-        resetCameraView();
-        resetSimulation();
+      // Load Google Photorealistic 3D Tiles for ultra-detail surface textures
+      Cesium.createGooglePhotorealistic3DTileset().then(tileset => {
+        tileset.maximumScreenSpaceError = 2;
+        viewer.scene.primitives.add(tileset);
+        console.log('✅ Google Photorealistic 3D Tiles loaded');
+      }).catch(e => console.warn('Google 3D Tiles failed:', e));
 
-        setTimeout(() => {
-          if (!isRunning) toggleSimulation();
-        }, 1500);
-      } catch (e) {
-        console.error("Cesium init error:", e);
-      }
+      // Leaflet 2D fallback
+      leafletMap = L.map('leafletContainer', { zoomControl: true }).setView([34.065, -118.525], 13);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, attribution: 'Esri'
+      }).addTo(leafletMap);
+
+      switchEngine('3d');
+      fetchGridAndRender();
+    }
+
+    function switchEngine(mode) {
+      currentEngine = mode;
+      document.getElementById('btn-3d').classList.toggle('active', mode === '3d');
+      document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
+      document.getElementById('cesiumContainer').style.display = mode === '3d' ? 'block' : 'none';
+      document.getElementById('leafletContainer').style.display = mode === '2d' ? 'block' : 'none';
+      if (mode === '3d' && viewer) { viewer.resize(); resetCameraView(); }
+      if (mode === '2d' && leafletMap) { leafletMap.invalidateSize(); }
     }
 
     function resetCameraView() {
-      if (!viewer) return;
+      if (!viewer || currentEngine !== '3d') return;
+      const lon = gridBounds ? (gridBounds.minLon + gridBounds.maxLon) / 2 : -118.525;
+      const lat = gridBounds ? (gridBounds.minLat + gridBounds.maxLat) / 2 : 34.065;
+
+      // Shallow 25° pitch from the south looking north into the mountains.
+      // This angle makes elevated terrain visually obvious.
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(-118.5300, 34.0320, 5200.0),
+        destination: Cesium.Cartesian3.fromDegrees(lon, lat - 0.07, 2000),
         orientation: {
-          heading: Cesium.Math.toRadians(0.0),
-          pitch: Cesium.Math.toRadians(-38.0),
-          roll: 0.0
+          heading: 0,
+          pitch: Cesium.Math.toRadians(-25),
+          roll: 0
         },
         duration: 1.5
       });
     }
 
-    async function resetSimulation() {
-      if (isRunning) toggleSimulation();
-
+    async function fetchGridAndRender() {
       try {
         const res = await fetch('/reset');
         const data = await res.json();
-
-        clearVisuals();
-
-        counts = { water_team: 0, trench_crew: 0, rescue_vehicle: 0, helicopter: 0 };
-        updateCounts();
-
-        document.getElementById('hud-time').innerText = '00:00';
-        document.getElementById('hud-blazes').innerText = data.fire_cells.length;
-        document.getElementById('hud-reward').innerText = '0.00';
-        document.getElementById('action-log').innerHTML = '<div class="log-entry">🔥 Palisades Fire Ignited at Skull Rock (34.0725° N, -118.5425° W)</div>';
-
-        render8x4SectorGrid(data.zones);
-        renderIgnitionBeacon();
-        renderFireCells(data.fire_cells, []);
-
-      } catch (e) {
-        console.error("Error resetting simulation:", e);
+        computeAndDrawGrid(data.zones);
+      } catch(e) {
+        console.error('Grid fetch error, using fallback bounds:', e);
+        computeAndDrawGrid(null);
       }
     }
 
-    function clearVisuals() {
-      if (!viewer) return;
-      Object.values(fireEntities).forEach(e => viewer.entities.remove(e));
-      fireEntities = {};
-
-      gridEntities.forEach(e => viewer.entities.remove(e));
-      gridEntities = [];
-
-      resourceEntities.forEach(e => viewer.entities.remove(e));
-      resourceEntities = [];
-    }
-
-    function render8x4SectorGrid(zones) {
-      if (!zones || !viewer) return;
-
-      Object.keys(zones).forEach(zIdx => {
-        const z = zones[zIdx];
-        const b = z.bounds;
-        const centerLat = z.lat;
-        const centerLon = z.lon;
-
-        const borderEntity = viewer.entities.add({
-          name: `Sector ${zIdx}`,
-          polyline: {
-            positions: Cesium.Cartesian3.fromDegreesArray([
-              b[1], b[0],
-              b[3], b[0],
-              b[3], b[2],
-              b[1], b[2],
-              b[1], b[0]
-            ]),
-            width: 3.5,
-            material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.25,
-              color: Cesium.Color.CYAN.withAlpha(0.75)
-            }),
-            clampToGround: true
-          }
+    function computeAndDrawGrid(zones) {
+      let minLat, maxLat, minLon, maxLon;
+      if (zones && Object.keys(zones).length) {
+        minLat = 90; maxLat = -90; minLon = 180; maxLon = -180;
+        Object.values(zones).forEach(z => {
+          const b = z.bounds;
+          if (b[0] < minLat) minLat = b[0]; if (b[2] > maxLat) maxLat = b[2];
+          if (b[1] < minLon) minLon = b[1]; if (b[3] > maxLon) maxLon = b[3];
         });
-        gridEntities.push(borderEntity);
-
-        const labelEntity = viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 80),
-          label: {
-            text: `SECTOR ${zIdx}`,
-            font: '13px "JetBrains Mono", sans-serif',
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 3,
-            showBackground: true,
-            backgroundColor: Cesium.Color.fromCssColorString('rgba(10, 15, 30, 0.75)'),
-            backgroundPadding: new Cesium.Cartesian2(6, 4),
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 15000.0)
-          }
-        });
-        gridEntities.push(labelEntity);
-      });
-    }
-
-    function renderIgnitionBeacon() {
-      if (!viewer) return;
-      const beacon = viewer.entities.add({
-        name: 'Palisades Fire Ignition Point',
-        position: Cesium.Cartesian3.fromDegrees(IGNITION_SITE.lon, IGNITION_SITE.lat, 100),
-        point: {
-          pixelSize: 18,
-          color: Cesium.Color.YELLOW,
-          outlineColor: Cesium.Color.RED,
-          outlineWidth: 4
-        },
-        label: {
-          text: '🔥 IGNITION: Skull Rock Trailhead',
-          font: 'bold 14px Inter, sans-serif',
-          fillColor: Cesium.Color.YELLOW,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 4,
-          pixelOffset: new Cesium.Cartesian2(0, -25)
-        }
-      });
-      gridEntities.push(beacon);
-    }
-
-    function renderFireCells(activeCells, burnedCells) {
-      if (!viewer) return;
-      activeCells.forEach(cell => {
-        const key = `${cell.r}_${cell.c}`;
-        const isBlaze = cell.state === 3;
-        
-        if (!fireEntities[key]) {
-          fireEntities[key] = viewer.entities.add({
-            position: Cesium.Cartesian3.fromDegrees(cell.lon, cell.lat, 60),
-            cylinder: {
-              length: 120.0,
-              topRadius: 35.0,
-              bottomRadius: 45.0,
-              material: isBlaze ? Cesium.Color.RED.withAlpha(0.9) : Cesium.Color.ORANGE.withAlpha(0.85)
-            },
-            point: {
-              pixelSize: 12,
-              color: isBlaze ? Cesium.Color.YELLOW : Cesium.Color.ORANGE,
-              outlineColor: Cesium.Color.RED,
-              outlineWidth: 2
-            }
-          });
-        } else {
-          fireEntities[key].cylinder.material = isBlaze ? Cesium.Color.RED.withAlpha(0.9) : Cesium.Color.ORANGE.withAlpha(0.85);
-        }
-      });
-
-      burnedCells.forEach(cell => {
-        const key = `${cell.r}_${cell.c}`;
-        if (!fireEntities[key]) {
-          fireEntities[key] = viewer.entities.add({
-            position: Cesium.Cartesian3.fromDegrees(cell.lon, cell.lat, 10),
-            cylinder: {
-              length: 15.0,
-              topRadius: 30.0,
-              bottomRadius: 30.0,
-              material: Cesium.Color.DARKSLATEGRAY.withAlpha(0.8)
-            }
-          });
-        }
-      });
-    }
-
-    function toggleSimulation() {
-      const btn = document.getElementById('btn-start');
-      const badge = document.getElementById('status-badge');
-
-      if (!isRunning) {
-        isRunning = true;
-        btn.innerText = '⏸ Pause';
-        btn.classList.replace('btn-primary', 'btn-secondary');
-        badge.innerText = 'SIMULATING';
-        badge.style.color = '#ef4444';
-        badge.style.background = 'rgba(239, 68, 68, 0.15)';
-        simInterval = setInterval(stepSimulation, 1500);
       } else {
-        isRunning = false;
-        btn.innerText = '▶ Resume';
-        btn.classList.replace('btn-secondary', 'btn-primary');
-        badge.innerText = 'PAUSED';
-        badge.style.color = '#f59e0b';
-        badge.style.background = 'rgba(245, 158, 11, 0.15)';
-        clearInterval(simInterval);
+        minLat = 34.01; maxLat = 34.12; minLon = -118.60; maxLon = -118.46;
       }
+      gridBounds = { minLat, maxLat, minLon, maxLon };
+      draw3DGrid(minLat, maxLat, minLon, maxLon);
+      draw2DGrid(minLat, maxLat, minLon, maxLon);
+      resetCameraView();
     }
 
-    async function stepSimulation() {
-      try {
-        const res = await fetch('/step');
-        const data = await res.json();
-
-        if (data.is_done) {
-          toggleSimulation();
-          document.getElementById('status-badge').innerText = 'CONTAINED 100%';
-          document.getElementById('status-badge').style.color = '#38bdf8';
-          document.getElementById('status-badge').style.background = 'rgba(56, 189, 248, 0.15)';
-          return;
-        }
-
-        const mins = Math.floor(data.tick * 2);
-        const secs = (data.tick * 2 % 1) * 60;
-        document.getElementById('hud-time').innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        document.getElementById('hud-blazes').innerText = data.stats.active_blazes;
-        document.getElementById('hud-reward').innerText = data.total_reward.toFixed(2);
-
-        renderFireCells(data.fire_cells, data.burned_cells);
-
-        if (data.action && data.action.resource_type) {
-          animateRLResourceDispatch(data.action);
-        }
-      } catch (e) {
-        console.error("Error stepping sim:", e);
-      }
-    }
-
-    function animateRLResourceDispatch(action) {
+    function draw3DGrid(minLat, maxLat, minLon, maxLon) {
       if (!viewer) return;
-      const type = action.resource_type;
-      const targetLat = action.target_lat;
-      const targetLon = action.target_lon;
-      const zoneIdx = action.zone_idx;
-
-      if (counts[type] !== undefined) counts[type]++;
-      updateCounts();
-
-      const log = document.getElementById('action-log');
-      const entry = document.createElement('div');
-      entry.className = `log-entry log-${type.split('_')[0]}`;
-      entry.innerText = `[T+${counts[type]}] ${type.toUpperCase()} dispatched -> Sector ${zoneIdx}`;
-      log.prepend(entry);
-
-      if (type === 'helicopter') {
-        const heliEntity = viewer.entities.add({
-          name: `Helicopter Unit ${counts.helicopter}`,
-          position: Cesium.Cartesian3.fromDegrees(VAN_NUYS_DEPOT.lon, VAN_NUYS_DEPOT.lat, 450),
-          billboard: {
-            image: 'https://img.icons8.com/color/96/helicopter.png',
-            scale: 0.8,
-            heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
-          },
-          label: {
-            text: `🚁 LAFD HELI #${counts.helicopter}`,
-            font: 'bold 12px Inter, sans-serif',
-            fillColor: Cesium.Color.MAGENTA,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 3,
-            pixelOffset: new Cesium.Cartesian2(0, -35)
-          }
-        });
-        resourceEntities.push(heliEntity);
-
-        let startTime = Date.now();
-        let flightDuration = 1800;
-
-        let animInterval = setInterval(() => {
-          let elapsed = Date.now() - startTime;
-          let progress = Math.min(1.0, elapsed / flightDuration);
-
-          let currentLat = VAN_NUYS_DEPOT.lat + (targetLat - VAN_NUYS_DEPOT.lat) * progress;
-          let currentLon = VAN_NUYS_DEPOT.lon + (targetLon - VAN_NUYS_DEPOT.lon) * progress;
-          let currentAlt = 450 - progress * 150;
-
-          heliEntity.position = Cesium.Cartesian3.fromDegrees(currentLon, currentLat, currentAlt);
-
-          if (progress >= 1.0) {
-            clearInterval(animInterval);
-
-            const dropSurge = viewer.entities.add({
-              position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 80),
-              cylinder: {
-                length: 160.0,
-                topRadius: 60.0,
-                bottomRadius: 100.0,
-                material: Cesium.Color.DEEPSKYBLUE.withAlpha(0.75)
-              }
-            });
-            resourceEntities.push(dropSurge);
-            setTimeout(() => viewer.entities.remove(dropSurge), 3000);
-          }
-        }, 30);
+      const nR = 4, nC = 8;
+      const dLat = (maxLat - minLat) / nR;
+      const dLon = (maxLon - minLon) / nC;
+      for (let r = 0; r <= nR; r++) {
+        const lat = minLat + r * dLat;
+        viewer.entities.add({ polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArray([minLon, lat, maxLon, lat]),
+          width: (r === 0 || r === nR) ? 5 : 3,
+          material: Cesium.Color.CYAN.withAlpha(0.95),
+          clampToGround: true,
+          classificationType: Cesium.ClassificationType.BOTH
+        }});
       }
-
-      else if (type === 'water_team') {
-        const tenderUnit = viewer.entities.add({
-          name: `Water Tender Engine ${counts.water_team}`,
-          position: Cesium.Cartesian3.fromDegrees(targetLon - 0.003, targetLat - 0.003, 30),
-          billboard: {
-            image: 'https://img.icons8.com/color/96/fire-truck.png',
-            scale: 0.75,
-            heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
-          },
-          label: {
-            text: `🌊 WATER ENGINE #${counts.water_team}`,
-            font: 'bold 12px Inter, sans-serif',
-            fillColor: Cesium.Color.CYAN,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 3,
-            pixelOffset: new Cesium.Cartesian2(0, -35)
-          }
-        });
-        resourceEntities.push(tenderUnit);
-
-        const waterJet = viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 40),
-          ellipse: {
-            semiMinorAxis: 110.0,
-            semiMajorAxis: 110.0,
-            material: Cesium.Color.CYAN.withAlpha(0.55),
-            height: 45
-          }
-        });
-        resourceEntities.push(waterJet);
-        setTimeout(() => viewer.entities.remove(waterJet), 3500);
-      }
-
-      else if (type === 'trench_crew') {
-        const bulldozer = viewer.entities.add({
-          name: `Trench Crew ${counts.trench_crew}`,
-          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 25),
-          billboard: {
-            image: 'https://img.icons8.com/color/96/bulldozer.png',
-            scale: 0.75,
-            heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
-          },
-          label: {
-            text: `🚜 TRENCH CREW #${counts.trench_crew}`,
-            font: 'bold 12px Inter, sans-serif',
-            fillColor: Cesium.Color.GOLD,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 3,
-            pixelOffset: new Cesium.Cartesian2(0, -35)
-          }
-        });
-        resourceEntities.push(bulldozer);
-
-        const trenchLine = viewer.entities.add({
-          name: 'Containment Line',
-          polyline: {
-            positions: Cesium.Cartesian3.fromDegreesArray([
-              targetLon - 0.012, targetLat - 0.006,
-              targetLon + 0.012, targetLat + 0.006
-            ]),
-            width: 8,
-            material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.35,
-              color: Cesium.Color.GOLD
-            }),
-            clampToGround: true
-          }
-        });
-        resourceEntities.push(trenchLine);
-      }
-
-      else if (type === 'rescue_vehicle') {
-        const rescueTruck = viewer.entities.add({
-          name: `Rescue Vehicle ${counts.rescue_vehicle}`,
-          position: Cesium.Cartesian3.fromDegrees(targetLon + 0.002, targetLat + 0.002, 25),
-          billboard: {
-            image: 'https://img.icons8.com/color/96/ambulance.png',
-            scale: 0.75,
-            heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
-          },
-          label: {
-            text: `🚑 RESCUE EVAC #${counts.rescue_vehicle}`,
-            font: 'bold 12px Inter, sans-serif',
-            fillColor: Cesium.Color.SPRINGGREEN,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 3,
-            pixelOffset: new Cesium.Cartesian2(0, -35)
-          }
-        });
-        resourceEntities.push(rescueTruck);
-
-        const shieldDome = viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 50),
-          ellipsoid: {
-            radii: new Cesium.Cartesian3(160.0, 160.0, 90.0),
-            material: Cesium.Color.SPRINGGREEN.withAlpha(0.3),
-            outline: true,
-            outlineColor: Cesium.Color.LIME
-          }
-        });
-        resourceEntities.push(shieldDome);
+      for (let c = 0; c <= nC; c++) {
+        const lon = minLon + c * dLon;
+        viewer.entities.add({ polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArray([lon, minLat, lon, maxLat]),
+          width: (c === 0 || c === nC) ? 5 : 3,
+          material: Cesium.Color.CYAN.withAlpha(0.95),
+          clampToGround: true,
+          classificationType: Cesium.ClassificationType.BOTH
+        }});
       }
     }
 
-    function updateCounts() {
-      document.getElementById('count-water').innerText = counts.water_team;
-      document.getElementById('count-trench').innerText = counts.trench_crew;
-      document.getElementById('count-rescue').innerText = counts.rescue_vehicle;
-      document.getElementById('count-heli').innerText = counts.helicopter;
+    function draw2DGrid(minLat, maxLat, minLon, maxLon) {
+      if (!leafletMap) return;
+      const nR = 4, nC = 8;
+      const dLat = (maxLat - minLat) / nR;
+      const dLon = (maxLon - minLon) / nC;
+      for (let r = 0; r <= nR; r++) {
+        const lat = minLat + r * dLat;
+        L.polyline([[lat, minLon],[lat, maxLon]], { color:'#00d2ff', weight:(r===0||r===nR)?4:2 }).addTo(leafletMap);
+      }
+      for (let c = 0; c <= nC; c++) {
+        const lon = minLon + c * dLon;
+        L.polyline([[minLat, lon],[maxLat, lon]], { color:'#00d2ff', weight:(c===0||c===nC)?4:2 }).addTo(leafletMap);
+      }
     }
 
-    window.onload = initCesium;
+    window.onload = initMapEngines;
   </script>
 </body>
 </html>

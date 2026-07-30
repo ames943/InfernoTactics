@@ -23,7 +23,10 @@ from env.inferno_env import InfernoEnv, TRAINING_IGNITION_POINT, RESOURCE_TYPES,
 from models.relative_model import RelativeInfernoModel
 from train.relative_actions import TARGET_TYPES, decode_action, resolve_relative_targets
 
-app = FastAPI(title="Palisades 3D Fire Simulator API")
+MAX_DISPATCH_SLOTS = 5
+MAX_EPISODE_TICKS = 30  # ~60-second total rollout experience at 2.0s/tick
+
+app = FastAPI(title="Palisades 3D Fire Simulator API - High-Performance v10")
 
 app.mount("/static", StaticFiles(directory=current_dir), name="static")
 
@@ -131,17 +134,15 @@ async def serve_index():
 async def reset_api():
     reset_simulation()
     fire_state = env.sim.state
-    blaze_coords = []
     
-    rows, cols = np.where((fire_state == 2) | (fire_state == 3))
-    for r, c in zip(rows, cols):
-        blaze_coords.append({
-            "r": int(r),
-            "c": int(c),
-            "lat": float(coord_grid[r, c, 0]),
-            "lon": float(coord_grid[r, c, 1]),
-            "state": int(fire_state[r, c])
-        })
+    blaze_cells, threat_cells = [], []
+    rows_blaze, cols_blaze = np.where(fire_state == 3)
+    rows_threat, cols_threat = np.where(fire_state == 2)
+    
+    for r, c in zip(rows_blaze, cols_blaze):
+        blaze_cells.append({"r": int(r), "c": int(c), "lat": float(coord_grid[r, c, 0]), "lon": float(coord_grid[r, c, 1]), "state": 3})
+    for r, c in zip(rows_threat, cols_threat):
+        threat_cells.append({"r": int(r), "c": int(c), "lat": float(coord_grid[r, c, 0]), "lon": float(coord_grid[r, c, 1]), "state": 2})
         
     return JSONResponse({
         "status": "reset",
@@ -153,88 +154,109 @@ async def reset_api():
             "lon": float(coord_grid[TRAINING_IGNITION_POINT[0], TRAINING_IGNITION_POINT[1], 1])
         },
         "zones": zone_centers,
-        "fire_cells": blaze_coords
+        "blaze_cells": blaze_cells,
+        "threat_cells": threat_cells
     })
 
 @app.get("/step")
 async def step_api():
     global obs, total_reward, tick_count, is_done
     
-    if is_done:
+    if is_done or tick_count >= MAX_EPISODE_TICKS:
         return JSONResponse({"is_done": True, "tick": tick_count, "total_reward": total_reward})
         
+    local_available = {
+        rtype: int(obs["scalars"][f"{rtype}_available"])
+        for rtype in RESOURCE_TYPES
+    }
+    actions = []
+    
     with torch.no_grad():
-        grid_t, scalars_t = RelativeInfernoModel.obs_to_tensors(obs)
-        target_zones, target_features = resolve_relative_targets(env, obs)
-        zones_t = torch.from_numpy(target_zones).unsqueeze(0)
-        features_t = torch.from_numpy(target_features).unsqueeze(0)
-        
-        logits, value, _ = model(grid_t, scalars_t, zones_t, features_t)
-        
-        resource_logits = logits["resource_type"][0].clone()
-        available = torch.tensor(
-            [obs["scalars"][f"{r}_available"] > 0 for r in RESOURCE_TYPES], dtype=torch.bool
-        )
-        resource_logits[~available] = -1e9
-        resource_idx = int(torch.argmax(resource_logits)) if bool(available.any()) else 0
-        target_idx = int(torch.argmax(logits["target"][0, resource_idx]))
-        
-        action = decode_action(resource_idx, target_idx, target_zones)
-        
-        obs, reward, is_done, info = env.step(action)
+        for _ in range(MAX_DISPATCH_SLOTS):
+            grid_t, scalars_t = RelativeInfernoModel.obs_to_tensors(obs)
+            target_zones, target_features = resolve_relative_targets(env, obs)
+            zones_t = torch.from_numpy(target_zones).unsqueeze(0)
+            features_t = torch.from_numpy(target_features).unsqueeze(0)
+            
+            logits, value, _ = model(grid_t, scalars_t, zones_t, features_t)
+            
+            resource_logits = logits["resource_type"][0].clone()
+            available = torch.tensor(
+                [local_available[r] > 0 for r in RESOURCE_TYPES], dtype=torch.bool
+            )
+            resource_logits[~available] = -1e9
+            if not bool(available.any()):
+                break
+            resource_idx = int(torch.argmax(resource_logits))
+            target_idx = int(torch.argmax(logits["target"][0, resource_idx]))
+            
+            action = decode_action(resource_idx, target_idx, target_zones)
+            if action is None:
+                break
+            local_available[action[0]] -= 1
+            actions.append(action)
+            
+        # Step env with multi-dispatch actions
+        obs, reward, is_done, info = env.step(actions)
         total_reward += reward
         tick_count += 1
         
     fire_state = env.sim.state
     
-    active_rows, active_cols = np.where((fire_state == 2) | (fire_state == 3))
-    burned_rows, burned_cols = np.where(fire_state == 4)
+    rows_blaze, cols_blaze = np.where(fire_state == 3)   # BLAZE (state 3)
+    rows_threat, cols_threat = np.where(fire_state == 2) # THREAT (state 2)
+    rows_burned, cols_burned = np.where(fire_state == 4) # BURNED OUT (state 4)
+    rows_fuel, cols_fuel = np.where(fire_state == 1)     # FUEL AT RISK (state 1)
     
-    fire_cells = []
-    for r, c in zip(active_rows, active_cols):
-        fire_cells.append({
-            "r": int(r),
-            "c": int(c),
-            "lat": float(coord_grid[r, c, 0]),
-            "lon": float(coord_grid[r, c, 1]),
-            "state": int(fire_state[r, c])
-        })
+    blaze_cells, threat_cells, burned_cells, fuel_cells = [], [], [], []
+    
+    for r, c in zip(rows_blaze, cols_blaze):
+        blaze_cells.append({"r": int(r), "c": int(c), "lat": float(coord_grid[r, c, 0]), "lon": float(coord_grid[r, c, 1]), "state": 3})
         
-    burned_cells = []
-    if len(burned_rows) > 0:
-        step = max(1, len(burned_rows) // 150)
-        for i in range(0, len(burned_rows), step):
-            r, c = burned_rows[i], burned_cols[i]
-            burned_cells.append({
-                "r": int(r),
-                "c": int(c),
-                "lat": float(coord_grid[r, c, 0]),
-                "lon": float(coord_grid[r, c, 1]),
-                "state": 4
-            })
+    for r, c in zip(rows_threat, cols_threat):
+        threat_cells.append({"r": int(r), "c": int(c), "lat": float(coord_grid[r, c, 0]), "lon": float(coord_grid[r, c, 1]), "state": 2})
+        
+    if len(rows_burned) > 0:
+        step_b = max(1, len(rows_burned) // 120)
+        for i in range(0, len(rows_burned), step_b):
+            r, c = rows_burned[i], cols_burned[i]
+            burned_cells.append({"r": int(r), "c": int(c), "lat": float(coord_grid[r, c, 0]), "lon": float(coord_grid[r, c, 1]), "state": 4})
+
+    # Sample fuel cells near active blazes for fuel perimeter visualization
+    if len(rows_blaze) > 0 and len(rows_fuel) > 0:
+        step_f = max(1, len(rows_fuel) // 80)
+        for i in range(0, len(rows_fuel), step_f):
+            r, c = rows_fuel[i], cols_fuel[i]
+            fuel_cells.append({"r": int(r), "c": int(c), "lat": float(coord_grid[r, c, 0]), "lon": float(coord_grid[r, c, 1]), "state": 1})
             
-    res_type, z_idx = action if action else ("noop", 0)
-    target_info = zone_centers.get(z_idx, {"lat": 34.0725, "lon": -118.5425})
-    
-    return JSONResponse({
-        "tick": tick_count,
-        "is_done": is_done,
-        "reward": float(reward),
-        "total_reward": float(total_reward),
-        "action": {
-            "resource_type": res_type,
+    actions_data = []
+    for act in actions:
+        r_type, z_idx = act
+        target_info = zone_centers.get(z_idx, {"lat": 34.0725, "lon": -118.5425})
+        actions_data.append({
+            "resource_type": r_type,
             "zone_idx": int(z_idx),
             "target_lat": target_info["lat"],
             "target_lon": target_info["lon"]
-        },
-        "fire_cells": fire_cells,
+        })
+    
+    return JSONResponse({
+        "tick": tick_count,
+        "is_done": is_done or (tick_count >= MAX_EPISODE_TICKS),
+        "reward": float(reward),
+        "total_reward": float(total_reward),
+        "actions": actions_data,
+        "blaze_cells": blaze_cells,
+        "threat_cells": threat_cells,
         "burned_cells": burned_cells,
+        "fuel_cells": fuel_cells,
         "stats": {
-            "active_blazes": int(len(active_rows)),
-            "burned_out": int(len(burned_rows)),
+            "active_blazes": int(len(rows_blaze)),
+            "active_threats": int(len(rows_threat)),
+            "burned_out": int(len(rows_burned)),
             "buildings_destroyed": info.get("buildings_destroyed", 0),
             "contained": info.get("contained", False),
-            "wind_speed_mph": float(env.weather_history[env.current_weather_idx]["wind_speed_mph"]) if hasattr(env, 'weather_history') and env.weather_history else 25.0
+            "wind_speed_mph": float(env.weather_history[env.current_weather_idx]["wind_speed_mph"]) if hasattr(env, 'weather_history') and env.weather_history else 25.3
         }
     })
 

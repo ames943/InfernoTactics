@@ -839,17 +839,24 @@ class InfernoEnv:
         return reward, int(len(rows)), n_evacuated, events
 
     def step(self, action):
-        resource_type, target_zone = self._parse_action(action)
+        if isinstance(action, list):
+            actions_list = action
+        elif action is None or action == "noop":
+            actions_list = []
+        else:
+            actions_list = [action]
 
         # Advance units already en route/deployed BEFORE committing this
-        # tick's new dispatch, so a freshly-dispatched unit's ETA countdown
-        # starts on the *next* step() rather than losing a tick to this one.
+        # tick's new dispatches.
         reward, resource_events = self._advance_resources()
 
-        dispatch_info = None
-        if resource_type is not None:
-            dispatch_info = self._try_dispatch(resource_type, target_zone)
-            reward += dispatch_info["reward_delta"]
+        dispatch_infos = []
+        for act in actions_list:
+            resource_type, target_zone = self._parse_action(act)
+            if resource_type is not None:
+                d_info = self._try_dispatch(resource_type, target_zone)
+                reward += d_info["reward_delta"]
+                dispatch_infos.append(d_info)
 
         wind_speed, wind_direction, humidity = self._weather_schedule(self.tick_count)
         self._last_weather = (wind_speed, wind_direction, humidity)
@@ -867,7 +874,7 @@ class InfernoEnv:
         done = contained or timed_out
 
         info = {
-            "dispatch": dispatch_info,
+            "dispatch": dispatch_infos,
             "resource_events": resource_events,
             "weather": {"wind_speed_mph": wind_speed, "wind_direction_deg": wind_direction, "humidity_pct": humidity},
             "state_counts": counts,
