@@ -19,6 +19,7 @@ from env.inferno_env import LAYER_INDEX  # noqa: E402
 
 
 UPSCALE = 3  # basemap pixels per grid cell; fire is drawn at cell resolution on top
+DISPLAY_GAMMA_LIFT = 0.88  # midtone lift so the texture survives linear-space lighting
 
 
 def _normalize(values, low=None, high=None):
@@ -59,17 +60,29 @@ def render(grid_static, meta, upscale=UPSCALE):
     population = grid_static[LAYER_INDEX["population_density"]]
 
     # --- Terrain base: fuel-tinted ground, elevation-banded, hillshaded -------
-    dry_low = np.array([0.180, 0.157, 0.114], dtype=np.float32)   # dry canyon floor
-    dry_high = np.array([0.290, 0.248, 0.169], dtype=np.float32)  # exposed ridge
-    chaparral = np.array([0.157, 0.216, 0.129], dtype=np.float32)  # vegetated fuel
+    dry_low = np.array([0.196, 0.169, 0.114], dtype=np.float32)   # dry canyon floor
+    dry_high = np.array([0.353, 0.294, 0.196], dtype=np.float32)  # exposed ridge
+    chaparral = np.array([0.133, 0.196, 0.098], dtype=np.float32)  # vegetated fuel
+    rock = np.array([0.400, 0.353, 0.298], dtype=np.float32)       # bare steep face
 
     elevation_norm = _normalize(np.where(water, np.nan, elevation))
     elevation_norm = np.nan_to_num(elevation_norm, nan=0.0)
     ground = _lerp(dry_low, dry_high, elevation_norm ** 0.75)
-    ground = _lerp(ground, chaparral, np.clip(fuel, 0.0, 1.0) * 0.72)
+    ground = _lerp(ground, chaparral, np.clip(fuel, 0.0, 1.0) * 0.80)
 
+    # Steep faces shed soil and hold less brush, so let rock show through on
+    # them. Without this the whole basin renders as one flat olive tone, because
+    # fuel_density is a near-uniform placeholder layer.
+    slope = grid_static[LAYER_INDEX["slope"]]
+    steepness = _normalize(slope, low=float(np.percentile(slope, 55)),
+                           high=float(np.percentile(slope, 99)))
+    ground = _lerp(ground, rock, steepness * 0.20)
+
+    # Deliberately gentle: the 3D view lights this texture again with a real
+    # directional light, so baking full-contrast hillshade in would double-shade
+    # every slope. Enough is kept to carry drainage detail below mesh resolution.
     shade = _hillshade(elevation, cell_size_m)
-    ground *= (0.34 + 0.86 * shade)[..., None]
+    ground *= (0.62 + 0.52 * shade)[..., None]
 
     # --- Developed area: population glow, then building footprints -----------
     # Buildings are deliberately warm and roads cool, so the two read apart in
@@ -86,7 +99,11 @@ def render(grid_static, meta, upscale=UPSCALE):
     ocean = np.array([0.043, 0.114, 0.196], dtype=np.float32)
     ground = np.where(water[..., None], ocean, ground)
 
-    image = np.clip(ground, 0.0, 1.0)
+    # The 3D view samples this as an sRGB texture, so the GPU decodes it to
+    # linear before lighting it. Values that look right in a flat 2D map
+    # (median byte ~43, i.e. 0.024 linear) come out almost black once lit, so
+    # lift the midtones here. Shadow detail survives; highlights are preserved.
+    image = np.clip(ground, 0.0, 1.0) ** DISPLAY_GAMMA_LIFT
     rgb = (image * 255.0).astype(np.uint8)
 
     # Smooth the terrain on upscale so hillshade reads as landform, not pixels.

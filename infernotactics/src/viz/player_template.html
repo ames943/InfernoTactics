@@ -63,7 +63,12 @@
   .v.big { font-size: 17px; letter-spacing: -0.02em; }
   .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--hot); }
 
-  #topleft { top: 14px; left: 14px; width: 288px; }
+  /* Hard cap the stacked columns so a busy tick can never push a panel off
+     screen or over the one below it. */
+  #topleft { top: 14px; left: 14px; width: 288px;
+             max-height: calc(100vh - 116px); overflow-y: auto; scrollbar-width: none;
+             padding-bottom: 4px; }
+  #topleft::-webkit-scrollbar { display: none; }
   #brand { display: flex; align-items: baseline; gap: 8px; }
   #brand h1 { font: 700 15px/1 var(--sans); letter-spacing: -0.01em; }
   #brand span { font: 600 9px/1 var(--mono); color: var(--fire); letter-spacing: 0.1em; }
@@ -165,7 +170,7 @@
   /* event ticker */
   #ticker { bottom: 14px; right: 14px; width: 262px; max-height: 216px; }
   #ticker .pad { padding: 10px 12px; }
-  #log { max-height: 168px; overflow: hidden; display: flex; flex-direction: column-reverse; gap: 5px; }
+  #log { max-height: 168px; overflow: hidden; display: flex; flex-direction: column; gap: 5px; }
   .ev { display: flex; gap: 7px; align-items: flex-start; font: 500 10px/1.35 var(--mono); animation: slide .25s ease-out; }
   @keyframes slide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .ev .tk { color: var(--dim); flex: none; font-variant-numeric: tabular-nums; }
@@ -184,7 +189,6 @@
   #camctl button:hover { color: var(--text); background: rgba(255,255,255,0.10); }
   #camctl button.on { color: var(--hot); border-color: rgba(255,182,72,0.45); }
 
-  #legend { bottom: 14px; left: 14px; width: 214px; }
   #legend .pad { padding: 10px 12px; }
   .lg { display: flex; align-items: center; gap: 7px; font: 500 9.5px/1.3 var(--mono); color: var(--muted); }
   .lg + .lg { margin-top: 5px; }
@@ -214,7 +218,6 @@
 
   @media (max-width: 1180px) {
     #camctl { right: 14px; top: auto; bottom: 244px; flex-direction: row; flex-wrap: wrap; width: 262px; }
-    #legend { display: none; }
   }
   @media (max-width: 880px) {
     #topright, #ticker { display: none; }
@@ -240,8 +243,22 @@
     <div class="body" id="decisions"></div>
   </div>
   <div class="panel pad" id="roster">
-    <div class="ttl">Fleet - 8 real LAFD stations</div>
+    <div class="ttl">Fleet ready - 8 real LAFD stations</div>
     <div class="body" id="units"></div>
+  </div>
+  <div class="panel" id="legend">
+    <div class="pad">
+      <div class="ttl fold" id="lg-fold">Legend &amp; provenance</div>
+      <div class="body">
+        <div class="lg"><i style="background:#ff7a2f"></i>Active flame front (Blaze)</div>
+        <div class="lg"><i style="background:#a8471c"></i>Pre-heated fuel (Threat)</div>
+        <div class="lg"><i style="background:#2a2422"></i>Burned out</div>
+        <div class="lg"><i style="background:#4fc3f7"></i>Water / air drop</div>
+        <div class="lg"><i style="background:#c9a227"></i>Trench line</div>
+        <div class="lg"><i style="background:#66d98a"></i>Rescue / evacuation</div>
+        <div id="prov"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -308,21 +325,6 @@
   <div class="pad">
     <div class="ttl">Event log</div>
     <div id="log"></div>
-  </div>
-</div>
-
-<div class="hud panel" id="legend">
-  <div class="pad">
-    <div class="ttl fold" id="lg-fold">Legend</div>
-    <div class="body">
-      <div class="lg"><i style="background:#ff7a2f"></i>Active flame front (Blaze)</div>
-      <div class="lg"><i style="background:#a8471c"></i>Pre-heated fuel (Threat)</div>
-      <div class="lg"><i style="background:#2a2422"></i>Burned out</div>
-      <div class="lg"><i style="background:#4fc3f7"></i>Water / air drop</div>
-      <div class="lg"><i style="background:#c9a227"></i>Trench line</div>
-      <div class="lg"><i style="background:#66d98a"></i>Rescue / evacuation</div>
-      <div id="prov"></div>
-    </div>
   </div>
 </div>
 
@@ -408,7 +410,7 @@ async function main() {
      Height is exaggerated: 686 m of real relief across 18 km reads almost
      flat at true scale, and the canyon/ridge structure the fire model
      actually depends on becomes invisible. The factor is surfaced in the UI. */
-  const VERT_EXAG = 2.6;
+  const VERT_EXAG = 3.4;
   const yOf = (metres) => metres / CELL_M * VERT_EXAG;
   const X0 = -GW / 2, Z0 = -GH / 2;
   const wx = (col) => X0 + col;
@@ -428,7 +430,12 @@ async function main() {
   /* ══════════════════════════ renderer & scene ══════════════════════════ */
   step('BUILDING SCENE', 38);
   const host = document.getElementById('scene');
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  // still=1 keeps the drawing buffer so a one-shot frame survives long enough
+  // to be captured by a screenshot tool; the live loop does not need it.
+  const wantStill = new URLSearchParams(location.search).get('still') === '1';
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: wantStill
+  });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -439,8 +446,12 @@ async function main() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 1, 6000);
 
-  /* Smoke-tinted haze; the far ridges should sit back in the murk. */
-  scene.fog = new THREE.FogExp2(0x2a2118, 0.00085);
+  /* Smoke-tinted haze; the far ridges should sit back in the murk. The colour is
+     set in linear light units to match the sky dome's horizon, so terrain, sea
+     and sky all converge on the same tone instead of meeting at a hard seam. */
+  const HAZE = new THREE.Vector3(0.205, 0.150, 0.108);
+  scene.fog = new THREE.FogExp2(0x000000, 0.00022);
+  scene.fog.color.setRGB(HAZE.x, HAZE.y, HAZE.z);
 
   const sun = new THREE.DirectionalLight(0xffd9a8, 2.1);
   sun.position.set(-260, 220, -190);
@@ -458,11 +469,13 @@ async function main() {
         varying vec3 vP; uniform float uSmoke;
         void main(){
           float h = normalize(vP).y;
-          vec3 zenith = mix(vec3(0.055,0.098,0.180), vec3(0.129,0.106,0.098), uSmoke);
-          vec3 horizon = mix(vec3(0.478,0.396,0.310), vec3(0.616,0.322,0.157), uSmoke);
-          vec3 c = mix(horizon, zenith, pow(clamp(h,0.0,1.0), 0.62));
-          c = mix(c, vec3(0.035,0.043,0.055), clamp(-h*1.7,0.0,1.0));
+          vec3 zenith = mix(vec3(0.058,0.115,0.235), vec3(0.185,0.130,0.098), uSmoke);
+          vec3 horizon = mix(vec3(0.520,0.430,0.335), vec3(0.720,0.360,0.150), uSmoke);
+          vec3 c = mix(horizon, zenith, pow(clamp(h,0.0,1.0), 0.42));
+          c = mix(c, vec3(0.022,0.028,0.038), clamp(-h*1.7,0.0,1.0));
           gl_FragColor = vec4(c, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }`
     })
   );
@@ -506,17 +519,22 @@ async function main() {
       uFire: { value: fireTex },
       uTime: { value: 0 },
       uTexel: { value: new THREE.Vector2(1 / GW, 1 / GH) },
+      // Kept as plain vectors, in linear light units, so the numbers below mean
+      // exactly what they say -- THREE.Color would silently sRGB-decode them.
       uSunDir: { value: sun.position.clone().normalize() },
-      uSunColor: { value: new THREE.Color(0xffd9a8) },
-      uAmbient: { value: new THREE.Color(0x4a5570) },
-      uFogColor: { value: new THREE.Color(0x2a2118) },
+      uSunColor: { value: new THREE.Vector3(1.18, 0.95, 0.70) },
+      uAmbient: { value: new THREE.Vector3(0.17, 0.20, 0.27) },
+      uFogColor: { value: HAZE },
       uFogDensity: { value: scene.fog.density }
     },
     vertexShader: `
       varying vec2 vUv; varying vec3 vN; varying float vDepth;
       void main(){
         vUv = uv;
-        vN = normalize(normalMatrix * normal);
+        // World space, not view space: uSunDir is a world direction, and
+        // dotting it against a view-space normal zeroes out the diffuse term
+        // as soon as the camera orbits.
+        vN = normalize(mat3(modelMatrix) * normal);
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vDepth = -mv.z;
         gl_Position = projectionMatrix * mv;
@@ -525,6 +543,7 @@ async function main() {
       uniform sampler2D uBase, uFire;
       uniform vec3 uSunDir, uSunColor, uAmbient, uFogColor;
       uniform vec2 uTexel; uniform float uTime, uFogDensity;
+      #define TERRAIN_LIT 1
       varying vec2 vUv; varying vec3 vN; varying float vDepth;
 
       /* Ring tap so firelight spills onto the ground around a burning cell -
@@ -543,34 +562,81 @@ async function main() {
       }
 
       void main(){
+        /* uBase is uploaded as an sRGB texture, so this sample is already
+           linear; all the lighting below therefore happens in linear space and
+           the result is tone-mapped and encoded by the chunks at the end. */
         vec3 base = texture2D(uBase, vUv).rgb;
         vec4 f = texture2D(uFire, vUv);
         float threat = f.r, blaze = f.g, burned = f.b;
 
-        base = mix(base, vec3(0.058,0.048,0.044), burned * 0.90);   // burn scar
-        base = mix(base, vec3(0.290,0.118,0.043), threat * 0.72);   // scorched, pre-ignition
+        base = mix(base, vec3(0.012,0.010,0.009), burned * 0.90);   // burn scar
+        base = mix(base, vec3(0.085,0.028,0.008), threat * 0.72);   // scorched, pre-ignition
 
         float ndl = max(dot(normalize(vN), normalize(uSunDir)), 0.0);
-        vec3 col = base * (uAmbient + uSunColor * ndl * 1.15);
+        vec3 col = base * (uAmbient + uSunColor * ndl);
 
         float flick = 0.70 + 0.30 * sin(uTime * 10.5 + vUv.x * 540.0 + vUv.y * 380.0);
-        vec3 hot = vec3(1.0, 0.44, 0.13);
-        col += hot * blaze * flick * 1.65;
-        col += hot * threat * 0.22;
-        col += hot * nearFlame(vUv) * 0.55;
+        vec3 hot = vec3(1.0, 0.28, 0.055);
+        col += hot * blaze * flick * 2.6;
+        col += hot * threat * 0.30;
+        col += hot * nearFlame(vUv) * 0.85;
 
         float fogAmount = 1.0 - exp(-uFogDensity * uFogDensity * vDepth * vDepth);
         col = mix(col, uFogColor, clamp(fogAmount, 0.0, 1.0));
         gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }`
   });
   const terrain = new THREE.Mesh(terrainGeo, terrainMat);
   scene.add(terrain);
 
-  /* Ocean plane, so the Santa Monica Bay edge does not float in the void. */
+  /* ── skirt ───────────────────────────────────────────────────────────────
+     The modelled area is a finite 595x316 tile. Without a side wall its
+     boundary reads as a torn sheet of paper hanging in mid-air; with one it
+     reads as an extracted block of the real basin, which is what it is. */
+  {
+    const SKIRT_Y = yOf(-140);
+    const positions = [];
+    const push = (col, row) => {
+      positions.push(wx(col), heightAt(col, row), wz(row));
+      positions.push(wx(col), SKIRT_Y, wz(row));
+    };
+    const edge = (points) => {
+      const start = positions.length / 3;
+      for (const [col, row] of points) push(col, row);
+      const quads = points.length - 1;
+      const idx = [];
+      for (let i = 0; i < quads; i++) {
+        const a = start + i * 2, b = a + 1, c = a + 2, d = a + 3;
+        idx.push(a, b, c, c, b, d);
+      }
+      return idx;
+    };
+    const along = (fn, n) => Array.from({ length: n + 1 }, (_, i) => fn(i / n));
+    const N = 160;
+    const indices = [
+      ...edge(along((t) => [t * (GW - 1), 0], N)),
+      ...edge(along((t) => [(1 - t) * (GW - 1), GH - 1], N)),
+      ...edge(along((t) => [0, (1 - t) * (GH - 1)], N)),
+      ...edge(along((t) => [GW - 1, t * (GH - 1)], N))
+    ];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    const skirt = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: 0x2a2320, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide, flatShading: true
+    }));
+    scene.add(skirt);
+  }
+
+  /* Sea plane. It has to run far past the grid: the camera looks down over the
+     edge of a 595x316 cell tile, and anything short of the horizon leaves a
+     void where the world simply stops. Fog carries it into the sky colour. */
   const sea = new THREE.Mesh(
-    new THREE.PlaneGeometry(GW * 3, GH * 3),
-    new THREE.MeshStandardMaterial({ color: 0x081a2c, roughness: 0.28, metalness: 0.55 })
+    new THREE.PlaneGeometry(24000, 24000),
+    new THREE.MeshStandardMaterial({ color: 0x0b2137, roughness: 0.22, metalness: 0.6, fog: true })
   );
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = yOf(0.4);
@@ -623,6 +689,8 @@ async function main() {
           void main(){
             vec4 t = texture2D(uMap, gl_PointCoord);
             gl_FragColor = vec4(vC, t.a * vA);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
           }`
       });
       this.points = new THREE.Points(g, this.mat);
@@ -703,7 +771,15 @@ async function main() {
      Vehicles are drawn far above true scale: a 16 m helicopter is half a
      cell wide and would be a sub-pixel speck over an 18 km basin. The
      markers are symbolic; their positions and timings are not. */
-  const UNIT_SCALE = 7.0;
+  /* A real AW139 is 17 m -- 0.57 of one cell -- so at true scale every vehicle
+     is a sub-pixel speck over an 18 km basin. Markers are therefore symbolic,
+     and scaled with camera distance: small enough to look right in a close
+     chase shot, large enough to still be findable from the full-basin overview. */
+  const UNIT_SCALE_MIN = 2.6, UNIT_SCALE_MAX = 8.0;
+  let unitScale = 5.0;
+  const updateUnitScale = () => {
+    unitScale = Math.max(UNIT_SCALE_MIN, Math.min(UNIT_SCALE_MAX, cam.radius * 0.0092));
+  };
   const COLORS = {
     water_team: 0x4fc3f7, trench_crew: 0xc9a227,
     rescue_vehicle: 0x66d98a, helicopter: 0xff5c5c
@@ -733,7 +809,7 @@ async function main() {
     mast.position.y = 0.34; g.add(mast);
     const rotor = new THREE.Group(); rotor.position.y = 0.44;
     const bladeMat = new THREE.MeshStandardMaterial({
-      color: 0x14171c, roughness: 0.8, transparent: true, opacity: 0.62,
+      color: 0x3a4048, roughness: 0.8, transparent: true, opacity: 0.30,
       side: THREE.DoubleSide, depthWrite: false
     });
     for (let i = 0; i < 4; i++) {
@@ -741,7 +817,7 @@ async function main() {
       blade.rotation.y = i * Math.PI / 2; rotor.add(blade);
     }
     const disc = new THREE.Mesh(new THREE.CircleGeometry(1.28, 32),
-      new THREE.MeshBasicMaterial({ color: 0x8ea0b8, transparent: true, opacity: 0.07,
+      new THREE.MeshBasicMaterial({ color: 0xaebccc, transparent: true, opacity: 0.045,
                                     side: THREE.DoubleSide, depthWrite: false, fog: false }));
     disc.rotation.x = -Math.PI / 2; rotor.add(disc);
     g.add(rotor);
@@ -784,10 +860,11 @@ async function main() {
     if (unitObjects.has(uid)) return unitObjects.get(uid);
     const type = uid.split(':')[0];
     const group = type === 'helicopter' ? buildHelicopter() : buildGroundUnit(type);
-    group.scale.setScalar(UNIT_SCALE);
+    group.scale.setScalar(unitScale);
     group.visible = false;
     scene.add(group);
-    const rec = { group, type, prev: new THREE.Vector3(), heading: 0, init: false };
+    const rec = { group, type, prev: new THREE.Vector3(), heading: 0, init: false,
+                  index: parseInt(uid.split(':')[1], 10) || 0 };
     unitObjects.set(uid, rec);
     return rec;
   }
@@ -861,15 +938,15 @@ async function main() {
   const cam = {
     target: new THREE.Vector3(0, 0, 0),
     goalTarget: new THREE.Vector3(0, 0, 0),
-    radius: 620, goalRadius: 620,
+    radius: 780, goalRadius: 780,
     theta: -Math.PI * 0.62, goalTheta: -Math.PI * 0.62,
-    phi: 0.92, goalPhi: 0.92,
+    phi: 1.24, goalPhi: 1.24,
     mode: 'overview', autoSpin: true
   };
   const CAM_PRESETS = {
-    overview: { radius: 660, phi: 0.86, theta: -Math.PI * 0.62, spin: true },
-    fire: { radius: 210, phi: 1.02, theta: -Math.PI * 0.55, spin: false },
-    air: { radius: 95, phi: 1.12, theta: -Math.PI * 0.5, spin: false },
+    overview: { radius: 780, phi: 1.24, theta: -Math.PI * 0.62, spin: true },
+    fire: { radius: 340, phi: 1.16, theta: -Math.PI * 0.55, spin: false },
+    air: { radius: 130, phi: 1.18, theta: -Math.PI * 0.5, spin: false },
     free: { spin: false }
   };
   function setCamMode(mode) {
@@ -902,7 +979,7 @@ async function main() {
         cam.goalTarget.addScaledVector(right, -dx * s).addScaledVector(fwd, -dy * s);
       } else {
         cam.goalTheta -= dx * 0.005;
-        cam.goalPhi = Math.max(0.10, Math.min(1.50, cam.goalPhi - dy * 0.004));
+        cam.goalPhi = Math.max(0.10, Math.min(1.46, cam.goalPhi - dy * 0.004));
       }
     });
     const stop = (e) => { drag = null; try { el.releasePointerCapture(e.pointerId); } catch (_) {} };
@@ -1038,43 +1115,52 @@ async function main() {
       &middot; ${o.destroyed} lost</div>`;
   }
 
+  /* Lit pips = units READY at the moment the policy chose. Counting the moving
+     markers instead would disagree with the decision panel by one tick, because
+     a unit can finish its reload inside the same step it was not available for. */
   function renderRoster(t) {
     const holder = $('units');
     const roster = episode().roster;
-    const busy = {};
-    for (const u of t.units) {
-      const type = u.u.split(':')[0];
-      busy[type] = (busy[type] || 0) + (u.s === 'idle' ? 0 : 1);
-    }
     holder.innerHTML = DATA.meta.resource_types.map((type) => {
       const total = roster[type] || 0;
-      const active = busy[type] || 0;
+      const ready = t.ready ? (t.ready[type] || 0) : 0;
       const hex = '#' + COLORS[type].toString(16).padStart(6, '0');
       const pips = Array.from({ length: total }, (_, i) =>
-        `<span class="pip ${i < active ? 'up' : ''}"></span>`).join('');
+        `<span class="pip ${i < ready ? 'up' : ''}"></span>`).join('');
       return `<div class="unit" style="color:${hex}">
         <span class="swatch" style="background:${hex}"></span>
         <span class="nm">${RES_LABEL[type]}</span>
         <span class="bars">${pips}</span>
-        <span class="cnt">${active}/${total}</span></div>`;
+        <span class="cnt">${ready}/${total}</span></div>`;
     }).join('');
   }
 
+  /* Multi-dispatch routinely sends the whole fleet of one type to the same
+     target in a single tick. Listing five identical rows overflows the column
+     and hides the panels below it, so collapse repeats into one row with a
+     count -- the information is the same and the layout stays fixed. */
   function renderDecisions(t) {
     const holder = $('decisions');
     if (!t.actions.length) {
       holder.innerHTML = '<div class="none">No dispatch - fleet committed or nothing actionable.</div>';
       return;
     }
-    holder.innerHTML = t.actions.map((a) => {
+    const groups = [];
+    for (const a of t.actions) {
+      const key = `${a.r}|${a.t}|${a.z}|${a.held ? 1 : 0}`;
+      const hit = groups.find((g) => g.key === key);
+      if (hit) hit.n++; else groups.push({ key, a, n: 1 });
+    }
+    holder.innerHTML = groups.slice(0, 4).map(({ a, n }) => {
       const hex = '#' + COLORS[a.r].toString(16).padStart(6, '0');
       const zone = a.held ? 'unreachable' : `zone ${a.z}`;
       return `<div class="dec ${a.held ? 'held' : ''}" style="border-left-color:${hex}">
-        <span style="color:${hex}">${RES_LABEL[a.r]}</span>
+        <span style="color:${hex}">${RES_LABEL[a.r]}${n > 1 ? ` &times;${n}` : ''}</span>
         <span class="arrow">&rarr;</span>
         <span class="tgt">${TGT_LABEL[a.t] || a.t}</span>
         <span class="arrow">/</span><span>${zone}</span></div>`;
-    }).join('');
+    }).join('') + (groups.length > 4
+      ? `<div class="none">+ ${groups.length - 4} more</div>` : '');
   }
 
   function simClock(tick) {
@@ -1089,8 +1175,10 @@ async function main() {
     const el = document.createElement('div');
     el.className = 'ev ' + cls;
     el.innerHTML = `<span class="tk">${String(tick).padStart(3, '0')}</span><span class="tx">${text}</span>`;
-    log.appendChild(el);
-    while (log.childElementCount > 26) log.removeChild(log.firstChild);
+    // Newest first, and trim from the far end, so the entry that just fired is
+    // never the one clipped by the panel's height.
+    log.insertBefore(el, log.firstChild);
+    while (log.childElementCount > 22) log.removeChild(log.lastChild);
   }
 
   function buildTrackMarks() {
@@ -1130,6 +1218,8 @@ async function main() {
   }
 
   $('prov').innerHTML = `
+    <b>Controls</b> drag to orbit &middot; shift-drag to pan &middot; scroll to zoom &middot;
+    space to play &middot; &larr;/&rarr; to step &middot; 1-${DATA.episodes.length} to switch scenario<br>
     <b>Model</b> ${DATA.meta.model}<br>
     <b>Weights</b> ${DATA.meta.checkpoint_name}${DATA.meta.scalar_adapter
       ? ` (MLP input ${DATA.meta.scalar_adapter}, v9 scalars zeroed)` : ''}<br>
@@ -1167,13 +1257,21 @@ async function main() {
         logEvent(t.t, 'miss', `${label} arrived - no effect (target already clear)`);
       }
     }
+    // Same collapsing as the decision panel: one line per distinct dispatch.
+    const rolled = [];
     for (const d of t.dispatch) {
+      const key = `${d.r}|${d.z}|${d.st}|${d.station || ''}|${d.eta || ''}`;
+      const hit = rolled.find((r) => r.key === key);
+      if (hit) hit.n++; else rolled.push({ key, d, n: 1 });
+    }
+    for (const { d, n } of rolled) {
+      const many = n > 1 ? ` &times;${n}` : '';
       if (d.st === 'dispatched')
-        logEvent(t.t, 'dis', `${RES_LABEL[d.r]} rolling from Stn ${d.station} &rarr; zone ${d.z} (ETA ${d.eta}t)`);
+        logEvent(t.t, 'dis', `${RES_LABEL[d.r]}${many} rolling from Stn ${d.station} &rarr; zone ${d.z} (ETA ${d.eta}t)`);
       else if (d.st === 'zone_unreachable')
-        logEvent(t.t, 'miss', `zone ${d.z} unreachable by ${RES_LABEL[d.r]} - no road access`);
+        logEvent(t.t, 'miss', `zone ${d.z} unreachable by ${RES_LABEL[d.r]}${many} - no road access`);
       else
-        logEvent(t.t, 'miss', `no ${RES_LABEL[d.r]} available for zone ${d.z}`);
+        logEvent(t.t, 'miss', `no ${RES_LABEL[d.r]} available for zone ${d.z}${many}`);
     }
     if (t.losses.length) {
       const evac = t.losses.filter((l) => l.evac).length;
@@ -1205,6 +1303,7 @@ async function main() {
   const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
 
   function updateUnits(dt, frac, i0, i1) {
+    updateUnitScale();
     const a = tickAt(i0), b = tickAt(i1);
     const mapB = new Map(b.units.map((u) => [u.u, u]));
     const seen = new Set();
@@ -1237,13 +1336,27 @@ async function main() {
       }
       tmpA.set(wx(col), y, wz(row));
 
+      /* The environment dispatches whole groups of one type to the same zone,
+         which means their reconstructed positions are identical. Drawn literally
+         that is one aircraft, not five, so spread them into a formation across
+         the flight path. The offset is presentation only -- every unit's timing,
+         routing and effect stays exactly where the simulation put it. */
+      const fleet = episode().roster[rec.type] || 1;
+      if (fleet > 1) {
+        const lateral = (rec.index - (fleet - 1) / 2) * (flying ? 13 : 3.2);
+        tmpA.x += Math.cos(rec.heading) * lateral;
+        tmpA.z += -Math.sin(rec.heading) * lateral;
+        if (flying) tmpA.y += (rec.index - (fleet - 1) / 2) * 4.5;
+      }
+
       if (!rec.init) { rec.prev.copy(tmpA); rec.init = true; }
       tmpB.subVectors(tmpA, rec.prev);
       const speed = tmpB.length() / Math.max(dt, 1e-4);
       if (tmpB.lengthSq() > 1e-6) rec.heading = Math.atan2(tmpB.x, tmpB.z);
       rec.prev.copy(tmpA);
       g.position.copy(tmpA);
-      g.rotation.y = rec.heading + (flying ? -Math.PI / 2 : -Math.PI / 2);
+      g.rotation.y = rec.heading - Math.PI / 2;
+      g.scale.setScalar(unitScale);
 
       if (flying) {
         const ud = g.userData;
@@ -1283,8 +1396,8 @@ async function main() {
       flames.spawn({
         x, y: y + 0.6, z,
         vx: (Math.random() - 0.5) * 2, vy: 7 + Math.random() * 9, vz: (Math.random() - 0.5) * 2,
-        r: 1.0, g: 0.42 + Math.random() * 0.3, b: 0.10,
-        size: 0.75 + Math.random() * 0.9, alpha: 0.85,
+        r: 1.0, g: 0.26 + Math.random() * 0.20, b: 0.055,
+        size: 0.7 + Math.random() * 0.8, alpha: 0.5,
         life: 0.7 + Math.random() * 0.6, drag: 0.03, grav: 2.5
       });
       if (Math.random() < 0.55) {
@@ -1347,10 +1460,10 @@ async function main() {
     updateUnits(dt, frac, i0, i1);
 
     // Smoke haze thickens with the fire, then clears once it is knocked down.
-    const load = Math.min(1, t.active / 900);
+    const load = Math.min(0.72, t.active / 1200);
     smokeMix += (load - smokeMix) * Math.min(1, dt * 0.6);
     sky.material.uniforms.uSmoke.value = smokeMix;
-    scene.fog.density = 0.00072 + smokeMix * 0.0011;
+    scene.fog.density = 0.00022 + smokeMix * 0.00042;
     terrainMat.uniforms.uFogDensity.value = scene.fog.density;
     terrainMat.uniforms.uTime.value = now / 1000;
 
@@ -1455,16 +1568,90 @@ async function main() {
     for (const p of [flames, smoke, drops]) p.mat.uniforms.uScale.value = innerHeight * 0.5;
   });
 
-  /* ══════════════════════════ go ══════════════════════════ */
+  /* ══════════════════════════ go ══════════════════════════
+     Query parameters (handy for grabbing stills for a writeup, and for
+     automated checks -- ?still=1 renders a fixed number of frames and stops
+     instead of running the animation loop forever):
+       ?ep=<0-3>  episode index      ?tick=<n>  seek to this frame
+       ?still=1   render then freeze  ?cam=overview|fire|air|free
+       ?spin=0    disable the slow overview orbit                            */
+  const Q = new URLSearchParams(location.search);
   step('WARMING UP', 82);
   S.shownTick = -1;
-  loadEpisode(0);
-  renderer.render(scene, camera);
+  loadEpisode(Math.max(0, Math.min(DATA.episodes.length - 1, parseInt(Q.get('ep') || '0', 10))));
+  if (Q.has('tick')) {
+    S.t = Math.max(0, Math.min(episode().ticks.length - 1, parseInt(Q.get('tick'), 10)));
+    S.shownTick = -1;
+  }
+  if (Q.has('cam')) setCamMode(Q.get('cam'));
+  if (Q.get('spin') === '0') cam.autoSpin = false;
+
+  const still = Q.get('still') === '1';
+  if (still) {
+    // Settle the scene deterministically: seed particles and decals over a few
+    // fixed steps, then draw one frame and stop.
+    S.playing = false; setPlayIcon();
+    syncTick(Math.floor(S.t), false);
+    // Frame the action, not the ignition point, so a still shows the fire.
+    updateUnits(1 / 30, 0.35, Math.floor(S.t), Math.min(episode().ticks.length - 1, Math.floor(S.t) + 1));
+    let focus = fireCentroid(tickAt(Math.floor(S.t)));
+    if (cam.mode === 'air') {
+      const air = [...unitObjects.entries()].find(([uid, r]) => uid.startsWith('helicopter') && r.group.visible);
+      if (air) focus = air[1].group.position.clone();
+    }
+    if (focus) { cam.goalTarget.copy(focus); cam.target.copy(focus); }
+    const wind = new THREE.Vector3(6, 0, 4);
+    for (let i = 0; i < 40; i++) {
+      emitFire(1 / 30, wind);
+      flames.update(1 / 30, wind); smoke.update(1 / 30, wind); drops.update(1 / 30, wind);
+    }
+    updateUnits(1 / 30, 0.35, Math.floor(S.t), Math.min(episode().ticks.length - 1, Math.floor(S.t) + 1));
+    for (let i = 0; i < 60; i++) updateCamera(1 / 30);
+    for (const s of stationLabels) projectLabel(s.el, s.pos);
+    if (zoneLabel.style.display !== 'none') projectLabel(zoneLabel, zoneLabelPos);
+    terrainMat.uniforms.uTime.value = 3.0;
+    const load = Math.min(0.72, tickAt(Math.floor(S.t)).active / 1200);
+    sky.material.uniforms.uSmoke.value = load;
+    scene.fog.density = 0.00022 + load * 0.00042;
+    terrainMat.uniforms.uFogDensity.value = scene.fog.density;
+    // Re-present the same frame across a few animation frames so whatever the
+    // compositor hands to a screenshot is the drawn scene, not a cleared buffer.
+    let presented = 0;
+    const present = () => {
+      renderer.render(scene, camera);
+      if (++presented < 6) requestAnimationFrame(present);
+      else document.title = 'STILL READY';
+    };
+    present();
+    document.getElementById('load').classList.add('done');
+    if (Q.get('debug') === '1') {
+      const gl = renderer.getContext();
+      const info = renderer.info.render;
+      const bs = terrainGeo.boundingSphere;
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:99;'
+        + 'font:11px/1.5 monospace;color:#7fff7f;background:#000c;padding:8px 12px;'
+        + 'border:1px solid #0f04;border-radius:6px;white-space:pre;text-align:left';
+      el.textContent = [
+        `glError=${gl.getError()} ctx=${gl.constructor.name} lost=${gl.isContextLost()}`,
+        `draws=${info.calls} tris=${info.triangles} progs=${renderer.info.programs.length}`,
+        `cam.pos=${camera.position.toArray().map(n => n.toFixed(1)).join(',')}`,
+        `cam.tgt=${cam.target.toArray().map(n => n.toFixed(1)).join(',')} r=${cam.radius.toFixed(0)}`,
+        `terrain vis=${terrain.visible} bs.r=${bs ? bs.radius.toFixed(1) : 'null'}`,
+        `elev[0]=${elevation[0].toFixed(2)} mid=${elevation[(GH / 2 | 0) * GW + (GW / 2 | 0)].toFixed(2)}`,
+        `posY0=${terrainGeo.attributes.position.getY(0).toFixed(2)} frustum=${camera.far}`,
+        `flames=${flames.n} smoke=${smoke.n} drops=${drops.n}`
+      ].join('\n');
+      document.body.appendChild(el);
+    }
+  } else {
+    renderer.render(scene, camera);
+    setTimeout(() => document.getElementById('load').classList.add('done'), 260);
+    S.lastFrame = performance.now();
+    frame();
+  }
   step('READY', 100);
-  setTimeout(() => document.getElementById('load').classList.add('done'), 260);
-  S.lastFrame = performance.now();
-  frame();
-  window.__inferno = { S, scene, camera, cam, DATA, THREE };
+  window.__inferno = { S, scene, camera, cam, DATA, THREE, renderer, terrain, flames, smoke, drops };
 }
 </script>
 </body>

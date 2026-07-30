@@ -769,10 +769,79 @@ independent copy.
 
 ---
 
+## 11b. 3D simulation viewer — BUILT (model tied to the simulation)
+
+`Simulation3D.html` at the repo root: a single self-contained file (~2.5 MB, no server, no
+CDN, no API token) that replays the canonical relative-action policy on a real 3D model of
+the basin. Built by three scripts in `infernotactics/src/viz/` — see that directory's
+`README.md` for the full pipeline and regeneration commands.
+
+```
+InfernoEnv + RelativeInfernoModel --export_trajectory.py--> trajectories.json --\
+                                                                                 build_player.py --> Simulation3D.html
+grid_static.npy --render_basemap.py--> terrain texture ------------------------/
+```
+
+**The model is what drives it.** `export_trajectory.py` runs a real deterministic rollout —
+same env, weather, routing, reward and the argmax/roster-masked decode from
+`eval_relative.py` — and records per-tick fire diffs, every unit's reconstructed position,
+every effect with the exact cell the physics touched, every structure loss, the weather
+series, the reward stream and the semantic action chosen. The browser is a renderer only;
+nothing is re-simulated client-side.
+
+**Four scenarios ship** (deterministic, seed 9100, `traffic_mode=legacy` to match the
+dynamics the v8 weights were trained under):
+
+| Scenario | Ticks | Reward | Structures lost | Contained |
+|---|---|---|---|---|
+| Skull Rock (training anchor) | 4 | −18.0 | 0 | yes |
+| Mandeville Canyon (**held out**) | 3 | −219.7 | 0 | yes |
+| Getty View Park (**held out**) | 4 | −167.2 | 0 | yes |
+| Three simultaneous ignitions | 150 | −154,047.6 | 553 | **no** |
+
+The contrast is the point: three fast air-only knockdowns, then the multi-ignition run
+burning uncontrolled for the full 150-tick cap — the fleet-capacity ceiling from §9, visible.
+
+**What the viewer shows**: real 3DEP terrain mesh (595×316 verts) textured from the real
+road/building/population/water layers; fire as a per-tick GPU texture with burn scars,
+scorch, flicker and firelight bleed; flame and wind-advected smoke particle systems;
+helicopters flying in from Station 114 at Van Nuys (genuinely north of the grid, so they
+enter off-map) with spinning rotors and water-drop bursts; ground units following real
+Dijkstra routes over the OSM graph; the target macro-zone highlighted; and a HUD with the
+live policy decision, ready-fleet state, Santa Ana wind compass, incident metrics, critic
+V(s), scrubable timeline and event log.
+
+**Rendering choices, all disclosed in the viewer's own provenance panel**: 3.4× vertical
+exaggeration (686 m over 18 km is flat at true scale); vehicle markers symbolic in size and
+distance-adaptive (a 17 m helicopter is 0.57 of a 30 m cell — sub-pixel); group dispatches
+fanned into a formation because the env sends whole fleets to one zone and their
+reconstructed positions coincide; and return legs animated over the post-effect busy/reload
+timer, which the environment models as a duration rather than a path.
+
+**One dynamics-neutral env change** was needed: `_advance_resources()` now records `row`/`col`
+on its effect events, so the view can place drops on the cell the physics actually hit. No
+change to state, reward or timing.
+
+**Scalar adapter**: v8 checkpoints carry an 8-column MLP input while the current env emits 11
+scalars. The three v9 traffic scalars are appended *last* in `SCALAR_KEYS`, so the loader
+widens the layer and zero-fills them — function-identical to v8 on the eight inputs it was
+trained on. Reported on stdout and in the UI.
+
+**Verification**: shader/lighting correctness, draw counts and pixel values were checked
+against the live page over the DevTools Protocol; live playback confirmed running (particles
+alive, timeline advancing, log accumulating, zero exceptions). Two real bugs were found and
+fixed this way — a world/view space mismatch that zeroed the terrain's diffuse term, and a
+missing sRGB output encode that made the whole scene render ~20× too dark.
+
+The legacy Cesium sketch at `Simulation.html` is left untouched for reference; it was a
+decorative shell (fake 8×4 grid, hardcoded Ion token, `fetch('/get_latest_action')` against a
+server that never existed) and is superseded by `Simulation3D.html`.
+
+---
+
 ## 12. Not yet built
 
-- 3D visualization (pydeck/Streamlit) — intentionally deferred until after training produces
-  results worth rendering
+- Streamlit wrapper / hosted deployment (the viewer is a standalone file, opened locally)
 - Tier 3 stretch: congestion penalty term in the reward (`-mu * congestion_created`),
   judge-drawn road blockages
 - Real LANDFIRE fuel data

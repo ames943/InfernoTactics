@@ -391,6 +391,7 @@ def load_model(checkpoint_path, obs, env, device):
 def choose_action(model, obs, env, device):
     """The deterministic policy from eval_relative.py: argmax, masked by roster."""
     available = {rtype: int(obs["scalars"][f"{rtype}_available"]) for rtype in RESOURCE_TYPES}
+    ready = dict(available)   # what the policy could actually see when it chose
     actions, semantics = [], []
     critic_value = 0.0
     for slot in range(MAX_DISPATCH_SLOTS):
@@ -416,7 +417,7 @@ def choose_action(model, obs, env, device):
         actions.append(action)
         semantics.append({"r": RESOURCE_TYPES[resource_idx], "t": TARGET_TYPES[target_idx],
                           "z": int(action[1])})
-    return actions, semantics, critic_value
+    return actions, semantics, critic_value, ready
 
 
 # --- rollout ----------------------------------------------------------------
@@ -462,9 +463,10 @@ def rollout(model, env, scenario_key, device, seed, post_ticks=0):
                 if remaining_post <= 0:
                     break
                 remaining_post -= 1
+                ready = {rtype: int(obs["scalars"][f"{rtype}_available"]) for rtype in RESOURCE_TYPES}
                 actions, semantics, value, is_post = [], [], 0.0, True
             else:
-                actions, semantics, value = choose_action(model, obs, env, device)
+                actions, semantics, value, ready = choose_action(model, obs, env, device)
                 is_post = False
             obs, reward, done, info = env.step(actions)
             cumulative += reward
@@ -529,6 +531,9 @@ def rollout(model, env, scenario_key, device, seed, post_ticks=0):
                 "burned": int(counts["Burned Out"]),
                 "fire": {"add": added, "del": removed},
                 "units": tracker.snapshot(),
+                # Roster state as the policy saw it when it chose, which is not
+                # the same as the post-step state the unit snapshot reflects.
+                "ready": {rtype: int(ready[rtype]) for rtype in RESOURCE_TYPES},
                 "actions": semantics,
                 "dispatch": dispatches,
                 "effects": effects,
