@@ -536,10 +536,15 @@ def _build_zones(grid_static, meta, zone_size_cells=ZONE_SIZE_CELLS):
 
     zones = []
     zone_id = 0
-    for r0 in range(0, height, zone_size_cells):
-        r1 = min(r0 + zone_size_cells, height)
-        for c0 in range(0, width, zone_size_cells):
-            c1 = min(c0 + zone_size_cells, width)
+    num_rows = 4
+    num_cols = 8
+    
+    for r in range(num_rows):
+        r0 = int(r * height / num_rows)
+        r1 = int((r + 1) * height / num_rows)
+        for c in range(num_cols):
+            c0 = int(c * width / num_cols)
+            c1 = int((c + 1) * width / num_cols)
             zones.append({
                 "zone_id": zone_id,
                 "row_range": (r0, r1),
@@ -1045,31 +1050,21 @@ class InfernoEnv:
         return reward, int(len(rows)), n_evacuated, events
 
     def step(self, action):
-        actions = self._parse_actions(action)
+        if not isinstance(action, list):
+            raise ValueError("actions must be a list of (resource_type, target_zone) pairs")
+        actions_list = action
 
         # Advance units already en route/deployed BEFORE committing this
-        # tick's new dispatch, so a freshly-dispatched unit's ETA countdown
-        # starts on the *next* step() rather than losing a tick to this one.
+        # tick's new dispatches.
         reward, resource_events = self._advance_resources()
 
-        # Snapshot trench-protected cells BEFORE any dispatch this tick, so we
-        # can reward later ticks when fire tries to burn over them and fails.
-        pre_trench_mask = (
-            (self.sim.ignitability <= 0.0)
-            & (np.isin(self.sim.state, (SAFE, FUEL)))
-        )
-
-        dispatch_info = []
-        dispatch_cost_total = 0.0
-        for resource_type, target_zone in actions:
-            if resource_type is None:
-                continue
-            result = self._try_dispatch(resource_type, target_zone)
-            dispatch_info.append(result)
-            reward += result["reward_delta"]
-            # Per-dispatch cost (negative; applies even on wasted dispatches
-            # because the policy still spent an action slot).
-            dispatch_cost_total += DISPATCH_COST.get(resource_type, 0.0)
+        dispatch_infos = []
+        for act in actions_list:
+            resource_type, target_zone = self._parse_actions([act])[0]
+            if resource_type is not None:
+                d_info = self._try_dispatch(resource_type, target_zone)
+                reward += d_info["reward_delta"]
+                dispatch_infos.append(d_info)
 
         wind_speed, wind_direction, humidity = self._weather_schedule(self.tick_count)
         self._last_weather = (wind_speed, wind_direction, humidity)
@@ -1120,7 +1115,7 @@ class InfernoEnv:
         done = contained or timed_out
 
         info = {
-            "dispatch": dispatch_info,
+            "dispatch": dispatch_infos,
             "resource_events": resource_events,
             "weather": {"wind_speed_mph": wind_speed, "wind_direction_deg": wind_direction, "humidity_pct": humidity},
             "state_counts": counts,
