@@ -36,12 +36,13 @@ from train.relative_actions import (  # noqa: E402
     resolve_relative_targets,
 )
 from train.run_logger import RunLogger, summarize_episode  # noqa: E402
+from train.progress import EpisodeProgress  # noqa: E402
 
 
 # Hyperparameters (previously in train_actor_critic.py; inlined here after that
 # file was removed in the v10 reorganization to keep only the active pipeline).
 CLASSIFICATION_LOSS_COEFF = 0.3
-ENTROPY_COEFF = 0.01
+ENTROPY_COEFF = 0.02  # bumped from 0.01 to maintain exploration under v11's larger reward magnitudes
 GAMMA = 0.99
 GRAD_CLIP_NORM = 0.5
 
@@ -51,11 +52,19 @@ class RunningMeanStd:
     hit the loss. epsilon-initialized count so the very first episode doesn't
     divide by zero; normalize() is called BEFORE update() each episode so an
     episode's own returns don't bias the statistics used to normalize it.
+
+    v11 reward scale: a 100-cell fire running for 50 ticks now produces
+    -50*100*50 = -250000 just from the per-tick fire penalty alone (on top of
+    buildings destroyed and dispatch costs).  Old defaults of mean=0, var=1
+    produced huge initial advantages and policy gradients that exploded on
+    the first episode.  We seed the variance with a larger value (~5000^2)
+    so early advantages are in a reasonable range and Adam's per-parameter
+    learning rates can adapt.
     """
 
-    def __init__(self, epsilon=1e-4):
+    def __init__(self, epsilon=1e-4, init_var=5e3 ** 2):
         self.mean = 0.0
-        self.var = 1.0
+        self.var = float(init_var)
         self.count = epsilon
 
     def update(self, values):
@@ -85,14 +94,25 @@ def compute_returns(rewards, gamma):
     return returns
 
 
-def get_device():
+def get_device(force_cpu: bool = False):
+    # Try DirectML (AMD/Intel GPUs on Windows) for inference
+    try:
+        import torch_directml
+        if torch_directml.is_available() and not force_cpu:
+            return torch_directml.device()
+    except Exception:
+        pass
+    # Fallback: CUDA
+    if torch.cuda.is_available() and not force_cpu:
+        return torch.device("cuda")
+    # Fallback: CPU
     return torch.device("cpu")
 
 
 
 N_EPISODES = int(os.environ.get("INFERNO_N_EPISODES", 2000))
 BASE_SEED = 8200
-LEARNING_RATE = float(os.environ.get("INFERNO_V8_LR", 3e-4))
+LEARNING_RATE = float(os.environ.get("INFERNO_V8_LR", 1e-4))
 AUX_TARGET_LOSS_COEFF = float(os.environ.get("INFERNO_V8_AUX_COEFF", 0.05))
 STATUS_EVERY = 20
 EVAL_EVERY = int(os.environ.get("INFERNO_V8_EVAL_EVERY", 50))
@@ -101,6 +121,14 @@ CHECKPOINT_EVERY = int(os.environ.get("INFERNO_V8_CHECKPOINT_EVERY", 2))
 CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "models", f"checkpoints_{RUN_TAG}")
 MAX_DISPATCH_SLOTS = int(os.environ.get("INFERNO_MAX_DISPATCH_SLOTS", 10))
 TRACE_EVERY = int(os.environ.get("INFERNO_TRACE_EVERY", 0))
+PROGRESS_ENABLED = os.environ.get("INFERNO_PROGRESS_ENABLED", "1") != "0"
+PROGRESS_START = int(os.environ.get("INFERNO_PROGRESS_START", 1))
+PROGRESS_WINDOW = int(os.environ.get("INFERNO_ROLLING_WINDOW", 50))
+
+print(f"[relative_v10] N_EPISODES={N_EPISODES} LEARNING_RATE={LEARNING_RATE} "
+      f"AUX_TARGET_LOSS_COEFF={AUX_TARGET_LOSS_COEFF} STATUS_EVERY={STATUS_EVERY} EVAL_EVERY={EVAL_EVERY} "
+      f"RUN_TAG={RUN_TAG} CHECKPOINT_EVERY={CHECKPOINT_EVERY} MAX_DISPATCH_SLOTS={MAX_DISPATCH_SLOTS} TRACE_EVERY={TRACE_EVERY} "
+      f"PROGRESS_ENABLED={PROGRESS_ENABLED} PROGRESS_START={PROGRESS_START} PROGRESS_WINDOW={PROGRESS_WINDOW}")
 
 
 def _tensor_targets(env, obs, device):
@@ -314,12 +342,24 @@ def save_checkpoint(model, episode):
 
 
 def main():
-    device = get_device()
+    device = get_device(force_cpu=True)
     env = InfernoEnv(seed=BASE_SEED)
     obs = env.reset(seed=BASE_SEED)
     model = RelativeInfernoModel(len(obs["grid"]), len(SCALAR_KEYS), len(RESOURCE_TYPES), env.n_zones).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     normalizer = RunningMeanStd()
+
+    # Resume from latest checkpoint if available
+    start_episode = 1
+    latest_checkpoint = os.path.join(CHECKPOINT_DIR, "latest.pt")
+    print(f"[relative_v10] Looking for latest checkpoint at {latest_checkpoint}")
+    if os.path.exists(latest_checkpoint):
+        print(f"[relative_v10] Resuming from {latest_checkpoint}")
+        checkpoint = torch.load(latest_checkpoint, map_location=device, weights_only=True)
+        model.load_state_dict(checkpoint)
+        # Try to extract episode number from checkpoints.csv
+        start_episode = PROGRESS_START if PROGRESS_START is not None else 1
+
     pool = env._ignition_candidates
     holdout = np.array(list(VALIDATION_IGNITION_POINTS.values()), dtype=np.float32)
     distances = np.sqrt(((pool[:, None, :].astype(np.float32) - holdout[None, :, :]) ** 2).sum(axis=2)).min(axis=1)
@@ -330,32 +370,57 @@ def main():
         "learning_rate": LEARNING_RATE, "gamma": GAMMA, "scalar_keys": SCALAR_KEYS,
         "resource_counts": {rtype: len(env.resources[rtype]) for rtype in RESOURCE_TYPES},
     }, trace_every=TRACE_EVERY)
-    print(f"[relative_v10] device={device} episodes={N_EPISODES} ignition_pool={len(pool)} run={RUN_TAG}")
+    print(f"[relative_v10] device={device} episodes={N_EPISODES} ignition_pool={len(pool)} run={RUN_TAG} start_episode={start_episode}")
     rng = np.random.default_rng(BASE_SEED + 1)
+    eval_scenarios = ["anchor", *VALIDATION_IGNITION_POINTS.keys()]
+    progress = EpisodeProgress(
+        n_episodes_start=start_episode,
+        n_episodes=N_EPISODES,
+        run_dir=logger.run_dir,
+        run_tag=RUN_TAG,
+        env_cfg={
+            "device": str(device),
+            "traffic_mode": env.traffic_mode,
+            "max_dispatch_slots": MAX_DISPATCH_SLOTS,
+            "learning_rate": LEARNING_RATE,
+            "gamma": GAMMA,
+        },
+        rolling_window=PROGRESS_WINDOW,
+        eval_scenarios=eval_scenarios,
+        enable=PROGRESS_ENABLED,
+    )
+    print(f"[relative_v10] progress={progress.status_file} live={progress.is_live} window={PROGRESS_WINDOW}", flush=True)
     try:
-        for episode in range(1, N_EPISODES + 1):
-            point = tuple(int(x) for x in pool[rng.integers(len(pool))])
-            steps, reward, destroyed, contained = collect_rollout(env, model, point, device, BASE_SEED + episode)
-            losses = update_policy(model, optimizer, steps, device, normalizer)
-            for tick, step in enumerate(steps):
-                logger.log_tick(episode, tick, point, step, device)
-            logger.log_episode(summarize_episode(steps, episode, point, device, losses))
-            if episode % STATUS_EVERY == 0:
-                print(f"[relative_v10 @ {episode}] reward={reward:.1f} destroyed={destroyed} contained={contained} "
-                      f"policy={losses[0]:.3f} aux={losses[3]:.3f} entropy={losses[4]:.3f}", flush=True)
-            if episode % EVAL_EVERY == 0:
-                for name, eval_point in [("anchor", TRAINING_IGNITION_POINT), *VALIDATION_IGNITION_POINTS.items()]:
-                    result = evaluate(model, env, eval_point, device)
-                    logger.log_eval({
-                        "checkpoint_episode": episode, "scenario": name,
-                        "ignition_row": eval_point[0], "ignition_col": eval_point[1],
-                        "evaluation_seed": BASE_SEED, "avg_reward": result[0],
-                        "avg_buildings_destroyed": result[1], "containment_rate": result[2],
-                    })
-                    print(f"  eval {name}: reward={result[0]:.1f} destroyed={result[1]:.1f} containment={result[2]:.0%}", flush=True)
-            if episode % CHECKPOINT_EVERY == 0:
-                checkpoint = save_checkpoint(model, episode)
-                logger.log_checkpoint(episode, checkpoint)
+        with progress:
+            for episode in range(start_episode, N_EPISODES + 1):
+                point = tuple(int(x) for x in pool[rng.integers(len(pool))])
+                steps, reward, destroyed, contained = collect_rollout(env, model, point, device, BASE_SEED + episode)
+                losses = update_policy(model, optimizer, steps, device, normalizer)
+                for tick, step in enumerate(steps):
+                    logger.log_tick(episode, tick, point, step, device)
+                summary = summarize_episode(steps, episode, point, device, losses)
+                logger.log_episode(summary)
+                progress.tick(episode, summary)
+                if episode % STATUS_EVERY == 0 or not progress.is_live:
+                    print(f"[relative_v10 @ {episode}] reward={reward:.1f} destroyed={destroyed} contained={contained} "
+                          f"policy={losses[0]:.3f} aux={losses[3]:.3f} entropy={losses[4]:.3f}", flush=True)
+                if episode % EVAL_EVERY == 0:
+                    eval_rows = []
+                    for name, eval_point in [("anchor", TRAINING_IGNITION_POINT), *VALIDATION_IGNITION_POINTS.items()]:
+                        result = evaluate(model, env, eval_point, device)
+                        row = {
+                            "checkpoint_episode": episode, "scenario": name,
+                            "ignition_row": eval_point[0], "ignition_col": eval_point[1],
+                            "evaluation_seed": BASE_SEED, "avg_reward": result[0],
+                            "avg_buildings_destroyed": result[1], "containment_rate": result[2],
+                        }
+                        logger.log_eval(row)
+                        eval_rows.append(row)
+                        print(f"  eval {name}: reward={result[0]:.1f} destroyed={result[1]:.1f} containment={result[2]:.0%}", flush=True)
+                    progress.refresh_evals(eval_rows)
+                if episode % CHECKPOINT_EVERY == 0:
+                    checkpoint = save_checkpoint(model, episode)
+                    logger.log_checkpoint(episode, checkpoint)
     finally:
         logger.close()
 

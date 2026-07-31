@@ -18,6 +18,9 @@ EPISODE_FIELDS = [
     "mean_traffic_delay_s", "traffic_mean_load", "traffic_max_load",
     "water_team_dispatches", "trench_crew_dispatches", "rescue_vehicle_dispatches", "helicopter_dispatches",
     "water_team_effect_success", "trench_crew_effect_success", "rescue_vehicle_effect_success", "helicopter_effect_success",
+    "rc_fire_extinguished", "rc_fire_penalty", "rc_dispatch_cost",
+    "rc_trench_bonus", "rc_buildings_destroyed", "rc_travel_delay", "rc_wasted",
+    "trench_held_total",
 ]
 
 EVAL_FIELDS = [
@@ -89,10 +92,10 @@ class RunLogger:
             episode = row["episode"]
             for key in ("total_reward", "buildings_destroyed", "mean_reward_per_tick", "contained", "n_ticks", "actions_per_tick", "noop_ticks", "mean_response_ticks", "mean_traffic_delay_s"):
                 value = row.get(key)
-                if value != "":
+                if value != "" and value is not None:
                     self.writer.add_scalar(f"train/{key}", float(value), episode)
             for key in ("policy_loss", "value_loss", "classification_loss", "aux_target_loss", "entropy", "resource_entropy", "target_entropy", "grad_norm"):
-                if key in row:
+                if key in row and row[key] != "" and row[key] is not None:
                     self.writer.add_scalar(f"loss/{key}" if "loss" in key else f"policy/{key}", float(row[key]), episode)
             self.writer.flush()
 
@@ -133,6 +136,16 @@ def summarize_episode(steps, episode, ignition, device, losses):
     first_loss = next((i for i, info in enumerate(infos) if info.get("buildings_destroyed", 0) > 0), "")
     active = [c.get("Threat", 0) + c.get("Blaze", 0) for c in counts]
     blaze = [c.get("Blaze", 0) for c in counts]
+    # Aggregate v11 reward components across the episode
+    rc_keys = ("fire_extinguished", "fire_penalty", "dispatch_cost",
+               "trench_bonus", "buildings_destroyed", "travel_delay", "wasted")
+    rc_sums = {k: 0.0 for k in rc_keys}
+    for info in infos:
+        rc = info.get("reward_components", {})
+        for k in rc_keys:
+            if k in rc:
+                rc_sums[k] += rc[k]
+    trench_held_total = sum(info.get("trench_held", 0) for info in infos)
     return {
         "episode": episode, "ignition_row": ignition[0], "ignition_col": ignition[1],
         "device": str(device), "n_ticks": len(steps),
@@ -155,5 +168,13 @@ def summarize_episode(steps, episode, ignition, device, losses):
         "mean_traffic_delay_s": _mean([d.get("traffic_delay_s", 0) for d in successful]),
         "traffic_mean_load": _mean([s.get("scalars", [0] * 9)[8] for s in steps]),
         "traffic_max_load": max((s.get("scalars", [0] * 10)[9] for s in steps), default=0),
+        "rc_fire_extinguished": rc_sums["fire_extinguished"],
+        "rc_fire_penalty": rc_sums["fire_penalty"],
+        "rc_dispatch_cost": rc_sums["dispatch_cost"],
+        "rc_trench_bonus": rc_sums["trench_bonus"],
+        "rc_buildings_destroyed": rc_sums["buildings_destroyed"],
+        "rc_travel_delay": rc_sums["travel_delay"],
+        "rc_wasted": rc_sums["wasted"],
+        "trench_held_total": trench_held_total,
     } | {f"{rtype}_dispatches": sum(d.get("resource_type") == rtype for d in successful) for rtype in effect_success} \
       | {f"{rtype}_effect_success": effect_success[rtype] for rtype in effect_success}

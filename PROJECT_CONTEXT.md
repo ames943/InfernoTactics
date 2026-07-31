@@ -5,7 +5,7 @@ de-duplicated and reconciled. Where the two originals conflicted, the *second*
 (the v8/v9/v10 workspace update) wins. Verified corrections against the actual
 repo are marked **[VERIFIED]** or **[CORRECTED]**.
 
-Last consolidated: 2026-07-29.
+Last consolidated: 2026-07-30.
 
 ---
 
@@ -23,6 +23,7 @@ directly on it). It is the deliverable — the *architecture*, not any single ch
 | Semantic action targets | `src/train/relative_actions.py` |
 | Training | `src/train/train_relative.py` |
 | Evaluation | `src/train/eval_relative.py` |
+| Real-time logging | `src/train/progress.py` — `EpisodeProgress` (rich Live panel + `live_status.json` tail file) |
 | Action-space tests | `src/train/test_relative_actions.py` |
 
 ### Everything absolute-zone-based is history, not a candidate
@@ -96,6 +97,12 @@ the random sweep is the representative number.
 - **Working interpreter is `infernotactics/.venv`** — Python 3.14.3, torch 2.13.0, CPU only.
   **[CORRECTED]** The `cosmos-venv` conda env named in the original docs **does not exist on
   this machine** (`conda info --envs` shows only base / bioenv / humann3).
+- **DirectML is available** via `torch-directml` (AMD Radeon 880M → `privateuseone:0`).
+  Autograd support is limited; `train_relative.py` **forces CPU for training** via
+  `get_device(force_cpu=True)`. Inference can use `get_device(force_cpu=False)` to pick up DirectML.
+- **Checkpoint resume is automatic**: `main()` now loads `checkpoints_<RUN_TAG>/latest.pt`
+  and derives `start_episode` from `logs/runs/<RUN_TAG>/checkpoints.csv` (or filename
+  parsing as fallback). Re-running with the same `INFERNO_RUN_TAG` resumes seamlessly.
 - A training-loop bug was found and fixed before this checkpoint's later episodes: the
   gradient update recomputed the resource-type distribution **without re-masking by which
   resource types were actually available that tick**, while the rollout that generated the
@@ -148,7 +155,7 @@ COSMOS_FINAL/
         ├── data_pipeline/  # real data pulling (done)
         ├── env/            # grid/graph sim + fire physics + RL env (done)
         ├── models/         # CNN, MLP, classification, actor-critic, relative_model (done)
-        ├── train/          # training loops + heuristic baseline
+        ├── train/          # training loops + heuristic baseline + real-time logging (done)
         └── viz/            # pydeck/Streamlit (NOT started)
 ```
 
@@ -721,11 +728,16 @@ v10 multi-dispatch (§6) is the direct attack on this ceiling.
 | `models/checkpoints_relative_v10_multi_dispatch_smoke/` | v10 smoke, ep1 | 11 | **Interrupted — not a result** |
 | `models/checkpoints_zonehead_zonehead_randign_v1/` | zone-head repair, ep1225 + resume_state | 8 | Prior work (absolute zones) |
 | `models/checkpoints/` | original 2000-ep run, `best.pt` = ep260 | 8 | Prior work; the +29,443 anchor headline |
+| `models/checkpoints_relative_v8/` | v8 relative (new run with resume, live logging) | 8 | **In progress — auto-resumes from latest** |
 
 **Logging gap [VERIFIED]:** `logs/` contains train/eval CSVs **only** for the zonehead run.
 There are no logs for v8, v9, or v10 — those runs' curves are unrecoverable; only checkpoints
 survive. Any v8/v9 number in the writeup must come from re-evaluating a checkpoint, not from a
 log.
+
+**New in v8 relative run:** `logs/runs/<tag>/live_status.json` (atomic JSON, updated every
+episode — `Get-Content -Wait` friendly) + optional rich Live panel (`INFERNO_PROGRESS=1`).
+Checkpoint resume is automatic on re-run with same `INFERNO_RUN_TAG`.
 
 `best_model/inferno_best_model.pt` hash-matches none of the in-repo v8 checkpoints — it's an
 independent copy.
@@ -859,6 +871,12 @@ server that never existed) and is superseded by `Simulation3D.html`.
 3. Evaluate the final checkpoint on Skull Rock, both named held-out validation points, and
    **30 random ignition points** — the random sweep is the number that matters.
 
-Cheap parallel win: evaluate the never-measured `checkpoints_relative_v8_500/episode_0060.pt`
+**Cheap parallel win:** evaluate the never-measured `checkpoints_relative_v8_500/episode_0060.pt`
 on the same 30-point sweep against the shipped ep10. Same env, same 8-scalar interface, no
 training required. If ep60 beats −244.6, the release gets better for free.
+
+**Training loop upgrades (done):**
+- Real-time visibility: `EpisodeProgress` (rich Live panel + `live_status.json` tail file)
+- Auto-resume from `latest.pt` + `checkpoints.csv` episode tracking
+- DirectML detection for inference (`get_device(force_cpu=False)`)
+- CPU-forced training (`get_device(force_cpu=True)`) due to DirectML autograd limits
