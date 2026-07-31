@@ -50,9 +50,9 @@ def main():
     out_dir = os.path.join(PROJECT_ROOT, "reports", args.run_tag)
     os.makedirs(out_dir, exist_ok=True)
 
-    fig, axes = plt.subplots(4, 3, figsize=(18, 18), constrained_layout=True)
+    fig, axes = plt.subplots(5, 3, figsize=(18, 22), constrained_layout=True)
     plots = [
-        ("total_reward", "Reward", True),
+        ("total_reward", "Total Reward", True),
         ("buildings_destroyed", "Buildings Destroyed", False),
         ("contained", "Containment (episode)", False),
         ("n_ticks", "Episode Length", False),
@@ -64,6 +64,11 @@ def main():
         ("actions_per_tick", "Actions per Tick", False),
         ("noop_ticks", "No-op Ticks", False),
         ("mean_response_ticks", "Mean Response Ticks", False),
+        # v11 reward components
+        ("rc_fire_penalty", "Fire Penalty / Episode", False),
+        ("rc_dispatch_cost", "Dispatch Cost / Episode", False),
+        ("rc_trench_bonus", "Trench Bonus / Episode", False),
+        ("peak_active_fire", "Peak Active Fire Cells", False),
     ]
     for ax, (key, title, log_y) in zip(axes.flat, plots):
         data = values(train, key)

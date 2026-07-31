@@ -4,6 +4,7 @@ import argparse
 import collections
 import os
 import sys
+import time
 
 import numpy as np
 import torch
@@ -108,7 +109,7 @@ def eval_policy(policy, env, n_episodes=5, use_real_weather=True, deterministic=
     }
 
 
-def evaluate(model, env, name, point, device, episodes):
+def evaluate(model, env, name, point, device, episodes, verbose=True):
     rewards, destroyed, contained, ticks = [], [], [], []
     actions = collections.Counter()
     dispatched = collections.Counter()
@@ -173,12 +174,13 @@ def evaluate(model, env, name, point, device, episodes):
         "avg_ticks": float(np.mean(ticks)),
         "semantic_actions": actions,
     }
-    print(f"{name}: reward={result['avg_reward']:.1f}  destroyed={result['avg_buildings_destroyed']:.1f}  "
-          f"containment={result['containment_rate']:.0%}  avg_ticks={result['avg_ticks']:.1f}")
-    print(f"  rewards={rewards}")
-    print(f"  roster={{{', '.join(f'{r}: {len(env.resources[r])}' for r in RESOURCE_TYPES)}}}")
-    print(f"  dispatched={dict(dispatched)}  max_concurrent={dict(max_active)}")
-    print(f"  actions={actions}")
+    if verbose:
+        print(f"{name}: reward={result['avg_reward']:.1f}  destroyed={result['avg_buildings_destroyed']:.1f}  "
+              f"containment={result['containment_rate']:.0%}  avg_ticks={result['avg_ticks']:.1f}")
+        print(f"  rewards={rewards}")
+        print(f"  roster={{{', '.join(f'{r}: {len(env.resources[r])}' for r in RESOURCE_TYPES)}}}")
+        print(f"  dispatched={dict(dispatched)}  max_concurrent={dict(max_active)}")
+        print(f"  actions={actions}")
     return result
 
 
@@ -202,6 +204,7 @@ def main():
     state = torch.load(args.checkpoint, map_location=device, weights_only=True)
     model.load_state_dict(state)
     print(f"checkpoint={os.path.abspath(args.checkpoint)} device={device} episodes_per_scenario={args.episodes}")
+    t_total = time.perf_counter()
     if args.random_points > 0:
         candidates = env._ignition_candidates.astype(np.float32)
         holdouts = np.array(list(VALIDATION_IGNITION_POINTS.values()), dtype=np.float32)
@@ -210,17 +213,35 @@ def main():
         rng = np.random.default_rng(9317)
         count = min(args.random_points, len(candidates))
         selected = candidates[rng.choice(len(candidates), size=count, replace=False)]
+        print(f"random_points: sampling {count} of {len(candidates)} candidates (>30 cells from holdouts)")
+        print(f"  start: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         results = []
+        t_run = time.perf_counter()
         for index, point in enumerate(selected, 1):
-            results.append(evaluate(model, env, f"random_{index:03d}", tuple(map(int, point)), device, args.episodes))
+            t_pt = time.perf_counter()
+            print(f"  [{index}/{count}] igniting (row={int(point[0])}, col={int(point[1])})... ", end="", flush=True)
+            res = evaluate(model, env, f"random_{index:03d}", tuple(map(int, point)), device, args.episodes, verbose=False)
+            results.append(res)
+            elapsed = time.perf_counter() - t_pt
+            print(f"reward={res['avg_reward']:>10.1f}  destroyed={res['avg_buildings_destroyed']:>5.1f}  "
+                  f"containment={res['containment_rate']:>3.0%}  ticks={res['avg_ticks']:>5.1f}  ({elapsed:.1f}s)", flush=True)
+        print(f"  total: {time.perf_counter() - t_run:.1f}s  ({len(selected)} points, "
+              f"{(time.perf_counter() - t_run) / max(1, len(selected)):.1f}s/point)")
         print("random aggregate: "
               f"reward={np.mean([r['avg_reward'] for r in results]):.1f}  "
               f"destroyed={np.mean([r['avg_buildings_destroyed'] for r in results]):.1f}  "
               f"containment={np.mean([r['containment_rate'] for r in results]):.0%}")
     else:
         scenarios = [("anchor", TRAINING_IGNITION_POINT)] + list(VALIDATION_IGNITION_POINTS.items())
+        print(f"scenarios: {', '.join(name for name, _ in scenarios)}")
         for name, point in scenarios:
-            evaluate(model, env, name, point, device, args.episodes)
+            t_pt = time.perf_counter()
+            print(f"  running {name} (row={point[0]}, col={point[1]})... ", end="", flush=True)
+            res = evaluate(model, env, name, point, device, args.episodes)
+            print(f"  {name}: reward={res['avg_reward']:.1f}  destroyed={res['avg_buildings_destroyed']:.1f}  "
+                  f"containment={res['containment_rate']:.0%}  ticks={res['avg_ticks']:.1f}  "
+                  f"({time.perf_counter() - t_pt:.1f}s)", flush=True)
+    print(f"done: total wall time {time.perf_counter() - t_total:.1f}s")
 
 
 if __name__ == "__main__":

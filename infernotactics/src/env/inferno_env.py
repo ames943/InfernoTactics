@@ -306,6 +306,22 @@ LAMBDA_TRAVEL_TIME = 0.02  # reward penalty per second of dispatch travel time
 LAMBDA_RESPONSE_DELAY = 0.02
 MU_CONGESTION = 0.01
 
+# --- New v11 reward: per-tick fire penalty and resource dispatch costs -------
+# Encourages the policy to shrink the active fire front every tick, not just
+# pocket the building-loss penalty and ignore the fire.  Per-dispatch costs
+# prevent spam (especially helicopter spam given the 12-tick reload).
+FIRE_PENALTY_PER_CELL_PER_TICK = 0.5  # positive number; subtracted as a penalty
+DISPATCH_COST = {
+    "water_team": 5.0,
+    "trench_crew": 8.0,
+    "rescue_vehicle": 3.0,
+    "helicopter": 15.0,
+}
+# Trench crew gets a bonus per cell that reaches BURNED_OUT *without* ever
+# becoming Threat or Blaze -- i.e. a firebreak held.  Pays out only on the
+# tick the cell transitions Fuel/Threat-free -> BURNED_OUT.
+TRENCH_BREAK_HOLD_BONUS = 2.0
+
 # --- Population-aware building-loss penalty (population_density layer is
 # 0-1, log1p+min-max normalized -- see grid_builder.py) -----------------------
 # A building lost in a dense area (e.g. Westwood Village) should cost more
@@ -1049,11 +1065,17 @@ class InfernoEnv:
                 d_info = self._try_dispatch(resource_type, target_zone)
                 reward += d_info["reward_delta"]
                 dispatch_infos.append(d_info)
+        dispatch_cost_total = sum(
+            DISPATCH_COST[d["resource_type"]] for d in dispatch_infos if d["status"] == "dispatched"
+        )
 
         wind_speed, wind_direction, humidity = self._weather_schedule(self.tick_count)
         self._last_weather = (wind_speed, wind_direction, humidity)
 
         before_state = self.sim.state.copy()
+        # v11 trench-hold bonus uses pre_trench_mask: cells protected
+        # (ignitability <= 0) and still Safe/Fuel at the START of this tick.
+        pre_trench_mask = (self.sim.ignitability <= 0) & np.isin(before_state, (SAFE, FUEL))
         self.sim.step(wind_speed_mph=wind_speed, wind_direction_deg=wind_direction, humidity_pct=humidity)
         destroy_reward, n_destroyed, n_destroyed_evacuated, destruction_events = \
             self._score_building_destruction(before_state)
@@ -1061,6 +1083,39 @@ class InfernoEnv:
 
         self.tick_count += 1
         counts = self.sim.state_counts()
+        # v11: per-tick fire penalty for Threat + Blaze cells (Blaze burns fuel
+        # now, Threat is about to burn next tick -- both should hurt).
+        active_fire_cells = counts["Threat"] + counts["Blaze"]
+        fire_penalty = FIRE_PENALTY_PER_CELL_PER_TICK * active_fire_cells
+
+        # v11: trench-hold bonus.  A cell that was protected (ignitability <= 0
+        # and still Safe/Fuel at the start of this tick) and ends this tick in
+        # BURNED_OUT without ever having been Threat or Blaze is a firebreak
+        # that held through the fire's arrival.  These cells are the rare but
+        # high-signal reward that makes trench crew worth dispatching
+        # proactively.
+        post_state = self.sim.state
+        held_now_burned = pre_trench_mask & (post_state == BURNED_OUT)
+        trench_bonus = TRENCH_BREAK_HOLD_BONUS * int(held_now_burned.sum())
+
+        reward_components = {
+            "fire_penalty": -float(fire_penalty),
+            "dispatch_cost": -float(dispatch_cost_total),
+            "trench_bonus": float(trench_bonus),
+            "buildings_destroyed": float(destroy_reward),
+            "travel_delay": float(sum(d["reward_delta"] for d in dispatch_infos)),
+            "wasted": float(-RESOURCE_WASTED_PENALTY * sum(1 for d in dispatch_infos if d["status"] != "dispatched")),
+        }
+        # Fire-extinguished component comes from _advance_resources (already in
+        # `reward`).  Capture it by reading the diff of resource events.
+        extinguish_count = sum(
+            1 for ev in resource_events
+            if ev.get("success") and ev["resource_type"] in ("water_team", "helicopter")
+        )
+        reward_components["fire_extinguished"] = float(FIRE_EXTINGUISHED_REWARD * extinguish_count)
+
+        reward = reward - fire_penalty - dispatch_cost_total + trench_bonus
+
         contained = counts["Threat"] == 0 and counts["Blaze"] == 0
         timed_out = self.tick_count >= MAX_TICKS
         done = contained or timed_out
@@ -1076,6 +1131,9 @@ class InfernoEnv:
             "contained": contained,
             "timeout": timed_out and not contained,
             "tick": self.tick_count,
+            "active_fire_cells": active_fire_cells,
+            "trench_held": int(held_now_burned.sum()),
+            "reward_components": reward_components,
         }
         return self._build_observation(), reward, done, info
 

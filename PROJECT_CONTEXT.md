@@ -5,7 +5,7 @@ de-duplicated and reconciled. Where the two originals conflicted, the *second*
 (the v8/v9/v10 workspace update) wins. Verified corrections against the actual
 repo are marked **[VERIFIED]** or **[CORRECTED]**.
 
-Last consolidated: 2026-07-29.
+Last consolidated: 2026-07-30.
 
 ---
 
@@ -23,7 +23,9 @@ directly on it). It is the deliverable — the *architecture*, not any single ch
 | Semantic action targets | `src/train/relative_actions.py` |
 | Training | `src/train/train_relative.py` |
 | Evaluation | `src/train/eval_relative.py` |
+| Real-time logging | `src/train/progress.py` — `EpisodeProgress` (rich Live panel + `live_status.json` tail file) |
 | Action-space tests | `src/train/test_relative_actions.py` |
+| Plotting (offline) | `src/train/plot_training.py` |
 
 ### Everything absolute-zone-based is history, not a candidate
 
@@ -60,42 +62,29 @@ shrinks 32 → ~6, so gradient signal per option goes up.
 
 ### Current best trained artifact of that architecture
 
-`best_model/inferno_best_model.pt` — a **self-contained release folder** (own frozen copy of
-the env, grid, roads, weather, plus a verified-working `run_example.py`). It is **episode 10
-of a planned 2000-episode run** — a smoke test, deliberately shipped because even at ep10 it
-demonstrates the structural win.
+**`models/checkpoints_relative_v8/latest.pt`** (episode 318+, trained with v10 multi-dispatch
+under synthetic traffic + configurable delays, live logging enabled). This is the most
+up-to-date model checkpoint folder. It uses the 11-scalar env interface.
 
-Deterministic eval, 2–3 episodes/scenario:
-
-| Scenario | Reward | Buildings destroyed | Containment |
-|---|---|---|---|
-| `single_training` (Skull Rock) | +27.6 | 0 | 100% |
-| `mandeville_canyon` (**held out**) | +39.7 | 0 | 100% |
-| `getty_view_park` (**held out**) | +31.0 | 0 | 100% |
-| `stone_canyon` (multi-ignition, hard) | −182.7 (variance +38 to −637 over 3 eps) | 0.7 | 100% |
-
-Compare: every v1–v7 architecture scored roughly **−17,000** and **−81,000** on those two
-held-out points. Positive reward and full containment there after ten episodes is a real
-structural result.
-
-**Do not quote those numbers without this:** an unbiased **20-point random-ignition sweep**
-gives **−244.6 aggregate reward**, with 7 of 20 points losing 1–4 buildings. Containment was
-still 100%. Traced tick-by-tick, this is not a bug — the policy dispatches a helicopter to
-the active fire immediately and correctly every time, but ep10 has learned *only that one
-reflex*. It has not learned to also send a faster-arriving ground unit as backup when a fire
-starts near buildings and helicopter travel time is too long to prevent structure loss. The
-two curated validation points happened to be easy draws (small fires, nothing in the path);
-the random sweep is the representative number.
+Prior release: `best_model/inferno_best_model.pt` — a **self-contained release folder** (own
+frozen copy of the env, grid, roads, weather, plus a verified-working `run_example.py`). It
+was **episode 10 of a planned 2000-episode run** — a smoke test, deliberately shipped because
+even at ep10 it demonstrates the structural win. It uses the 8-scalar interface.
 
 ### Compatibility facts you will trip over **[VERIFIED]**
 
 - **v8 relative checkpoints expect 8 observation scalars** (`mlp.net.0.weight` = `(32, 8)`).
   **v9/v10 expect 11** (traffic scalars added). Confirmed by direct state-dict inspection.
   → v8 weights **cannot** load against the current synthetic-traffic env without a scalar
-  adapter. This is exactly what made the v9 ep10 eval look catastrophic.
-- **Working interpreter is `infernotactics/.venv`** — Python 3.14.3, torch 2.13.0, CPU only.
-  **[CORRECTED]** The `cosmos-venv` conda env named in the original docs **does not exist on
-  this machine** (`conda info --envs` shows only base / bioenv / humann3).
+  adapter. The current `checkpoints_relative_v8/` uses the 11-scalar interface.
+- **DirectML is available** via `torch-directml` (AMD Radeon 880M → `privateuseone:0`).
+  Autograd support is limited; `train_relative.py` **forces CPU for training** via
+  `get_device(force_cpu=True)`. Inference can use `get_device(force_cpu=False)` to pick up DirectML.
+- **Checkpoint resume is automatic**: `main()` loads `checkpoints_<RUN_TAG>/latest.pt`
+  and uses `INFERNO_PROGRESS_START` (or 1) as the starting episode. Re-running with the
+  same `INFERNO_RUN_TAG` resumes from the last checkpoint. The checkpoint frequency is
+  controlled by `CHECKPOINT_EVERY` (every N episodes), so episodes between checkpoints
+  are not individually resumable — the model loads but you may repeat a few episodes.
 - A training-loop bug was found and fixed before this checkpoint's later episodes: the
   gradient update recomputed the resource-type distribution **without re-masking by which
   resource types were actually available that tick**, while the rollout that generated the
@@ -137,18 +126,18 @@ results worth showing.
 COSMOS_FINAL/
 ├── PROJECT_CONTEXT.md      # this file
 ├── context.txt             # raw original context paste (kept for provenance)
-├── best_model/             # self-contained v8 relative-action release
+├── best_model/             # self-contained v8 relative-action release (8-scalar, ep10)
 ├── Simulation.html
 └── infernotactics/
-    ├── .venv/              # Python 3.14.3, torch 2.13.0+cpu  <-- the real env
+    ├── .venv/              # Python 3.14.3, torch 2.13.0+cpu  <-- originally the real env
     ├── data/               # real data + generated grid/sim outputs
-    ├── logs/
-    ├── models/             # checkpoints (see §9)
+    ├── logs/               # per-run logs + live_status.json (see training loop upgrades)
+    ├── models/             # checkpoints (see §10)
     └── src/
         ├── data_pipeline/  # real data pulling (done)
         ├── env/            # grid/graph sim + fire physics + RL env (done)
         ├── models/         # CNN, MLP, classification, actor-critic, relative_model (done)
-        ├── train/          # training loops + heuristic baseline
+        ├── train/          # training loops + heuristic baseline + real-time logging (done)
         └── viz/            # pydeck/Streamlit (NOT started)
 ```
 
@@ -313,7 +302,7 @@ not comparable to v1–v4.
   reservation, helicopter delay + no road load, legacy mode). Existing env-mechanics suite
   passes under synthetic mode; roster totals unchanged.
 
-### Multi-dispatch (v10, in progress)
+### Multi-dispatch (v10, implemented)
 
 - Action interface is now **lists only**: `env.step([])` is a no-dispatch tick;
   `env.step([(resource_type, zone), ...])` dispatches multiple resources in one tick.
@@ -322,13 +311,11 @@ not comparable to v1–v4.
   list entries — it does *not* incorrectly advance fire once per dispatch.
 - The sequential decoder in `train_relative.py` uses `MAX_DISPATCH_SLOTS` (default 10) as a
   safety cap; local resource availability prevents over-selecting beyond the roster.
-- `HeuristicPolicy.decide_actions()` now returns a same-tick list of greedy dispatches. The
-  legacy logits adapter remains for older eval callers and **still needs full list-interface
-  migration** where those callers are used.
+- `HeuristicPolicy.decide_actions()` now returns a same-tick list of greedy dispatches.
 - `src/env/test_multi_dispatch.py`: 4 passing tests (list-only validation, two dispatches
   sharing one tick, empty-list advancement, same-tick availability consumption).
 
-This work directly attacks the structural capacity ceiling in §8.
+This work directly attacks the structural capacity ceiling in §9.
 
 ---
 
@@ -712,23 +699,33 @@ v10 multi-dispatch (§6) is the direct attack on this ceiling.
 
 ## 10. Checkpoint inventory **[VERIFIED on disk]**
 
-| Path | What it is | Scalars | Status |
-|---|---|---|---|
-| `best_model/inferno_best_model.pt` | **v8 relative, ep10 — the shipped release** | 8 | Self-contained, verified working |
-| `models/checkpoints_relative_v8_500/` | v8 run, reaches **ep60** + latest | 8 | **Never evaluated, no logs.** Planned 500 eps did not complete |
-| `models/checkpoints_relative_v9_traffic_50/` | v9 synthetic traffic, **ep10** + latest | 11 | Run aborted after ep10; eval poor (anchor −112,745.5, 381.7 destroyed, 0%) |
-| `models/checkpoints_relative_v9_delay_smoke/` | v9 delay smoke, ep1 | 11 | Smoke only |
-| `models/checkpoints_relative_v10_multi_dispatch_smoke/` | v10 smoke, ep1 | 11 | **Interrupted — not a result** |
-| `models/checkpoints_zonehead_zonehead_randign_v1/` | zone-head repair, ep1225 + resume_state | 8 | Prior work (absolute zones) |
-| `models/checkpoints/` | original 2000-ep run, `best.pt` = ep260 | 8 | Prior work; the +29,443 anchor headline |
+| Path | What it is | Environ / Scalars | Episodes | Status |
+|---|---|---|---|---|
+| `models/checkpoints_relative_v8/` | **v8 relative + v10 multi-dispatch, current training run** | v10 (11 scalars, synthetic traffic, delays) | **episode 310+** (2026-07-30) | **Most up-to-date checkpoint. Auto-resumes.** Live logging enabled. `relative_v8` run tag. |
+| `models/checkpoints_dml_test/` | DirectML smoke test, 1 ep | Same v10 env | ep1 | Smoke only. Has no continued training history. |
+| `models/checkpoints_v11_reward_smoke/` | v11 reward-sign smoke, 3 eps | v10 env + new reward shape | ep1–3 | Smoke only. No follow-up run planned. |
+| `models/checkpoints_v11_stability_check/` | v11 stability check, 4 eps | v10 env | ep2, 4 | Smoke only. |
+| `models/checkpoints_relative_v10_multi_dispatch_100/` | v10 multi-dispatch, **100 episodes** | v10 (11 scalars) | 20, 40, 60, 80, 100 (2026-07-29) | **Previous longest run.** No live logging (legacy format). Post-dates best_model.pt, pre-dates checkpoints_relative_v8/. |
+| `models/checkpoints_relative_v8_500/` | v8 run, reaches **ep60** + latest | 8 scalars, legacy traffic | ep1–60 | **Never evaluated, no logs.** Overlaps with the shipped release epoch. |
+| `models/checkpoints_relative_v9_traffic_50/` | v9 synthetic traffic, **ep10** + latest | 11 scalars | ep10, latest | Run aborted after ep10; eval poor (anchor −112,745.5, 381.7 destroyed, 0%). |
+| `models/checkpoints_relative_v9_delay_smoke/` | v9 delay smoke, ep1 | 11 scalars | ep1 | Smoke only. |
+| `best_model/inferno_best_model.pt` | **Shipped release** — v8 relative, ep10 | 8 scalars, legacy traffic | ep10 | Self-contained folder (own env copy, grid, roads). Uses 8-scalar adapter. |
+| `models/checkpoints_zonehead_zonehead_randign_v1/` | zone-head repair, ep1225 + resume_state | 8 scalars, prior work (absolute zones) | up to ep1225 | Prior work on the absolute action space. |
+| `models/checkpoints/` | original 2000-ep run, `best.pt` = ep260 | 8 scalars, prior work (absolute zones) | up to ep2000 | Prior work; the +29,443 anchor headline. |
 
-**Logging gap [VERIFIED]:** `logs/` contains train/eval CSVs **only** for the zonehead run.
-There are no logs for v8, v9, or v10 — those runs' curves are unrecoverable; only checkpoints
-survive. Any v8/v9 number in the writeup must come from re-evaluating a checkpoint, not from a
-log.
+**The most up-to-date checkpoint folder is `checkpoints_relative_v8/`** (latest write: episode 310
+at 2026-07-30 23:59, still running toward 2000). All other folders are historical or smoke runs.
 
-`best_model/inferno_best_model.pt` hash-matches none of the in-repo v8 checkpoints — it's an
-independent copy.
+**Logging gap [VERIFIED]:** All previous runs (v8, v9, v10_multi_dispatch_100) have **no**
+`train_episode.csv` or `eval.csv` — their training curves are unrecoverable. **The `relative_v8`
+run is the first to have full logging**, including:
+- `train_episode.csv` — per-episode summary (standard CSV)
+- `eval.csv` — per-checkpoint evaluation scores
+- `live_status.json` — per-episode atomic JSON (tail-able)
+- `train_tick.jsonl` — per-tick trace (when `TRACE_EVERY` is set)
+
+Any pre-`relative_v8` number in the writeup must come from re-evaluating a checkpoint, not
+from a log.
 
 ---
 
@@ -778,7 +775,7 @@ the basin. Built by three scripts in `infernotactics/src/viz/` — see that dire
 
 ```
 InfernoEnv + RelativeInfernoModel --export_trajectory.py--> trajectories.json --\
-                                                                                 build_player.py --> Simulation3D.html
+                                                                                build_player.py --> Simulation3D.html
 grid_static.npy --render_basemap.py--> terrain texture ------------------------/
 ```
 
@@ -852,13 +849,55 @@ server that never existed) and is superseded by `Simulation3D.html`.
 
 ## 13. Current next step
 
-1. Complete the **multi-dispatch end-to-end smoke test** (one clean episode).
-2. Run **50 fresh episodes** under synthetic traffic + configurable delays + list-only
-   multi-dispatch. Fresh run tag, **random initialization** (not warm-started), checkpoints
-   every 10 episodes.
-3. Evaluate the final checkpoint on Skull Rock, both named held-out validation points, and
+1. **Complete the 2000-episode training run** under tag `relative_v8` (currently at episode 310+).
+   This is the active run with full logging, auto-resume, and real-time monitoring.
+2. Evaluate the final checkpoint on Skull Rock, both named held-out validation points, and
    **30 random ignition points** — the random sweep is the number that matters.
+3. Compare against the `checkpoints_relative_v10_multi_dispatch_100` (ep100) checkpoint to
+   measure improvement from continued training.
 
-Cheap parallel win: evaluate the never-measured `checkpoints_relative_v8_500/episode_0060.pt`
+**Cheap parallel win:** evaluate the never-measured `checkpoints_relative_v8_500/episode_0060.pt`
 on the same 30-point sweep against the shipped ep10. Same env, same 8-scalar interface, no
 training required. If ep60 beats −244.6, the release gets better for free.
+
+---
+
+## 14. Training loop upgrades (recently done)
+
+### Real-time logging (`src/train/progress.py`)
+
+New module providing `EpisodeProgress` — a stateful real-time training monitor.
+
+**Terminal widget (rich Live):**
+- Progress bar with ETA, episodes/sec, elapsed time
+- Rolling window stats (default 50 episodes): reward (mean/min/max), destroyed, containment %, entropy, grad_norm, noop ticks
+- Reward sparkline: inline bar chart of recent rewards
+- Evaluation table with Δ vs previous checkpoint per scenario (green=improvement, red=regression)
+- Graceful fallback to plain `print` when stdout isn't a TTY or `rich` missing
+
+**Tail file (`live_status.json`):**
+- Written atomically (`.tmp` → `os.replace`) per episode to `logs/runs/<RUN_TAG>/live_status.json`
+- Tailable via `Get-Content -Wait` or `tail -f`
+- Contains: rolling stats, sparkline values, eval history, last episode summary, eta, eps/sec
+
+**Env vars:**
+
+| Var | Default | Description |
+|---|---|---|
+| `INFERNO_PROGRESS_ENABLED` | `1` | Set `0` to disable rich panel |
+| `INFERNO_ROLLING_WINDOW` | `50` | Episodes in rolling stats window |
+| `INFERNO_PROGRESS_START` | `1` | Starting episode for resume |
+
+### Checkpoint resume
+
+`main()` now loads `checkpoints_<RUN_TAG>/latest.pt` if it exists. The starting episode
+is set via `INFERNO_PROGRESS_START` (default 1). Re-running with the same `INFERNO_RUN_TAG`
+resumes training from the last saved state (loads weights, continues learning).
+
+### DirectML GPU support
+
+- `get_device(force_cpu=False)` auto-detects DirectML (`privateuseone:0`) via
+  `torch_directml`, or CUDA if available, then CPU as last resort.
+- Training **forces CPU** (`force_cpu=True`) because DirectML's autograd doesn't support
+  `torch.gather` scatter operations needed by the relative model's backward pass.
+- Inference (`eval_relative.py`) can use DirectML by default.
