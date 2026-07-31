@@ -1065,11 +1065,17 @@ class InfernoEnv:
                 d_info = self._try_dispatch(resource_type, target_zone)
                 reward += d_info["reward_delta"]
                 dispatch_infos.append(d_info)
+        dispatch_cost_total = sum(
+            DISPATCH_COST[d["resource_type"]] for d in dispatch_infos if d["status"] == "dispatched"
+        )
 
         wind_speed, wind_direction, humidity = self._weather_schedule(self.tick_count)
         self._last_weather = (wind_speed, wind_direction, humidity)
 
         before_state = self.sim.state.copy()
+        # v11 trench-hold bonus uses pre_trench_mask: cells protected
+        # (ignitability <= 0) and still Safe/Fuel at the START of this tick.
+        pre_trench_mask = (self.sim.ignitability <= 0) & np.isin(before_state, (SAFE, FUEL))
         self.sim.step(wind_speed_mph=wind_speed, wind_direction_deg=wind_direction, humidity_pct=humidity)
         destroy_reward, n_destroyed, n_destroyed_evacuated, destruction_events = \
             self._score_building_destruction(before_state)
@@ -1097,8 +1103,8 @@ class InfernoEnv:
             "dispatch_cost": -float(dispatch_cost_total),
             "trench_bonus": float(trench_bonus),
             "buildings_destroyed": float(destroy_reward),
-            "travel_delay": float(sum(d["reward_delta"] for d in dispatch_info)),
-            "wasted": float(-RESOURCE_WASTED_PENALTY * sum(1 for d in dispatch_info if d["status"] != "dispatched")),
+            "travel_delay": float(sum(d["reward_delta"] for d in dispatch_infos)),
+            "wasted": float(-RESOURCE_WASTED_PENALTY * sum(1 for d in dispatch_infos if d["status"] != "dispatched")),
         }
         # Fire-extinguished component comes from _advance_resources (already in
         # `reward`).  Capture it by reading the diff of resource events.

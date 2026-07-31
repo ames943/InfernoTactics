@@ -54,10 +54,16 @@ class RelativeInfernoModel(nn.Module):
         value = self.value_head(hidden)
 
         # target_zones: (B, resources, candidates); invalid candidates use -1.
+        # Gather target-zone features with a one-hot matmul instead of
+        # torch.gather: DirectML's scatter-backward can't handle a gather
+        # whose index dim (candidates) differs from the input dim (zones),
+        # while a (B,R,C,Z) @ (B,R,Z,F) matmul is fully supported.
         safe_zones = target_zones.clamp(min=0)
-        zone_features = zone_pooled.unsqueeze(1).expand(-1, self.n_resources, -1, -1)
-        safe_zones = safe_zones.unsqueeze(-1).expand(-1, -1, -1, zone_features.shape[-1])
-        zone_features = torch.gather(zone_features, 2, safe_zones)
+        n_zones = zone_pooled.shape[2]
+        zone_ids = torch.arange(n_zones, device=grid.device)
+        onehot_zones = (safe_zones.unsqueeze(-1) == zone_ids).float()
+        zone_pooled = zone_pooled.unsqueeze(1).expand(-1, self.n_resources, -1, -1)
+        zone_features = torch.matmul(onehot_zones, zone_pooled)
         global_features = mlp_features.unsqueeze(1).unsqueeze(1).expand(
             -1, self.n_resources, target_features.shape[2], -1
         )

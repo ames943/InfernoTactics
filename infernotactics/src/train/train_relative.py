@@ -109,6 +109,23 @@ def get_device(force_cpu: bool = False):
     return torch.device("cpu")
 
 
+def _categorical_log_prob(logits, value):
+    """log_prob for a Categorical without torch.gather. DirectML can't
+    backprop through gather when the sampled dim sizes differ, so select
+    the sampled entry with a one-hot dot product instead."""
+    logp = F.log_softmax(logits, dim=-1)
+    onehot = torch.zeros(logp.shape[-1], dtype=logp.dtype, device=logp.device)
+    onehot[value.to(device=logp.device).long()] = 1.0
+    return torch.dot(logp, onehot)
+
+
+def _categorical_entropy(logits):
+    """Shannon entropy of a Categorical logits vector, gather-free."""
+    p = F.softmax(logits, dim=-1)
+    logp = F.log_softmax(logits, dim=-1)
+    return -(p * logp).sum(-1)
+
+
 
 N_EPISODES = int(os.environ.get("INFERNO_N_EPISODES", 2000))
 BASE_SEED = 8200
@@ -124,6 +141,7 @@ TRACE_EVERY = int(os.environ.get("INFERNO_TRACE_EVERY", 0))
 PROGRESS_ENABLED = os.environ.get("INFERNO_PROGRESS_ENABLED", "1") != "0"
 PROGRESS_START = int(os.environ.get("INFERNO_PROGRESS_START", 1))
 PROGRESS_WINDOW = int(os.environ.get("INFERNO_ROLLING_WINDOW", 50))
+FORCE_CPU = os.environ.get("INFERNO_FORCE_CPU", "0") != "0"
 
 print(f"[relative_v10] N_EPISODES={N_EPISODES} LEARNING_RATE={LEARNING_RATE} "
       f"AUX_TARGET_LOSS_COEFF={AUX_TARGET_LOSS_COEFF} STATUS_EVERY={STATUS_EVERY} EVAL_EVERY={EVAL_EVERY} "
@@ -248,13 +266,11 @@ def update_policy(model, optimizer, steps, device, normalizer):
             resource_logits = logits["resource_type"][0].clone()
             resource_mask = torch.from_numpy(action_data["resource_mask"]).to(device)
             resource_logits[~resource_mask] = -1e9
-            resource_dist = Categorical(logits=resource_logits)
-            target_dist = Categorical(logits=logits["target"][0, resource_idx])
-            log_prob = log_prob + resource_dist.log_prob(torch.tensor(resource_idx, device=device)) \
-                + target_dist.log_prob(torch.tensor(target_idx, device=device))
-            entropy = entropy + target_dist.entropy()
-            target_entropy = target_entropy + target_dist.entropy()
-            resource_entropy = resource_entropy + resource_dist.entropy()
+            log_prob = log_prob + _categorical_log_prob(resource_logits, torch.tensor(resource_idx, device=device)) \
+                + _categorical_log_prob(logits["target"][0, resource_idx], torch.tensor(target_idx, device=device))
+            entropy = entropy + _categorical_entropy(logits["target"][0, resource_idx])
+            target_entropy = target_entropy + _categorical_entropy(logits["target"][0, resource_idx])
+            resource_entropy = resource_entropy + _categorical_entropy(resource_logits)
             aux_idx = _aux_target(resource_idx, target_zones_np)
             aux_loss = aux_loss + F.cross_entropy(
                 logits["target"][0, resource_idx].unsqueeze(0),
@@ -342,7 +358,7 @@ def save_checkpoint(model, episode):
 
 
 def main():
-    device = get_device(force_cpu=True)
+    device = get_device(force_cpu=FORCE_CPU)
     env = InfernoEnv(seed=BASE_SEED)
     obs = env.reset(seed=BASE_SEED)
     model = RelativeInfernoModel(len(obs["grid"]), len(SCALAR_KEYS), len(RESOURCE_TYPES), env.n_zones).to(device)
