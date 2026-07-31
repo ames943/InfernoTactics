@@ -1,0 +1,10 @@
+checkpoint_episode,scenario,ignition_row,ignition_col,evaluation_seed,avg_reward,avg_buildings_destroyed,containment_rate,avg_ticks,dispatch_attempts,successful_dispatches,wasted_dispatches,mean_actions_per_tick,water_team_dispatches,trench_crew_dispatches,rescue_vehicle_dispatches,helicopter_dispatches
+300,anchor,207,222,8200,-109883.0087596406,337.5,0.0,,,,,,,,,
+300,mandeville_canyon,57,371,8200,-26245.44604284221,55.5,0.0,,,,,,,,,
+300,getty_view_park,162,451,8200,-129.67668818172223,0.0,1.0,,,,,,,,,
+350,anchor,207,222,8200,-110001.88617346689,339.0,0.0,,,,,,,,,
+350,mandeville_canyon,57,371,8200,-25109.955635440383,56.5,0.0,,,,,,,,,
+350,getty_view_park,162,451,8200,-129.67668818172223,0.0,1.0,,,,,,,,,
+400,anchor,207,222,8200,-109681.54064325971,338.0,0.0,,,,,,,,,
+400,mandeville_canyon,57,371,8200,-25109.955635440383,56.5,0.0,,,,,,,,,
+400,getty_view_park,162,451,8200,-129.67668818172223,0.0,1.0,,,,,,,,,
