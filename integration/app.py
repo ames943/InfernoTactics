@@ -368,6 +368,21 @@ class UnitTracker:
                 uid = f"{rtype}:{i}"
                 self.unit_ids[(rtype, i)] = uid
 
+    def _get_target_latlon(self, env, zone_idx):
+        import numpy as np
+        zone = env.zones[zone_idx]
+        r0, r1 = zone["row_range"]
+        c0, c1 = zone["col_range"]
+        
+        region = env.sim.state[r0:r1, c0:c1]
+        active = np.argwhere((region == THREAT) | (region == BLAZE))
+        if len(active) > 0:
+            fire_r = r0 + active[:, 0].mean()
+            fire_c = c0 + active[:, 1].mean()
+            return grid_to_latlon(fire_r, fire_c, self.meta)
+        else:
+            return grid_to_latlon(zone["centroid_row"], zone["centroid_col"], self.meta)
+
     def snapshot(self, env):
         """Return unit positions for the current tick."""
         units = []
@@ -387,10 +402,7 @@ class UnitTracker:
                 elif state == "move":
                     # Interpolate along route
                     if unit["target_zone"] is not None:
-                        zone = env.zones[unit["target_zone"]]
-                        target_lat, target_lon = grid_to_latlon(
-                            zone["centroid_row"], zone["centroid_col"], self.meta
-                        )
+                        target_lat, target_lon = self._get_target_latlon(env, unit["target_zone"])
                         # Progress fraction
                         total_ticks = unit.get("pending_travel_ticks", 1) or 1
                         remaining = unit["remaining_ticks"]
@@ -412,10 +424,7 @@ class UnitTracker:
                 elif state in ("setup", "work"):
                     # At target zone
                     if unit["target_zone"] is not None:
-                        zone = env.zones[unit["target_zone"]]
-                        target_lat, target_lon = grid_to_latlon(
-                            zone["centroid_row"], zone["centroid_col"], self.meta
-                        )
+                        target_lat, target_lon = self._get_target_latlon(env, unit["target_zone"])
                         lat, lon = target_lat, target_lon
                         alt = 80 if rtype == "helicopter" else 0
                     else:

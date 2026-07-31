@@ -725,6 +725,23 @@
       Object.values(unitEntities).forEach(e => viewer.entities.remove(e));
       unitEntities = {};
       
+      const igStar = viewer.entities.getById('ignition-star');
+      if (igStar) viewer.entities.remove(igStar);
+      
+      if (timelineData && timelineData.scenario && timelineData.scenario.ignition) {
+        viewer.entities.add({
+          id: 'ignition-star',
+          position: Cesium.Cartesian3.fromDegrees(timelineData.scenario.ignition.lon, timelineData.scenario.ignition.lat, 10),
+          point: {
+            pixelSize: 20,
+            color: Cesium.Color.YELLOW,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        });
+      }
+      
       // Load initial fire
       const initFire = timelineData.initial_fire;
       initFire.forEach(([idx, state]) => {
@@ -778,7 +795,8 @@
       // Interpolate unit positions for smooth movement
       if (currentTick < frames) {
         const td = timelineData.ticks[currentTick];
-        renderUnits(td.units);
+        const tdNext = currentTick + 1 < frames ? timelineData.ticks[currentTick + 1] : td;
+        renderUnits(td.units, tdNext.units, fraction);
       }
     }
     
@@ -813,7 +831,8 @@
       
       let changed = false;
       fireDel.forEach(idx => {
-        activeFireState.delete(idx);
+        // Visual hack: show extinguished fire as burned out instead of leaving a phantom red square
+        activeFireState.set(idx, states.burned);
         changed = true;
       });
       fireAdd.forEach(([idx, state]) => {
@@ -872,18 +891,27 @@
       }
       
       activeFireState.forEach((state, idx) => {
-        let targetColor;
-        if (state === states.threat) targetColor = colThreat;
-        else if (state === states.blaze) targetColor = colBlaze;
-        else if (state === states.burned) targetColor = colBurned;
-        else return;
+        let targetMaterial;
+        if (state === states.threat) {
+          targetMaterial = new Cesium.ColorMaterialProperty(colThreat);
+        } else if (state === states.blaze) {
+          // Pulsing animation for active fire
+          targetMaterial = new Cesium.ColorMaterialProperty(new Cesium.CallbackProperty((time, result) => {
+            const osc = (Math.sin(performance.now() / 150) + 1) / 2; // 0 to 1
+            const alpha = 0.6 + 0.4 * osc; // 0.6 to 1.0
+            return Cesium.Color.fromCssColorString('#d62728').withAlpha(alpha * 0.9);
+          }, false));
+        } else if (state === states.burned) {
+          targetMaterial = new Cesium.ColorMaterialProperty(colBurned);
+        } else return;
         
         let entity = fireEntities.get(idx);
         
         if (entity) {
-          // If entity exists, update material if changed
-          if (!Cesium.Color.equals(entity.polygon.material.color.getValue(), targetColor)) {
-            entity.polygon.material = targetColor;
+          // If entity exists, update material if state changed
+          if (entity.fireState !== state) {
+            entity.polygon.material = targetMaterial;
+            entity.fireState = state;
           }
         } else {
           // Create new draped polygon entity
@@ -903,10 +931,11 @@
           entity = viewer.entities.add({
             polygon: {
               hierarchy: Cesium.Cartesian3.fromDegreesArray([...p1, ...p2, ...p3, ...p4]),
-              material: targetColor,
+              material: targetMaterial,
               classificationType: Cesium.ClassificationType.BOTH
             }
           });
+          entity.fireState = state;
           
           fireEntities.set(idx, entity);
         }
@@ -920,8 +949,13 @@
       'rescue_vehicle': Cesium.Color.LIME
     };
     
-    function renderUnits(units) {
+    function renderUnits(units, nextUnits, fraction = 0) {
       if (!units) return;
+      
+      const nextMap = {};
+      if (nextUnits) {
+        nextUnits.forEach(u => nextMap[u.u] = u);
+      }
       
       // Track which IDs were seen
       const seen = new Set();
@@ -930,43 +964,91 @@
         seen.add(u.u);
         const rtype = u.u.split(':')[0];
         
+        let lon = u.lon;
+        let lat = u.lat;
+        let alt = u.alt;
+        
+        const nextU = nextMap[u.u];
+        if (nextU) {
+           lon = u.lon + (nextU.lon - u.lon) * fraction;
+           lat = u.lat + (nextU.lat - u.lat) * fraction;
+           alt = u.alt + (nextU.alt - u.alt) * fraction;
+        }
+        
         if (!unitEntities[u.u]) {
+          const isHeli = rtype === 'helicopter';
+          const uri = isHeli ? 
+            'https://sandcastle.cesium.com/SampleData/models/CesiumAir/Cesium_Air.glb' : 
+            'https://sandcastle.cesium.com/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb';
+            
           // Create entity
           unitEntities[u.u] = viewer.entities.add({
             id: u.u,
-            position: Cesium.Cartesian3.fromDegrees(u.lon, u.lat, u.alt),
-            point: {
-              pixelSize: 12,
-              color: UNIT_COLORS[rtype] || Cesium.Color.WHITE,
-              outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 2,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            position: new Cesium.CallbackProperty(() => unitEntities[u.u]._currentPosition, false),
+            orientation: new Cesium.CallbackProperty(() => unitEntities[u.u]._currentOrientation, false),
+            model: {
+              uri: uri,
+              scale: isHeli ? 0.3 : 1.5,
+              minimumPixelSize: 48,
+              maximumScale: 200,
             },
             label: {
-              text: rtype === 'helicopter' ? '🚁' : (rtype === 'water_team' ? '🚒' : '🚜'),
+              text: isHeli ? '🚁' : (rtype === 'water_team' ? '🚒' : '🚜'),
               font: '20px sans-serif',
-              pixelOffset: new Cesium.Cartesian2(0, -20),
+              pixelOffset: new Cesium.Cartesian2(0, -40),
               disableDepthTestDistance: Number.POSITIVE_INFINITY
             }
           });
-        } else {
-          // Update position
-          unitEntities[u.u].position = Cesium.Cartesian3.fromDegrees(u.lon, u.lat, u.alt);
+          unitEntities[u.u]._currentPosition = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+          unitEntities[u.u]._currentOrientation = Cesium.Quaternion.IDENTITY;
+        } 
+        
+        const e = unitEntities[u.u];
+        const oldPosCarto = Cesium.Cartographic.fromCartesian(e._currentPosition);
+        const newPos = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+        
+        if (Math.abs(lon - Cesium.Math.toDegrees(oldPosCarto.longitude)) > 0.000001 || 
+            Math.abs(lat - Cesium.Math.toDegrees(oldPosCarto.latitude)) > 0.000001) {
+            
+            const dLon = lon - Cesium.Math.toDegrees(oldPosCarto.longitude);
+            const dLat = lat - Cesium.Math.toDegrees(oldPosCarto.latitude);
+            const heading = Math.atan2(dLon, dLat); // Cesium uses radians from North (0) towards East (pi/2)
+            const hpr = new Cesium.HeadingPitchRoll(heading, 0, 0);
+            e._currentOrientation = Cesium.Transforms.headingPitchRollQuaternion(newPos, hpr);
         }
+        e._currentPosition = newPos;
         
         // Update styling based on state
-        const e = unitEntities[u.u];
         if (u.s === 'idle') {
-          e.point.color = Cesium.Color.GRAY;
           e.show = false; // Hide idle units at station
-        } else if (u.s === 'move') {
-          e.point.color = Cesium.Color.YELLOW;
-          e.show = true;
-        } else if (u.s === 'work') {
-          e.point.color = UNIT_COLORS[rtype];
-          e.show = true;
         } else {
           e.show = true;
+        }
+        
+        // Retardant/Water Drop visual
+        if (u.s === 'work') {
+          if (!e.polyline) {
+             const isHeli = rtype === 'helicopter';
+             e.polyline = {
+               positions: new Cesium.CallbackProperty(() => {
+                 const pos = e.position.getValue(viewer.clock.currentTime);
+                 if (!pos) return [];
+                 const carto = Cesium.Cartographic.fromCartesian(pos);
+                 // Drop goes from unit to ground
+                 const ground = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 0);
+                 return [pos, ground];
+               }, false),
+               width: 8,
+               material: new Cesium.PolylineGlowMaterialProperty({
+                 glowPower: 0.2,
+                 color: isHeli ? Cesium.Color.RED : Cesium.Color.CYAN
+               })
+             };
+          }
+        } else {
+          if (e.polyline) {
+            e.polyline = undefined;
+          }
         }
       });
       
