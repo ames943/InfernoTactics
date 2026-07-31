@@ -1,0 +1,27 @@
+/Users/lin/Library/CloudStorage/GoogleDrive-leolin1625@gmail.com/My Drive/VS Code/InfernoTactics/integration/app.py:723: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [49991]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8000): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+[startup] Initializing InfernoEnv (Dijkstra routing)...
+[InfernoEnv] Loading + preparing road routing graph from /Users/lin/Library/CloudStorage/GoogleDrive-leolin1625@gmail.com/My Drive/VS Code/InfernoTactics/infernotactics/data/roads.graphml ...
+[startup] InfernoEnv ready in 2.0s
+[startup] Loading checkpoint: /Users/lin/Library/CloudStorage/GoogleDrive-leolin1625@gmail.com/My Drive/VS Code/InfernoTactics/infernotactics/models/checkpoints_relative_v10_multi_dispatch_100/latest.pt
+[startup] Model loaded, strict=True passed
+[startup] Computing zone geometry, coverage, delays...
+[startup] Fetching ALERTCalifornia cameras for coverage...
+[startup] Built 81 camera FOV polygons.
+[startup] Computing dense pixel coverage grid (50x50)...
+[startup] Built 81 camera FOV polygons.
+[startup] Zone 18: delay=1, coverage=1.0, ground_reachable=True
+[startup] Zone 31: delay=4, coverage=0.7
+[startup] Zone 16: delay=1, coverage=1.0
+[startup] Ready.

@@ -673,7 +673,7 @@ def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100):
             break
 
     # Compute ignition lat/lon
-    ig_row, ig_col = TRAINING_IGNITION_POINT
+    ig_row, ig_col = ig_point
     ig_lat, ig_lon = grid_to_latlon(ig_row, ig_col, env.meta)
     ig_zone = (ig_row // ZONE_SIZE_CELLS) * 8 + (ig_col // ZONE_SIZE_CELLS)
 
@@ -848,7 +848,12 @@ async def startup():
 async def serve_index():
     html_path = os.path.join(CURRENT_DIR, "Simulation.html")
     with open(html_path, "r") as f:
-        return f.read()
+        content = f.read()
+    return HTMLResponse(content=content, headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    })
 
 
 @app.get("/world")
