@@ -268,16 +268,19 @@ def compute_zone_data(env):
         # Coverage based on ALERTCalifornia camera intersections
         poly_shapely = Polygon([(c[1], c[0]) for c in corners])
         cov_count = sum(1 for cam_poly in cam_polys if cam_poly.intersects(poly_shapely))
-        
-        # Mapping rules from Response_delay script
-        if cov_count >= 11:
-            cov = 1.0     # Green
-        elif 9 <= cov_count <= 10:
-            cov = 0.75    # Yellow
-        elif 5 <= cov_count <= 8:
-            cov = 0.40    # Orange
+        # Mapping rules from Response_delay script (shifted scale)
+        if cov_count >= 14:
+            cov = 1.0      # Purple
+        elif cov_count == 13:
+            cov = 0.9      # Blue
+        elif cov_count == 12:
+            cov = 0.8      # Green
+        elif cov_count == 11:
+            cov = 0.7      # Yellow
+        elif cov_count == 10:
+            cov = 0.4      # Orange
         else:
-            cov = 0.15    # Red (Max delay)
+            cov = 0.15     # Red
 
         # Delay (realistic: worse coverage → longer hold)
         delay = round(MIN_DELAY_TICKS + (1.0 - cov) * (MAX_DELAY_TICKS - MIN_DELAY_TICKS))
@@ -301,9 +304,10 @@ def compute_zone_data(env):
             "polygon": [[lat, lon] for lat, lon in corners],
             "centroid": list(centroid),
             "best_arrival_s": round(ba, 1),
-            "coverage": round(cov, 2),
+            "coverage": cov,
             "delay_ticks": delay,
-            "ground_reachable": ground_reachable,
+            "cam_count": cov_count,
+            "ground_reachable": ba < 1e5,
             "building_cells": zone["building_cells"],
             "is_water": zone["is_water"],
             "travel_times": per_type,
@@ -709,7 +713,7 @@ def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100):
 
 @app.on_event("startup")
 async def startup():
-    global env, model, transformer_to_wgs84, world_cache
+    global env, model, transformer_to_wgs84, transformer_from_wgs84, world_cache
 
     print("[startup] Initializing InfernoEnv (Dijkstra routing)...")
     t0 = time.time()
@@ -740,6 +744,53 @@ async def startup():
     zones_data, travel_lo, travel_hi = compute_zone_data(env)
     stations_data = compute_station_data(env)
 
+    # Pre-compute the 50x50 pixel heatmap grid for the UI
+    print("[startup] Computing dense pixel coverage grid (50x50)...")
+    import numpy as np
+    from shapely.geometry import Polygon
+    from shapely.strtree import STRtree
+    
+    ROWS, COLS = 50, 50
+    # Generate 51x51 corner points that perfectly follow the tilted simulation grid
+    grid_pts = []
+    for r in range(ROWS + 1):
+        row_pts = []
+        env_r = min(int(r * env.height / ROWS), env.height - 1)
+        if r == ROWS: env_r = env.height - 1
+        
+        for c in range(COLS + 1):
+            env_c = min(int(c * env.width / COLS), env.width - 1)
+            if c == COLS: env_c = env.width - 1
+            
+            lat, lon = grid_to_latlon(env_r, env_c, env.meta)
+            row_pts.append((lon, lat)) # shapely uses (x, y) = (lon, lat)
+        grid_pts.append(row_pts)
+    
+    # Re-fetch cameras to build tree for this operation
+    try:
+        cam_polys = fetch_camera_polygons()
+        tree = STRtree(cam_polys)
+    except Exception as e:
+        print(f"Error fetching cameras for dense grid: {e}")
+        cam_polys = []
+        tree = None
+
+    pixel_grid = []
+    if tree is not None:
+        for r in range(ROWS):
+            row_counts = []
+            for c in range(COLS):
+                # Cell corners in CCW order
+                p1 = grid_pts[r][c]
+                p2 = grid_pts[r][c+1]
+                p3 = grid_pts[r+1][c+1]
+                p4 = grid_pts[r+1][c]
+                cell = Polygon([p1, p2, p3, p4])
+                possible_matches = tree.query(cell)
+                count = sum(1 for idx in possible_matches if cam_polys[idx].intersects(cell))
+                row_counts.append(count)
+            pixel_grid.append(row_counts)
+    
     world_cache = {
         "grid": {
             "width": env.width,
@@ -749,6 +800,7 @@ async def startup():
             "zone_cols": 8,
             "zone_size_cells": ZONE_SIZE_CELLS,
             "corners": GRID_CORNERS,
+            "transform": env.meta.get("transform"),
         },
         "zones": zones_data,
         "stations": stations_data,
@@ -762,6 +814,12 @@ async def startup():
             "resource_types": list(RESOURCE_TYPES),
             "roster": dict(RESOURCE_COUNTS),
         },
+        "pixel_coverage": {
+            "rows": ROWS,
+            "cols": COLS,
+            "points": grid_pts,
+            "grid": pixel_grid
+        }
     }
 
     # Verify delay mapping

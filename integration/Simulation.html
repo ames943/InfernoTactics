@@ -285,11 +285,14 @@
   <!-- Temporary Selection Legend -->
   <div id="selection-legend" class="panel" style="display: none; position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); width: 450px; z-index: 100; pointer-events: none;">
     <h3 style="text-align: center; margin-bottom: 12px; color: #fff;">Sector Response Delay (Documentation Coverage)</h3>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold;">
-      <span style="font-size: 0.85rem; color: #ff3333;">Poor Coverage = 12hr AI Delay</span>
-      <span style="font-size: 0.85rem; color: #33cc33;">Good Coverage = 1hr AI Delay</span>
+    <div style="display: flex; flex-direction: column; gap: 4px; padding: 0 20px;">
+      <div style="display: flex; justify-content: space-between;"><span style="color: #ef4444; font-weight: bold;">■ Red (≤ 9 Cams)</span> <span style="color: #ddd;">Max Delay (12hr)</span></div>
+      <div style="display: flex; justify-content: space-between;"><span style="color: #f97316; font-weight: bold;">■ Orange (10 Cams)</span> <span style="color: #ddd;">Long Delay (8hr)</span></div>
+      <div style="display: flex; justify-content: space-between;"><span style="color: #facc15; font-weight: bold;">■ Yellow (11 Cams)</span> <span style="color: #ddd;">Medium Delay (6hr)</span></div>
+      <div style="display: flex; justify-content: space-between;"><span style="color: #22c55e; font-weight: bold;">■ Green (12 Cams)</span> <span style="color: #ddd;">Short Delay (4hr)</span></div>
+      <div style="display: flex; justify-content: space-between;"><span style="color: #3b82f6; font-weight: bold;">■ Blue (13 Cams)</span> <span style="color: #ddd;">Quick Delay (2hr)</span></div>
+      <div style="display: flex; justify-content: space-between;"><span style="color: #a855f7; font-weight: bold;">■ Purple (14+ Cams)</span> <span style="color: #ddd;">Immediate (1hr)</span></div>
     </div>
-    <div style="height: 16px; border-radius: 8px; background: linear-gradient(to right, rgba(255,51,51,0.6), rgba(204,204,51,0.6), rgba(51,204,51,0.6)); border: 1px solid rgba(255,255,255,0.3);"></div>
   </div>
 
   <!-- Delay Banner -->
@@ -328,7 +331,7 @@
     
     // Rendering collections
     let gridPolygons = [];
-    let firePoints;
+    let fireEntities = new Map();
     let unitEntities = {};
     let activeFireState = new Map(); // cellIdx -> state
 
@@ -358,6 +361,18 @@
         sceneModePicker: false,
         infoBox: false,
         selectionIndicator: false
+      });
+
+      // Set default camera view immediately to prevent the whole earth from showing up
+      const centerLon = (worldData.grid.corners.nw[1] + worldData.grid.corners.se[1]) / 2;
+      const centerLat = (worldData.grid.corners.nw[0] + worldData.grid.corners.se[0]) / 2;
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - 0.1, 8000),
+        orientation: {
+          heading: Cesium.Math.toRadians(11), // Grid is rotated ~11 deg
+          pitch: Cesium.Math.toRadians(-35),
+          roll: 0
+        }
       });
 
       const padding = 0.05; // ~5km padding to ensure rotated grid is not cut off
@@ -472,8 +487,8 @@
       // 5. Draw Zones
       drawZones();
       
-      // 6. Setup fire collections
-      firePoints = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+      // Initialize collections
+      // Fire entities managed dynamically
       
       // 7. Go Home
       goHome();
@@ -490,41 +505,18 @@
         const pts = [];
         z.polygon.forEach(p => { pts.push(p[1], p[0]); }); // lon, lat
         
-        // Coverage color
-        // coverage: 1.0 (good) -> green, 0.0 (bad) -> red
-        const c = z.coverage;
-        const color = new Cesium.Color(1.0 - c, c * 0.8, 0.2, 0.55); // increased alpha so it's clearly visible
-        const outlineColor = new Cesium.Color(1.0 - c, c * 0.8, 0.2, 0.8);
+        const outlineColor = Cesium.Color.fromCssColorString("#00ff00").withAlpha(0.9);
         
-        // Polygon fill shading based on response delay (coverage)
-        const instance = new Cesium.GeometryInstance({
-          geometry: new Cesium.PolygonGeometry({
-            polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(pts)),
-            height: 0
-          }),
-          attributes: {
-            color: Cesium.ColorGeometryInstanceAttribute.fromColor(color)
-          }
-        });
-        
-        const shadingPrim = viewer.scene.primitives.add(new Cesium.GroundPrimitive({
-          geometryInstances: instance,
-          appearance: new Cesium.PerInstanceColorAppearance({ closed: true }),
-          show: false // Hide initially until selection mode
-        }));
-        zoneShadingPrimitives.push(shadingPrim);
-
-        // Add outline polyline (GroundPrimitives don't support true outlines well)
+        // Add macro sector outline polyline (no fill for macro zones now)
         viewer.entities.add({
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArray([...pts, pts[0], pts[1]]),
-            width: 2,
+            width: 2.5,
             material: outlineColor,
             clampToGround: true,
             classificationType: Cesium.ClassificationType.TERRAIN
           }
         });
-        
         // Add label
         let text = `S${z.id}`;
         if (z.id === 18) text += "\
@@ -544,6 +536,54 @@
           }
         });
       });
+      
+      // Draw dense 50x50 pixel coverage grid if available
+      const pc = worldData.pixel_coverage;
+      if (pc && pc.grid && pc.points) {
+        const instances = [];
+        for (let r = 0; r < pc.rows; r++) {
+          for (let c = 0; c < pc.cols; c++) {
+            const count = pc.grid[r][c];
+            let hexColor = "#ef4444"; // Red (≤ 9)
+            if (count >= 14) hexColor = "#a855f7"; // Purple
+            else if (count === 13) hexColor = "#3b82f6"; // Blue
+            else if (count === 12) hexColor = "#22c55e"; // Green
+            else if (count === 11) hexColor = "#facc15"; // Yellow
+            else if (count === 10) hexColor = "#f97316"; // Orange
+
+            const color = Cesium.Color.fromCssColorString(hexColor).withAlpha(0.40); // Soft alpha for pixel grid
+            
+            const p1 = pc.points[r][c];
+            const p2 = pc.points[r][c+1];
+            const p3 = pc.points[r+1][c+1];
+            const p4 = pc.points[r+1][c];
+            
+            const pts = [
+              p1[0], p1[1],
+              p2[0], p2[1],
+              p3[0], p3[1],
+              p4[0], p4[1]
+            ];
+            
+            instances.push(new Cesium.GeometryInstance({
+              geometry: new Cesium.PolygonGeometry({
+                polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(pts)),
+                height: 0
+              }),
+              attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color)
+              }
+            }));
+          }
+        }
+        
+        const shadingPrim = viewer.scene.primitives.add(new Cesium.GroundPrimitive({
+          geometryInstances: instances,
+          appearance: new Cesium.PerInstanceColorAppearance({ closed: true }),
+          show: false // Hide initially until selection mode
+        }));
+        zoneShadingPrimitives.push(shadingPrim);
+      }
     }
 
     function goHome() {
@@ -678,7 +718,8 @@
       if (playbackRAF) cancelAnimationFrame(playbackRAF);
       
       // Reset state
-      firePoints.removeAll();
+      fireEntities.forEach(e => viewer.entities.remove(e));
+      fireEntities.clear();
       activeFireState.clear();
       document.getElementById('policy-log').innerHTML = '';
       Object.values(unitEntities).forEach(e => viewer.entities.remove(e));
@@ -699,7 +740,7 @@
       if (delayInfo.ticks > 0) {
         const b = document.getElementById('delay-banner');
         document.getElementById('delay-desc').textContent = delayInfo.reason;
-        b.classList.add('show');
+        // b.classList.add('show'); // User requested to hide AI held back message
       }
       
       playbackRAF = requestAnimationFrame(playbackLoop);
@@ -810,52 +851,65 @@
     }
     
     function renderFireFull() {
-      firePoints.removeAll();
       const meta = worldData.grid;
       const w = meta.width;
-      
-      const states = worldData.meta.states;
-      const colThreat = Cesium.Color.fromCssColorString('#ff7f0e');
-      const colBlaze = Cesium.Color.fromCssColorString('#d62728');
-      const colBurned = Cesium.Color.fromCssColorString('#3a2a20');
-      
-      // Extract affine
-      const [a, b, c, d, e, f_aff] = worldData.grid.transform || [meta.cell_size_m, 0, meta.corners.nw[1], 0, -meta.cell_size_m, meta.corners.nw[0]]; 
-      
+      const h = meta.height;
       const cw = meta.corners;
       
-      activeFireState.forEach((state, idx) => {
-        const row = Math.floor(idx / w);
-        const col = idx % w;
-        
-        // Exact bilinear interpolation to handle the 13.4-degree geographic rotation!
-        const u = col / w;
-        const v = row / meta.height;
-        
+      const states = worldData.meta.states;
+      const colThreat = Cesium.Color.fromCssColorString('#ff7f0e').withAlpha(0.6);
+      const colBlaze = Cesium.Color.fromCssColorString('#d62728').withAlpha(0.85);
+      const colBurned = Cesium.Color.fromCssColorString('#3a2a20').withAlpha(0.75); // Dark gray for burned
+      
+      function getCellPoint(u, v) {
         const latNorth = cw.nw[0] * (1 - u) + cw.ne[0] * u;
         const lonNorth = cw.nw[1] * (1 - u) + cw.ne[1] * u;
-        
         const latSouth = cw.sw[0] * (1 - u) + cw.se[0] * u;
         const lonSouth = cw.sw[1] * (1 - u) + cw.se[1] * u;
-        
         const lat = latNorth * (1 - v) + latSouth * v;
         const lon = lonNorth * (1 - v) + lonSouth * v;
-        
-        let color, size;
-        if (state === states.threat) { color = colThreat; size = 12; }
-        else if (state === states.blaze) { color = colBlaze; size = 15; }
-        else if (state === states.burned) { color = colBurned; size = 10; }
+        return [lon, lat]; // exact corners
+      }
+      
+      activeFireState.forEach((state, idx) => {
+        let targetColor;
+        if (state === states.threat) targetColor = colThreat;
+        else if (state === states.blaze) targetColor = colBlaze;
+        else if (state === states.burned) targetColor = colBurned;
         else return;
         
-        // Subsample burned areas to keep rendering fast
-        if (state === states.burned && Math.random() > 0.2) return;
+        let entity = fireEntities.get(idx);
         
-        firePoints.add({
-          position: Cesium.Cartesian3.fromDegrees(lon, lat),
-          color: color,
-          pixelSize: size,
-          disableDepthTestDistance: 5000 // Don't clip into terrain too easily
-        });
+        if (entity) {
+          // If entity exists, update material if changed
+          if (!Cesium.Color.equals(entity.polygon.material.color.getValue(), targetColor)) {
+            entity.polygon.material = targetColor;
+          }
+        } else {
+          // Create new draped polygon entity
+          const row = Math.floor(idx / w);
+          const col = idx % w;
+          
+          const u1 = col / w;
+          const u2 = (col + 1) / w;
+          const v1 = row / h;
+          const v2 = (row + 1) / h;
+          
+          const p1 = getCellPoint(u1, v1); // NW
+          const p2 = getCellPoint(u2, v1); // NE
+          const p3 = getCellPoint(u2, v2); // SE
+          const p4 = getCellPoint(u1, v2); // SW
+          
+          entity = viewer.entities.add({
+            polygon: {
+              hierarchy: Cesium.Cartesian3.fromDegreesArray([...p1, ...p2, ...p3, ...p4]),
+              material: targetColor,
+              classificationType: Cesium.ClassificationType.BOTH
+            }
+          });
+          
+          fireEntities.set(idx, entity);
+        }
       });
     }
     

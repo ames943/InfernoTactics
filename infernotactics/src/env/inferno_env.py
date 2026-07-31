@@ -520,10 +520,15 @@ def _build_zones(grid_static, meta, zone_size_cells=ZONE_SIZE_CELLS):
 
     zones = []
     zone_id = 0
-    for r0 in range(0, height, zone_size_cells):
-        r1 = min(r0 + zone_size_cells, height)
-        for c0 in range(0, width, zone_size_cells):
-            c1 = min(c0 + zone_size_cells, width)
+    num_rows = 4
+    num_cols = 8
+    
+    for r in range(num_rows):
+        r0 = int(r * height / num_rows)
+        r1 = int((r + 1) * height / num_rows)
+        for c in range(num_cols):
+            c0 = int(c * width / num_cols)
+            c1 = int((c + 1) * width / num_cols)
             zones.append({
                 "zone_id": zone_id,
                 "row_range": (r0, r1),
