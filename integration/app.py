@@ -847,19 +847,11 @@ async def startup():
 
 
 SIMULATION_HTML_PATH = os.path.join(CURRENT_DIR, "Simulation.html")
-SIMULATION_HTML_CONTENT = ""
-for _attempt in range(10):
-    try:
-        with open(SIMULATION_HTML_PATH, "r", encoding="utf-8") as f:
-            SIMULATION_HTML_CONTENT = f.read()
-        if SIMULATION_HTML_CONTENT:
-            break
-    except Exception:
-        time.sleep(0.1)
-
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
-    return HTMLResponse(content=SIMULATION_HTML_CONTENT, headers={
+    with open(SIMULATION_HTML_PATH, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content, headers={
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0"

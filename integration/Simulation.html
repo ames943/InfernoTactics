@@ -658,15 +658,15 @@
       const cw = worldData.grid.corners;
       const centerLon = (cw.nw[1] + cw.se[1]) / 2;
       const centerLat = (cw.nw[0] + cw.se[0]) / 2;
-      flyToTarget(centerLat, centerLon, 12000.0);
+      flyToTarget(centerLat, centerLon, 12000.0, -40.0);
     }
 
     function focusOnIgnition(lat, lon) {
       if (!viewer || lat === undefined || lon === undefined) return;
-      flyToTarget(lat, lon, 9000.0);
+      flyToTarget(lat, lon, 7000.0, -40.0);
     }
 
-    function flyToTarget(lat, lon, range) {
+    function flyToTarget(lat, lon, range = 7000.0, pitchDeg = -40.0) {
       if (!viewer || lat === undefined || lon === undefined) return;
       
       const carto = Cesium.Cartographic.fromDegrees(lon, lat);
@@ -674,11 +674,14 @@
       const targetCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, terrainHeight);
 
       const headingRad = Cesium.Math.toRadians(11.0);
-      const pitchRad = Cesium.Math.toRadians(-45.0);
+      const pitchRad = Cesium.Math.toRadians(pitchDeg);
 
       viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(targetCartesian, 0.0), {
         offset: new Cesium.HeadingPitchRange(headingRad, pitchRad, range),
-        duration: 1.5
+        duration: 1.5,
+        complete: function() {
+          viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        }
       });
     }
     
