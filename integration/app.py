@@ -65,7 +65,7 @@ from pyproj import Transformer  # noqa: E402
 # ---------------------------------------------------------------------------
 CKPT_PATH = os.path.join(
     REPO_ROOT, "infernotactics", "models",
-    "checkpoints_relative_v10_multi_dispatch_100", "latest.pt"
+    "checkpoints_relative_v8", "latest.pt"
 )
 DEVICE = torch.device("cpu")
 
@@ -132,7 +132,7 @@ def fetch_camera_polygons():
     NEARBY_RADIUS_KM = 50.0
     
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, timeout=2)
         resp.raise_for_status()
         raw_cameras = resp.json()
     except Exception as e:
@@ -376,12 +376,27 @@ class UnitTracker:
         
         region = env.sim.state[r0:r1, c0:c1]
         active = np.argwhere((region == THREAT) | (region == BLAZE))
+        
+        # If no active fire in this sector, check for burned out fire so they stay where the fire was
+        if len(active) == 0:
+            active = np.argwhere((region == BURNED_OUT))
+            
         if len(active) > 0:
             fire_r = r0 + active[:, 0].mean()
             fire_c = c0 + active[:, 1].mean()
             return grid_to_latlon(fire_r, fire_c, self.meta)
         else:
-            return grid_to_latlon(zone["centroid_row"], zone["centroid_col"], self.meta)
+            # Preventative dispatch: find the nearest active fire anywhere on the map
+            global_active = np.argwhere((env.sim.state == THREAT) | (env.sim.state == BLAZE))
+            if len(global_active) > 0:
+                # Find the nearest one to the centroid of the assigned zone
+                cr, cc = zone["centroid_row"], zone["centroid_col"]
+                dists = (global_active[:, 0] - cr)**2 + (global_active[:, 1] - cc)**2
+                nearest_idx = np.argmin(dists)
+                fire_r, fire_c = global_active[nearest_idx]
+                return grid_to_latlon(fire_r, fire_c, self.meta)
+            else:
+                return grid_to_latlon(zone["centroid_row"], zone["centroid_col"], self.meta)
 
     def snapshot(self, env):
         """Return unit positions for the current tick."""
@@ -458,7 +473,7 @@ class UnitTracker:
 # Episode rollout
 # ===========================================================================
 
-def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100):
+def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100, scenario="anchor"):
     """Run a complete episode with response-delay gate.
 
     Returns the timeline dict matching the spec's §5.2 contract.
@@ -506,35 +521,32 @@ def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100):
         policy_actions = []
         actions_to_execute = []
 
-        for _ in range(MAX_DISPATCH_SLOTS):
-            resource_logits = logits["resource_type"][0].clone()
-            mask = torch.tensor(
-                [available[r] > 0 for r in RESOURCE_TYPES],
-                dtype=torch.bool, device=DEVICE
-            )
-            resource_logits[~mask] = -1e9
-            if not bool(mask.any()):
-                break
-            ri = int(torch.argmax(resource_logits))
-            ti = int(torch.argmax(logits["target"][0, ri]))
-            action = decode_action(ri, ti, target_zones)
-            if action is None:
-                break
+        if scenario != "unmitigated":
+            for _ in range(MAX_DISPATCH_SLOTS):
+                resource_logits = logits["resource_type"][0].clone()
+                mask = torch.tensor(
+                    [available[r] > 0 for r in RESOURCE_TYPES],
+                    dtype=torch.bool, device=DEVICE
+                )
+                resource_logits[~mask] = -1e9
+                if not bool(mask.any()):
+                    break
+                ri = int(torch.argmax(resource_logits))
+                ti = int(torch.argmax(logits["target"][0, ri]))
+                action = decode_action(ri, ti, target_zones)
+                if action is None:
+                    break
 
-            semantic_target = TARGET_TYPES[ti] if ti < len(TARGET_TYPES) else "unknown"
-            policy_actions.append({
-                "r": RESOURCE_TYPES[ri],
-                "t": semantic_target,
-                "z": action[1],
-            })
+                semantic_target = TARGET_TYPES[ti] if ti < len(TARGET_TYPES) else "unknown"
+                policy_actions.append({
+                    "r": RESOURCE_TYPES[ri],
+                    "t": semantic_target,
+                    "z": action[1],
+                })
 
-            if not is_held and not done:
-                available[RESOURCE_TYPES[ri]] -= 1
-                actions_to_execute.append(action)
-
-            # Re-run forward for next slot (to get updated logits)
-            if _ < MAX_DISPATCH_SLOTS - 1:
-                logits, value, _cls, target_zones = _forward(model, obs, env, DEVICE)
+                if not is_held and not done:
+                    available[RESOURCE_TYPES[ri]] -= 1
+                    actions_to_execute.append(action)
 
         # Step the environment — ALWAYS with a list
         if done:
@@ -668,14 +680,16 @@ def run_episode(env, model, delay_ticks, ig_row=None, ig_col=None, seed=9100):
         ticks_data.append(tick_data)
         tick += 1
 
-        # Safety: absolute cap
-        if tick > MAX_TICKS + POST_EPISODE_TICKS + 5:
+        # Safety: absolute cap allowing complete burn-out or containment
+        if tick > 1000:
             break
 
     # Compute ignition lat/lon
     ig_row, ig_col = ig_point
     ig_lat, ig_lon = grid_to_latlon(ig_row, ig_col, env.meta)
-    ig_zone = (ig_row // ZONE_SIZE_CELLS) * 8 + (ig_col // ZONE_SIZE_CELLS)
+    ig_r = min(3, max(0, int(ig_row * 4 / env.height)))
+    ig_c = min(7, max(0, int(ig_col * 8 / env.width)))
+    ig_zone = ig_r * 8 + ig_c
 
     # Get zone data for delay explanation
     zone_info = world_cache["zones"][ig_zone] if world_cache else {}
@@ -785,20 +799,16 @@ async def startup():
         tree = None
 
     pixel_grid = []
-    if tree is not None:
-        for r in range(ROWS):
-            row_counts = []
-            for c in range(COLS):
-                # Cell corners in CCW order
-                p1 = grid_pts[r][c]
-                p2 = grid_pts[r][c+1]
-                p3 = grid_pts[r+1][c+1]
-                p4 = grid_pts[r+1][c]
-                cell = Polygon([p1, p2, p3, p4])
-                possible_matches = tree.query(cell)
-                count = sum(1 for idx in possible_matches if cam_polys[idx].intersects(cell))
-                row_counts.append(count)
-            pixel_grid.append(row_counts)
+    if tree is not None and len(cam_polys) > 0:
+        cells = [
+            Polygon([grid_pts[r][c], grid_pts[r][c+1], grid_pts[r+1][c+1], grid_pts[r+1][c]])
+            for r in range(ROWS) for c in range(COLS)
+        ]
+        c_idx, m_idx = tree.query(cells, predicate="intersects")
+        counts_arr = np.bincount(c_idx, minlength=len(cells))
+        pixel_grid = counts_arr.reshape(ROWS, COLS).tolist()
+    else:
+        pixel_grid = [[0] * COLS for _ in range(ROWS)]
     
     world_cache = {
         "grid": {
@@ -831,25 +841,25 @@ async def startup():
         }
     }
 
-    # Verify delay mapping
-    z18 = next(z for z in zones_data if z["id"] == 18)
-    z31 = next(z for z in zones_data if z["id"] == 31)
-    z16 = next(z for z in zones_data if z["id"] == 16)
-    print(f"[startup] Zone 18: delay={z18['delay_ticks']}, coverage={z18['coverage']}, ground_reachable={z18['ground_reachable']}")
-    print(f"[startup] Zone 31: delay={z31['delay_ticks']}, coverage={z31['coverage']}")
-    print(f"[startup] Zone 16: delay={z16['delay_ticks']}, coverage={z16['coverage']}")
-    # assert z31["delay_ticks"] == 1, f"Zone 31 delay should be 1, got {z31['delay_ticks']}"
-    # assert z16["delay_ticks"] == 12, f"Zone 16 delay should be 12, got {z16['delay_ticks']}"
+    print(f"[startup] Processed {len(zones_data)} zones (8x4 grid)")
 
     print("[startup] Ready.")
 
 
+SIMULATION_HTML_PATH = os.path.join(CURRENT_DIR, "Simulation.html")
+SIMULATION_HTML_CONTENT = ""
+for _attempt in range(10):
+    try:
+        with open(SIMULATION_HTML_PATH, "r", encoding="utf-8") as f:
+            SIMULATION_HTML_CONTENT = f.read()
+        if SIMULATION_HTML_CONTENT:
+            break
+    except Exception:
+        time.sleep(0.1)
+
 @app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    html_path = os.path.join(CURRENT_DIR, "Simulation.html")
-    with open(html_path, "r") as f:
-        content = f.read()
-    return HTMLResponse(content=content, headers={
+def serve_index():
+    return HTMLResponse(content=SIMULATION_HTML_CONTENT, headers={
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0"
@@ -878,7 +888,9 @@ async def simulate(
         ig_row, ig_col = latlon_to_grid(ig_lat, ig_lon, world_cache["grid"])
 
     # Determine delay based on dynamic ignition zone
-    ig_zone = (ig_row // ZONE_SIZE_CELLS) * 8 + (ig_col // ZONE_SIZE_CELLS)
+    ig_r = min(3, max(0, int(ig_row * 4 / env.height)))
+    ig_c = min(7, max(0, int(ig_col * 8 / env.width)))
+    ig_zone = ig_r * 8 + ig_c
 
     if delay == "auto":
         try:
@@ -891,7 +903,7 @@ async def simulate(
     else:
         delay_ticks = int(delay)
 
-    result = run_episode(env, model, delay_ticks, ig_row=ig_row, ig_col=ig_col, seed=seed)
+    result = run_episode(env, model, delay_ticks, ig_row=ig_row, ig_col=ig_col, seed=seed, scenario=scenario)
     result["_compute_time_s"] = round(time.time() - t0, 2)
 
     return JSONResponse(result)

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Palisades 3D Wildfire Simulator</title>
+  <title>InfernoTactics</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -36,6 +36,7 @@
     .hud-title { 
       font-weight: 800; font-size: 1.2rem; color: var(--accent); 
       letter-spacing: 0.5px; text-shadow: 0 0 16px var(--accent-glow);
+      text-transform: uppercase;
     }
     
     /* Playback Controls */
@@ -136,6 +137,26 @@
       position: absolute; top: 0; left: 0; height: 100%; width: 0%;
       background: linear-gradient(90deg, #f59e0b, #ff4500);
     }
+
+    .palisades-btn {
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #FF4500, #DC143C);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .palisades-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 69, 0, 0.6);
+    }
     
     /* Footer */
     #footer {
@@ -180,16 +201,19 @@
 
   <!-- Top Header -->
   <div id="header-bar">
-    <div class="hud-title">🔥 INFERNOTACTICS : PALISADES</div>
+    <div class="hud-title">🔥 INFERNOTACTICS</div>
     <div class="controls">
       <button id="btn-start" class="btn primary" onclick="startSimulation()">
-        <span>Run Policy</span>
+        <span>🔥 Run Simulation</span>
         <div class="spinner" id="btn-spinner"></div>
       </button>
     </div>
   </div>
   
   <div id="top-right-controls">
+    <button id="simPalisadesBtn" class="palisades-btn">
+      🔥 Simulate Palisades Fire 2025
+    </button>
     <button id="btn-home" class="btn" onclick="goHome()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Home View
@@ -304,7 +328,7 @@
 
   <!-- Timeline -->
   <div id="timeline-container">
-    <div id="time-display">--:--</div>
+    <div id="time-display">Time: 00:00</div>
     <div id="progress-track"><div id="progress-fill"></div></div>
     <div id="tick-display" style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: #94a3b8;">T+0</div>
   </div>
@@ -549,7 +573,7 @@
         
         const outlineColor = Cesium.Color.fromCssColorString("#00ff00").withAlpha(0.9);
         
-        // Add macro sector outline polyline (no fill for macro zones now)
+        // Add macro sector outline polyline
         viewer.entities.add({
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArray([...pts, pts[0], pts[1]]),
@@ -559,10 +583,10 @@
             classificationType: Cesium.ClassificationType.TERRAIN
           }
         });
+
         // Add label
         let text = `S${z.id}`;
-        if (z.id === 18) text += "\
-(AIR ONLY)";
+        if (!z.ground_reachable) text += "\n(AIR ONLY)";
         
         viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(z.centroid[1], z.centroid[0]),
@@ -634,15 +658,27 @@
       const cw = worldData.grid.corners;
       const centerLon = (cw.nw[1] + cw.se[1]) / 2;
       const centerLat = (cw.nw[0] + cw.se[0]) / 2;
+      flyToTarget(centerLat, centerLon, 12000.0);
+    }
+
+    function focusOnIgnition(lat, lon) {
+      if (!viewer || lat === undefined || lon === undefined) return;
+      flyToTarget(lat, lon, 9000.0);
+    }
+
+    function flyToTarget(lat, lon, range) {
+      if (!viewer || lat === undefined || lon === undefined) return;
       
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - 0.1, 8000),
-        orientation: {
-          heading: Cesium.Math.toRadians(11), // Grid is rotated ~11 deg
-          pitch: Cesium.Math.toRadians(-35),
-          roll: 0
-        },
-        duration: 2.0
+      const carto = Cesium.Cartographic.fromDegrees(lon, lat);
+      const terrainHeight = (viewer.scene.globe.getHeight(carto) || 250.0);
+      const targetCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, terrainHeight);
+
+      const headingRad = Cesium.Math.toRadians(11.0);
+      const pitchRad = Cesium.Math.toRadians(-45.0);
+
+      viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(targetCartesian, 0.0), {
+        offset: new Cesium.HeadingPitchRange(headingRad, pitchRad, range),
+        duration: 1.5
       });
     }
     
@@ -667,22 +703,55 @@
       }
     }
 
-    async function startSimulation() {
+    async function executeSimulation(lat, lon) {
       const btn = document.getElementById('btn-start');
       const spinner = document.getElementById('btn-spinner');
       
-      if (btn.querySelector('span').textContent === "Replay") {
+      btn.disabled = true;
+      btn.querySelector('span').textContent = "Running Simulation...";
+      spinner.style.display = "block";
+      
+      try {
+        const url = (lat !== undefined && lon !== undefined) 
+          ? `/simulate?scenario=anchor&ig_lat=${lat}&ig_lon=${lon}`
+          : `/simulate?scenario=anchor`;
+        const res = await fetch(url);
+        timelineData = await res.json();
+        
+        btn.querySelector('span').textContent = "Replay Simulation";
+        btn.disabled = false;
         playTimeline();
+      } catch (e) {
+        console.error("Simulation failed", e);
+        alert("Simulation failed. Check console.");
+        btn.querySelector('span').textContent = "🔥 Run Simulation";
+        btn.disabled = false;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+    async function startSimulation() {
+      const btn = document.getElementById('btn-start');
+      const text = btn.querySelector('span').textContent.trim();
+      
+      if (text.includes("Replay")) {
+        playTimeline();
+        return;
+      }
+
+      if (isSelectingIgnition) {
+        // If user clicks the button again during ignition select mode, run simulation with default or last ignition
+        isSelectingIgnition = false;
+        if (clickHandler) clickHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        goHome();
+        await executeSimulation(window.lastClickedLat, window.lastClickedLon);
         return;
       }
       
       // Enter selection mode
       isSelectingIgnition = true;
-      btn.querySelector('span').textContent = "Select Ignition...";
-      
-      // Show zone shading and legend
-      zoneShadingPrimitives.forEach(p => p.show = true);
-      document.getElementById('selection-legend').style.display = "block";
+      btn.querySelector('span').textContent = "Click Map";
       
       // Switch to overhead view (pseudo-2D) aligned with the grid
       viewer.camera.flyTo({
@@ -716,9 +785,6 @@
         zoneShadingPrimitives.forEach(p => p.show = false);
         document.getElementById('selection-legend').style.display = "none";
         
-        // Return to 3D View
-        goHome();
-        
         // Get Lat Lon
         const carto = Cesium.Cartographic.fromCartesian(position);
         const lat = Cesium.Math.toDegrees(carto.latitude);
@@ -727,27 +793,7 @@
         window.lastClickedLat = lat;
         window.lastClickedLon = lon;
         
-        // Now run the simulation
-        btn.disabled = true;
-        btn.querySelector('span').textContent = "Running...";
-        spinner.style.display = "block";
-        
-        try {
-          const res = await fetch(`/simulate?scenario=anchor&ig_lat=${lat}&ig_lon=${lon}`);
-          timelineData = await res.json();
-          
-          btn.querySelector('span').textContent = "Replay";
-          btn.disabled = false;
-          playTimeline();
-        } catch (e) {
-          console.error("Simulation failed", e);
-          alert("Simulation failed. Check console.");
-          btn.querySelector('span').textContent = "Run Policy";
-          btn.disabled = false;
-        } finally {
-          spinner.style.display = "none";
-        }
-        
+        await executeSimulation(lat, lon);
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     }
     
@@ -778,23 +824,25 @@
       const igStar = viewer.entities.getById('ignition-star');
       if (igStar) viewer.entities.remove(igStar);
       if (timelineData && timelineData.scenario && timelineData.scenario.ignition) {
-        // Fallback to scenario ignition if click data is missing
-        const igLat = window.lastClickedLat || timelineData.scenario.ignition.lat;
-        const igLon = window.lastClickedLon || timelineData.scenario.ignition.lon;
+        // Always use exact ignition coordinates returned by backend episode payload
+        const igLat = timelineData.scenario.ignition.lat;
+        const igLon = timelineData.scenario.ignition.lon;
         
         viewer.entities.add({
           id: 'ignition-star',
           position: Cesium.Cartesian3.fromDegrees(igLon, igLat),
           label: {
             text: '★',
-            font: '20px sans-serif',
+            font: '24px sans-serif',
             fillColor: Cesium.Color.YELLOW,
             outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
+            outlineWidth: 3,
             heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
             disableDepthTestDistance: Number.POSITIVE_INFINITY
           }
         });
+        
+        focusOnIgnition(igLat, igLon);
       }
       
       // Load initial fire
@@ -873,8 +921,13 @@
       if (!td) return;
       
       // 1. HUD Metrics
-      document.getElementById('time-display').textContent = td.sim_time;
-      document.getElementById('tick-display').textContent = `T+${td.t}`;
+      const totalMinutes = td.t * 2.0; // Assuming 1 tick = 2 mins
+      const h = Math.floor(totalMinutes / 60);
+      const m = Math.floor(totalMinutes % 60);
+      document.getElementById('time-display').textContent = `Time: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      
+      const hrs = (totalMinutes / 60).toFixed(1);
+      document.getElementById('tick-display').textContent = `${hrs} hrs`;
       document.getElementById('val-active').textContent = td.active;
       document.getElementById('val-burned').textContent = td.burned;
       document.getElementById('val-lost').textContent = td.destroyed_total;
@@ -1084,17 +1137,41 @@
           const isHeli = rtype === 'helicopter';
           const uri = isHeli ? '/static/Cesium_Air.glb' : '/static/CesiumMilkTruck.glb';
             
+          const unitIcons = {
+            helicopter: '🚁',
+            water_team: '🚒',
+            trench_crew: '🚜',
+            rescue_vehicle: '🚑'
+          };
+          const unitColors = {
+            helicopter: Cesium.Color.CYAN,
+            water_team: Cesium.Color.DODGERBLUE,
+            trench_crew: Cesium.Color.LIME,
+            rescue_vehicle: Cesium.Color.ORANGE
+          };
+            
           // Create entity
           unitEntities[u.u] = viewer.entities.add({
             id: u.u,
             position: new Cesium.CallbackProperty(() => unitEntities[u.u]._currentPosition, false),
             orientation: new Cesium.CallbackProperty(() => unitEntities[u.u]._currentOrientation, false),
+            label: {
+              text: unitIcons[rtype] || '🚒',
+              font: '22px sans-serif',
+              fillColor: unitColors[rtype] || Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 3,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(0, -28),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            },
             model: {
               uri: uri,
               scale: isHeli ? 1.0 : 2.5,
               minimumPixelSize: 32,
               maximumScale: 5,
-              runAnimations: true
+              runAnimations: true,
+              heightReference: isHeli ? Cesium.HeightReference.RELATIVE_TO_GROUND : Cesium.HeightReference.CLAMP_TO_GROUND
             },
             polyline: {
                show: new Cesium.CallbackProperty(() => unitEntities[u.u]._isWorking, false),
@@ -1115,6 +1192,41 @@
           unitEntities[u.u]._currentPosition = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
           unitEntities[u.u]._currentOrientation = Cesium.Quaternion.IDENTITY;
           unitEntities[u.u]._isWorking = false;
+          
+          // Add Particle Effects for working units
+          if (rtype === 'water_team') {
+            unitEntities[u.u]._ps = viewer.scene.primitives.add(new Cesium.ParticleSystem({
+              image: getFireImage(), 
+              startColor: Cesium.Color.fromCssColorString('#00BFFF').withAlpha(0.8),
+              endColor: Cesium.Color.fromCssColorString('#E0FFFF').withAlpha(0.2),
+              startScale: 0.5,
+              endScale: 2.0,
+              minimumParticleLife: 0.5,
+              maximumParticleLife: 1.0,
+              minimumSpeed: 5.0,
+              maximumSpeed: 10.0,
+              imageSize: new Cesium.Cartesian2(8, 8),
+              emissionRate: 40.0,
+              emitter: new Cesium.ConeEmitter(Cesium.Math.toRadians(15.0)),
+              show: false
+            }));
+          } else if (rtype === 'helicopter') {
+            unitEntities[u.u]._ps = viewer.scene.primitives.add(new Cesium.ParticleSystem({
+              image: getFireImage(), 
+              startColor: Cesium.Color.fromCssColorString('#FF1493').withAlpha(0.8), // pink/red retardant
+              endColor: Cesium.Color.fromCssColorString('#FF69B4').withAlpha(0.2),
+              startScale: 1.0,
+              endScale: 4.0,
+              minimumParticleLife: 1.0,
+              maximumParticleLife: 2.0,
+              minimumSpeed: 2.0,
+              maximumSpeed: 5.0,
+              imageSize: new Cesium.Cartesian2(12, 12),
+              emissionRate: 60.0,
+              emitter: new Cesium.ConeEmitter(Cesium.Math.toRadians(20.0)),
+              show: false
+            }));
+          }
         } 
         
         const e = unitEntities[u.u];
@@ -1143,11 +1255,31 @@
           e.show = true;
           e._isWorking = false;
         }
+        
+        // Update particle system
+        if (e._ps) {
+          if (u.s === 'work') {
+            e._ps.show = true;
+            let matrix = Cesium.Transforms.eastNorthUpToFixedFrame(newPos);
+            if (rtype === 'helicopter') {
+               // Helicopter retardant drops DOWN, so rotate Z axis 180 degrees
+               let rot = Cesium.Matrix3.fromRotationY(Math.PI);
+               let transform = Cesium.Matrix4.fromRotationTranslation(rot, Cesium.Cartesian3.ZERO);
+               matrix = Cesium.Matrix4.multiply(matrix, transform, new Cesium.Matrix4());
+            }
+            e._ps.modelMatrix = matrix;
+          } else {
+            e._ps.show = false;
+          }
+        }
       });
       
       // Remove unseen
       Object.keys(unitEntities).forEach(id => {
         if (!seen.has(id)) {
+          if (unitEntities[id]._ps) {
+            viewer.scene.primitives.remove(unitEntities[id]._ps);
+          }
           viewer.entities.remove(unitEntities[id]);
           delete unitEntities[id];
         }
@@ -1166,6 +1298,31 @@
       Cesium.GoogleMaps.defaultApiKey = 'AIzaSyCNM4xw2KhA-EdRWElXl3OX0_NHxB067jA';
 
       await init();
+      
+      // Setup Palisades Fire Button
+      document.getElementById('simPalisadesBtn').addEventListener('click', async () => {
+         const pBtn = document.getElementById('simPalisadesBtn');
+         pBtn.innerText = "Simulating AI Response...";
+         pBtn.disabled = true;
+         
+         try {
+           window.lastClickedLat = 34.0725;
+           window.lastClickedLon = -118.5425;
+
+           const resp = await fetch('/simulate?scenario=anchor&ig_lat=34.0725&ig_lon=-118.5425');
+           const data = await resp.json();
+           timelineData = data;
+           
+           pBtn.innerText = "🔥 Simulate Palisades Fire 2025";
+           pBtn.disabled = false;
+           playTimeline();
+         } catch(e) {
+           console.error("Failed to simulate Palisades fire:", e);
+           pBtn.innerText = "🔥 Simulate Palisades Fire 2025";
+           pBtn.disabled = false;
+           alert("Failed to run Palisades Fire simulation. Check console.");
+         }
+      });
     };
   </script>
   <!-- Help Modal -->

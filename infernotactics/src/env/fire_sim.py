@@ -47,34 +47,24 @@ FUEL_MIN_THRESHOLD = 0.03      # below this effective flammability, a cell can n
 BUILDING_FLAMMABILITY_FACTOR = 0.35  # structures ignite less readily than dense brush
 ROAD_RESISTANCE_FACTOR = 0.08  # multiplicative ignition penalty for road cells (fuel break)
 
-BASE_SPREAD_PROB = 0.22        # per-neighbor, per-tick base ignition chance at full fuel, flat, no wind
-SLOPE_COEFF = 2.5              # larger -> stronger uphill acceleration / downhill suppression
-WIND_COEFF = 2.0               # larger -> stronger downwind acceleration / upwind suppression
+BASE_SPREAD_PROB = 0.12        # Significantly reduced spread probability for a much slower burn rate
+SLOPE_COEFF = 1.0              # Moderated uphill acceleration factor
+WIND_COEFF = 1.0               # Moderated downwind acceleration factor
 REFERENCE_WIND_MPH = 40.0      # wind speed normalization reference (strong Santa Ana)
 HUMIDITY_SUPPRESSION = 0.85    # at 100% humidity, spread prob is scaled by (1 - this)
 
 SLOPE_FACTOR_CLIP = (0.15, 4.0)
-WIND_FACTOR_CLIP = (0.15, 4.0)
+WIND_FACTOR_CLIP = (1.0, 4.0)  # Upwind never suppressed
 
-BURN_DURATION_TICKS = 4        # ticks a cell stays Blaze before becoming Burned Out
+MICRO_STEPS_PER_TICK = 1       # 1 micro-step per tick for slow, deliberate cellular spread
+BURN_DURATION_TICKS = 6 * MICRO_STEPS_PER_TICK       # ticks a cell stays Blaze before becoming Burned Out
 
 # --- Ember spotting (long-distance spot fires) --------------------------
-# A separate mechanism from the per-neighbor spread loop above: instead of
-# only being able to catch an immediately-adjacent Fuel cell, a Blaze cell
-# has a small chance each tick of directly igniting a Fuel cell well
-# downwind, regardless of what's physically in between -- including a road
-# cell that would otherwise act as a fuel break for adjacent spread (see
-# ROAD_RESISTANCE_FACTOR above, which only applies to that per-neighbor
-# loop, not here). This models real wind-carried embers, the documented
-# mechanism behind the actual Palisades Fire jumping containment lines.
-# Both launch frequency and jump distance scale with wind_speed_norm (see
-# step()) -- calm wind means rare, short jumps; a strong Santa Ana means
-# frequent, long-range ones.
-EMBER_BASE_PROB = 0.02          # per-Blaze-cell, per-tick launch chance at wind_speed_norm == 1.0 (REFERENCE_WIND_MPH)
-EMBER_MAX_LAUNCH_PROB = 0.5     # hard cap on the per-cell launch probability regardless of wind
-EMBER_MIN_DISTANCE_CELLS = 4    # jump floor, comfortably past adjacent-spread range -- always "a jump", not a graze
-EMBER_MAX_DISTANCE_CELLS = 12   # jump ceiling at wind_speed_norm == 1.0 (~360m at this grid's 30m cells)
-EMBER_LATERAL_JITTER_CELLS = 2  # perpendicular randomness so embers don't all land on one exact downwind ray
+EMBER_BASE_PROB = 0.02          # Low ember launch frequency for realistic, slow spot fire generation
+EMBER_MAX_LAUNCH_PROB = 0.08    # Low ember launch cap
+EMBER_MIN_DISTANCE_CELLS = 2    # Start jumping past adjacency
+EMBER_MAX_DISTANCE_CELLS = 5    # Short ember jump distance per tick
+EMBER_LATERAL_JITTER_CELLS = 2  # Narrow lateral jitter
 
 
 def _shift(arr, dy, dx, fill):
@@ -180,11 +170,8 @@ class FireSim:
         distances = self.rng.uniform(EMBER_MIN_DISTANCE_CELLS, max(max_dist, EMBER_MIN_DISTANCE_CELLS), size=n)
         lateral = self.rng.uniform(-EMBER_LATERAL_JITTER_CELLS, EMBER_LATERAL_JITTER_CELLS, size=n)
 
-        # Perpendicular (90 deg CCW) to the downwind (wind_to_east,
-        # wind_to_north) vector, for lateral jitter around the downwind ray.
+        # Realistic wind-driven spotting: embers carry downwind.
         perp_east, perp_north = -wind_to_north, wind_to_east
-        # row+ is south, so a +north offset subtracts from row (same
-        # convention as the per-neighbor spread loop above).
         target_rows = np.round(src_rows - distances * wind_to_north + lateral * perp_north).astype(int)
         target_cols = np.round(src_cols + distances * wind_to_east + lateral * perp_east).astype(int)
 
@@ -212,71 +199,74 @@ class FireSim:
         wind_to_deg = (wind_direction_deg + 180.0) % 360.0
         theta = np.radians(wind_to_deg)
         wind_to_east, wind_to_north = np.sin(theta), np.cos(theta)
-        wind_speed_norm = min(wind_speed_mph / REFERENCE_WIND_MPH, 1.5)
+        # Uncapped wind speed normalization so extreme winds (e.g. 100mph) properly scale ember distance and spread!
+        wind_speed_norm = wind_speed_mph / REFERENCE_WIND_MPH
 
         humidity_factor = 1.0 - HUMIDITY_SUPPRESSION * np.clip(humidity_pct / 100.0, 0.0, 1.0)
 
-        blaze_mask = self.state == BLAZE
-        fuel_mask = self.state == FUEL
+        for _ in range(MICRO_STEPS_PER_TICK):
+            blaze_mask = self.state == BLAZE
+            fuel_mask = self.state == FUEL
 
-        p_no_ignite = np.ones((self.height, self.width), dtype=np.float32)
+            p_no_ignite = np.ones((self.height, self.width), dtype=np.float32)
 
-        for dy, dx in _NEIGHBOR_OFFSETS:
-            neighbor_is_blaze = _shift(blaze_mask, dy, dx, fill=False)
-            if not neighbor_is_blaze.any():
-                continue
+            for dy, dx in _NEIGHBOR_OFFSETS:
+                neighbor_is_blaze = _shift(blaze_mask, dy, dx, fill=False)
+                if not neighbor_is_blaze.any():
+                    continue
 
-            dist = np.hypot(dy, dx)
-            # Fire travel direction is FROM the neighbor at (dy, dx) INTO
-            # this cell, i.e. the vector (-dy, -dx); row+ is south so
-            # north = -row_delta.
-            spread_east, spread_north = -dx / dist, dy / dist
-            alignment = spread_east * wind_to_east + spread_north * wind_to_north
-            wind_factor = np.clip(
-                np.exp(WIND_COEFF * wind_speed_norm * alignment), *WIND_FACTOR_CLIP
-            )
+                dist = np.hypot(dy, dx)
+                # Fire travel direction is FROM the neighbor at (dy, dx) INTO
+                # this cell, i.e. the vector (-dy, -dx); row+ is south so
+                # north = -row_delta.
+                spread_east, spread_north = -dx / dist, dy / dist
+                alignment = spread_east * wind_to_east + spread_north * wind_to_north
+                wind_factor = np.clip(
+                    np.exp(WIND_COEFF * wind_speed_norm * alignment), *WIND_FACTOR_CLIP
+                )
 
-            per_neighbor_prob = (
-                BASE_SPREAD_PROB
-                * self.ignitability
-                * self._slope_factor_by_dir[(dy, dx)]
-                * wind_factor
-                * self.road_resistance
-                * humidity_factor
-            )
-            per_neighbor_prob = np.clip(per_neighbor_prob, 0.0, 1.0)
-            contribution = np.where(neighbor_is_blaze, per_neighbor_prob, 0.0)
-            p_no_ignite *= (1.0 - contribution)
+                per_neighbor_prob = (
+                    BASE_SPREAD_PROB
+                    * self.ignitability
+                    * self._slope_factor_by_dir[(dy, dx)]
+                    * wind_factor
+                    * self.road_resistance
+                    * humidity_factor
+                )
+                per_neighbor_prob = np.clip(per_neighbor_prob, 0.0, 1.0)
+                contribution = np.where(neighbor_is_blaze, per_neighbor_prob, 0.0)
+                p_no_ignite *= (1.0 - contribution)
 
-        p_ignite = 1.0 - p_no_ignite
-        draws = self.rng.random((self.height, self.width))
-        newly_threat = fuel_mask & (draws < p_ignite)
+            p_ignite = 1.0 - p_no_ignite
+            draws = self.rng.random((self.height, self.width))
+            newly_threat = fuel_mask & (draws < p_ignite)
 
-        # Long-distance ember spotting (see EMBER_* constants): OR'd into
-        # the same newly_threat mask as adjacency spread -- an ember-caught
-        # cell becomes Threat this tick and Blaze next tick exactly like an
-        # adjacency-caught one, just reached by a different mechanism.
-        ember_ignited = self._ember_spot_fires(blaze_mask, fuel_mask, wind_to_east, wind_to_north, wind_speed_norm)
-        newly_threat = newly_threat | ember_ignited
+            # Long-distance ember spotting (see EMBER_* constants): OR'd into
+            # the same newly_threat mask as adjacency spread -- an ember-caught
+            # cell becomes Threat this tick and Blaze next tick exactly like an
+            # adjacency-caught one, just reached by a different mechanism.
+            ember_ignited = self._ember_spot_fires(blaze_mask, fuel_mask, wind_to_east, wind_to_north, wind_speed_norm)
+            newly_threat = newly_threat | ember_ignited
 
-        new_state = self.state.copy()
+            new_state = self.state.copy()
 
-        # 1. Fuel cells that catch this tick (adjacency spread OR ember
-        #    spotting) become Threat (an ignition front that becomes Blaze
-        #    next tick), based on last tick's Blaze cells.
-        new_state[newly_threat] = THREAT
+            # 1. Fuel cells that catch this tick (adjacency spread OR ember
+            #    spotting) become Threat (an ignition front that becomes Blaze
+            #    next tick), based on last tick's Blaze cells.
+            new_state[newly_threat] = THREAT
 
-        # 2. Cells that were Threat last tick fully ignite this tick.
-        was_threat = self.state == THREAT
-        new_state[was_threat] = BLAZE
-        self.blaze_age[was_threat] = 1
+            # 2. Cells that were Threat last tick fully ignite this tick.
+            was_threat = self.state == THREAT
+            new_state[was_threat] = BLAZE
+            self.blaze_age[was_threat] = 1
 
-        # 3. Cells that were already Blaze age by one tick; once fuel is
-        #    consumed (age >= BURN_DURATION_TICKS) they burn out.
-        self.blaze_age[blaze_mask] += 1
-        burned_out = blaze_mask & (self.blaze_age >= BURN_DURATION_TICKS)
-        new_state[burned_out] = BURNED_OUT
+            # 3. Cells that were already Blaze age by one tick; once fuel is
+            #    consumed (age >= BURN_DURATION_TICKS) they burn out.
+            self.blaze_age[blaze_mask] += 1
+            burned_out = blaze_mask & (self.blaze_age >= BURN_DURATION_TICKS)
+            new_state[burned_out] = BURNED_OUT
 
-        self.state = new_state
+            self.state = new_state
+            
         self.tick_count += 1
         return self.state

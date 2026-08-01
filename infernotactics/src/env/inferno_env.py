@@ -263,8 +263,8 @@ ROAD_TRAFFIC_MULTIPLIER = {
     "tertiary": 1.35, "residential": 1.20, "unclassified": 1.30, "service": 1.25,
 }
 ROAD_TRAFFIC_CAPACITY = {
-    "motorway": 40.0, "trunk": 30.0, "primary": 20.0, "secondary": 14.0,
-    "tertiary": 10.0, "residential": 6.0, "unclassified": 4.0, "service": 4.0,
+    "motorway": 0.03, "trunk": 0.02, "primary": 0.01, "secondary": 0.01,
+    "tertiary": 0.01, "residential": 0.01, "unclassified": 0.01, "service": 0.01,
 }
 TRAFFIC_BPR_ALPHA = 0.15
 TRAFFIC_BPR_BETA = 4.0
@@ -272,15 +272,16 @@ TRAFFIC_UPDATE_INTERVAL_TICKS = 5
 RESOURCE_TRAFFIC_WEIGHT = {
     "water_team": 1.0, "trench_crew": 1.0, "rescue_vehicle": 1.2, "helicopter": 0.0,
 }
+# Delay (in ticks) for dispatch, prep, and cooldown
 RESOURCE_DELAY_CONFIG = {
-    "water_team": {"dispatch_delay_ticks": 1, "arrival_setup_delay_ticks": 1, "post_effect_busy_ticks": 5},
-    "trench_crew": {"dispatch_delay_ticks": 1, "arrival_setup_delay_ticks": 2, "post_effect_busy_ticks": 5},
-    "rescue_vehicle": {"dispatch_delay_ticks": 2, "arrival_setup_delay_ticks": 2, "post_effect_busy_ticks": 5},
-    "helicopter": {"dispatch_delay_ticks": 2, "arrival_setup_delay_ticks": 1, "post_effect_busy_ticks": 12},
+    "water_team": {"dispatch_delay_ticks": 0, "arrival_setup_delay_ticks": 1, "post_effect_busy_ticks": 5},
+    "trench_crew": {"dispatch_delay_ticks": 0, "arrival_setup_delay_ticks": 2, "post_effect_busy_ticks": 5},
+    "rescue_vehicle": {"dispatch_delay_ticks": 0, "arrival_setup_delay_ticks": 2, "post_effect_busy_ticks": 5},
+    "helicopter": {"dispatch_delay_ticks": 0, "arrival_setup_delay_ticks": 1, "post_effect_busy_ticks": 12},
 }
 DEPLOYED_BUSY_TICKS = RESOURCE_DELAY_CONFIG["water_team"]["post_effect_busy_ticks"]
 HELICOPTER_RELOAD_TICKS = RESOURCE_DELAY_CONFIG["helicopter"]["post_effect_busy_ticks"]
-HELICOPTER_SPEED_MPS = 60.0  # ~135 mph cruise, plausible for a firefighting helicopter transiting to an incident
+HELICOPTER_SPEED_MPS = 60.0  # Real cruise speed (~135 mph) for swift aerial firefighting response
 
 # --- Time / weather -----------------------------------------------------------
 # Maps sim ticks <-> wall-clock minutes so road travel times (real seconds)
@@ -852,6 +853,19 @@ class InfernoEnv:
 
         return self._build_observation()
 
+    def _update_weather(self, tick):
+        if self.use_real_weather:
+            wind_speed_mph, wind_direction_deg, humidity_pct = _real_weather_at(
+                self.elapsed_seconds, self._weather_epochs, self._weather_values)
+        else:
+            wind_speed_mph = min(10.0 + 3.5 * tick, 45.0)
+            wind_direction_deg = 45.0
+            humidity_pct = 8.0
+        
+        self.wind_speed_mph = wind_speed_mph
+        self.wind_direction_deg = wind_direction_deg
+        self.humidity_pct = humidity_pct
+
     def _weather_schedule(self, tick):
         if self.use_real_weather:
             elapsed_seconds = tick * TICK_DURATION_MINUTES * 60.0
@@ -1117,7 +1131,7 @@ class InfernoEnv:
         reward = reward - fire_penalty - dispatch_cost_total + trench_bonus
 
         contained = counts["Threat"] == 0 and counts["Blaze"] == 0
-        timed_out = self.tick_count >= MAX_TICKS
+        timed_out = self.tick_count >= 1000  # High cap allowing simulation to run until fully contained or burned out
         done = contained or timed_out
 
         info = {
