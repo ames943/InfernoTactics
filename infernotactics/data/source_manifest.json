@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-04T01:12:13.517220+00:00",
+  "assets": {
+    "elevation": {
+      "provider": "USGS 3DEP",
+      "product": "3DEP elevation, 10 m",
+      "source": "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer",
+      "file": "elevation.tif",
+      "bytes": 7024990,
+      "sha256": "93633b2ae36ef80d4e6162a5e4df15f01b92cbe776c587e3a373a527112c4fba"
+    },
+    "fuel_model": {
+      "provider": "LANDFIRE / USGS",
+      "product": "LF2024 FBFM40 CONUS",
+      "source": "https://edcintl.cr.usgs.gov/geoserver/landfire_wcs/conus_2024/wcs",
+      "file": "landfire_fbfm40_2024.tif",
+      "bytes": 89680,
+      "sha256": "ef312cb34a76c74e44090f7da6324800d2ce7398141eede118899bc257731a05"
+    },
+    "buildings": {
+      "provider": "LA GeoHub",
+      "product": "LARIAC4 Building Footprints",
+      "source": "https://services5.arcgis.com/7nsPwEMP38bSkCjy/arcgis/rest/services/Building_Footprints/FeatureServer/0",
+      "file": "buildings.geojson",
+      "bytes": 46923940,
+      "sha256": "5e08c3e92edc9624f02c37fc4ad1605e4e261b86aceacc13de2f5eb86161243b"
+    },
+    "roads": {
+      "provider": "OpenStreetMap",
+      "product": "OSMnx drive network",
+      "source": "https://www.openstreetmap.org/",
+      "file": "roads.graphml",
+      "bytes": 5923776,
+      "sha256": "3d3786acf381a790cbb2da0a694cb36c275d3cea550f4dd0c3f42d92797771fe"
+    },
+    "population": {
+      "provider": "WorldPop",
+      "product": "USA 2020 population, 1 km",
+      "source": "https://data.worldpop.org/GIS/Population/Global_2000_2020_1km/2020/USA/",
+      "file": "population.tif",
+      "bytes": 6256,
+      "sha256": "7e128a08b5415171c2cc70a07faf63c2a012e70ad35afc85ab096382792559af"
+    },
+    "weather": {
+      "provider": "NOAA ASOS via Iowa Environmental Mesonet",
+      "product": "KSMO observations, 2025-01-07 through 2025-01-09 UTC",
+      "source": "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py",
+      "file": "palisades_weather_jan2025.csv",
+      "bytes": 1930,
+      "sha256": "9161ceb79ca83be6b15ad525b0b1e6a9a459d3955f807ca173847359ec5250a4"
+    },
+    "stations": {
+      "provider": "InfernoTactics curated from LAFD sources",
+      "product": "Modeled station roster",
+      "source": "version-controlled project file",
+      "file": "../src/data_pipeline/real_depots.json",
+      "bytes": 11408,
+      "sha256": "53ab9eea0e2a9e77c651bab4d1fc74f2f97766c6e3b1c5259c469ad7b64c6844"
+    }
+  }
+}

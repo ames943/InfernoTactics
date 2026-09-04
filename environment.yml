@@ -1,0 +1,8 @@
+name: ai-ml
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+  - pip:
+      - -e ./infernotactics[dev]

@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated local artifacts
+infernotactics/cache/
+infernotactics/logs/
+infernotactics/reports/
+infernotactics/models/checkpoints_*/
+infernotactics/data/*.graphml
+infernotactics/data/*.geojson
+infernotactics/data/*.tif
+infernotactics/data/*.npy
+infernotactics/data/*.png
