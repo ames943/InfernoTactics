@@ -69,3 +69,18 @@ Existing clients use the `default` simulation session. New clients can create an
 isolated session with `POST /api/sessions`, pass its `session_id` to reset/step/state
 requests, and delete it when finished. Session count is capped by
 `INFERNO_MAX_SESSIONS` (default `8`).
+
+## 3D playback interface
+
+The Cesium timeline interface is a separate presentation service. It uses the
+preserved legacy world and the matching bundled v10 checkpoint by default:
+
+```powershell
+uvicorn integration.app:app --port 8001
+```
+
+Open `http://127.0.0.1:8001`. The service prepares the world once at startup,
+runs a model-controlled episode for a selected ignition point, and sends a compact
+timeline to the browser for playback. It is intentionally separate from the
+session-oriented API above so visualization concerns do not leak into the core
+simulation service.

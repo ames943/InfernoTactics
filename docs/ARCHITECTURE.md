@@ -208,15 +208,20 @@ infernotactics/src/
     visualization/               browser asset serialization
     world/                       world build/load/validation/fingerprints
     training/                    trainer, evaluation, logging, plots, checkpoints
-  data_pipeline/                 deprecated command/import wrappers only
-  env/                           deprecated command/import wrappers only
-  models/                        deprecated import wrappers only
-  train/                         deprecated command/import wrappers only
 infernotactics/tests/
   unit/                          fast isolated domain/service/physics tests
   integration/                   environment and API boundary tests
 infernotactics/scripts/
   diagnostics/                   manual visual/performance diagnostics
 integration/
-  static/data/                   generated map subset exposed by the API
+  app.py                         Cesium playback API adapter
+  Simulation.html               interactive 3D timeline interface
+  *.glb                          local emergency-vehicle models
 ```
+
+The core API (`infernotactics.api.server`) owns live, isolated simulation
+sessions. The integration playback service is a deliberately separate adapter:
+it runs an episode with the matching bundled checkpoint, converts internal state
+to a compact visualization timeline, and serves the Cesium interface and its 3D
+assets. Both depend on the canonical package; there are no duplicate simulator,
+environment, policy, or training implementations under `integration/`.
