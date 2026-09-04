@@ -15,25 +15,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the detailed system model,
 data contracts, simulator mechanics, policy design, known limitations, and the
 implemented package structure.
 
-## Setup
-
-The reproducible environment is named `ai-ml`:
-
-```powershell
-conda env create -f environment.yml
-conda activate ai-ml
-```
-
-If the environment already exists:
-
-```powershell
-conda activate ai-ml
-python -m pip install -e ".\infernotactics[dev]"
-```
-
 ## Build the world
 
-Run from `infernotactics/` after activating `ai-ml`:
+Run from `infernotactics/` after you're in the environment:
 
 ```powershell
 python -m infernotactics.data.fetch_elevation

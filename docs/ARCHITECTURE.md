@@ -1,6 +1,6 @@
 # InfernoTactics architecture
 
-## 1. What the system does
+## What the system does
 
 InfernoTactics turns a geographic area into a simulation-ready world, starts one
 or more fires, advances those fires under terrain/fuel/weather effects, and lets a
@@ -12,7 +12,7 @@ The project is a research simulator, not an operational wildfire forecast or an
 incident-command system. Its outputs are only as credible as the calibration and
 validation of its simplified physical and operational assumptions.
 
-## 2. Runtime flow
+## Runtime flow
 
 ```mermaid
 flowchart LR
@@ -48,7 +48,7 @@ Each simulation tick follows one ordered transaction:
 This order matters. A resource arriving this tick acts before the fire advances;
 a resource dispatched this tick does not act immediately.
 
-## 3. Geographic data and world construction
+## Geographic data and world construction
 
 The configured study area spans the Palisades/Topanga-to-Westwood region. Source
 adapters are intentionally separate from raster construction:
@@ -82,7 +82,7 @@ still an adapter rather than a calibrated Rothermel implementation. Roads reduce
 fuel and also apply a separate spread-resistance multiplier; water is forced to
 zero ignitability.
 
-## 4. Fire model
+## Fire model
 
 `FireSim` is a stochastic, synchronous cellular automaton. Every cell is in one of
 five states:
@@ -111,7 +111,7 @@ wind, the modeled jump range reaches 4-12 cells (about 120-360 m), with lateral
 jitter. The automaton is reproducible for a fixed seed, not deterministic across
 different seeds.
 
-## 5. Operations and containment
+## Operations and containment
 
 `InfernoEnv` coordinates the fire engine, finite station roster, and road network.
 The resource inventory and its available -> preparing -> traveling -> setup ->
@@ -150,7 +150,7 @@ The reward includes:
 The environment returns every component separately for diagnosis. The sum is the
 learning reward.
 
-## 6. Policy and learning
+## Policy and learning
 
 The observation contains nine raster channels (the eight static layers plus fire
 state) and eleven scalar values: weather, available units, elapsed time, and
@@ -190,7 +190,7 @@ Version-2 checkpoints contain the model, optimizer, return normalizer, NumPy and
 PyTorch random state, completed episode, metadata, and world fingerprint. Legacy
 weight-only checkpoints still load, but they cannot prove world compatibility.
 
-## 7. Implemented source layout
+## Implemented source layout
 
 The executable implementation now lives under one installable package:
 
@@ -220,71 +220,3 @@ infernotactics/scripts/
 integration/
   static/data/                   generated map subset exposed by the API
 ```
-
-All application code imports `infernotactics.*`; the former compatibility trees
-and historical browser prototypes have been removed.
-
-## 8. Target structure
-
-```text
-infernotactics/
-  domain/        immutable actions, observations, weather, zones, resource state
-  data/          provider adapters, manifests, transforms, source cache
-  world/         WorldBundle, layer schemas, build/validate/version commands
-  simulation/    FireEngine protocol and calibrated engine implementations
-  operations/    routing, traffic, stations, suppression, Gym environment
-  policy/        neural policy, heuristic baseline, semantic target resolver
-  training/      rollout collection, losses, evaluation, checkpoints, experiment config
-  service/       session manager and application use cases
-  api/           thin HTTP schemas/routes only
-  visualization/ client assets and world/event serializers
-tests/
-  unit/          pure domain, physics, policy, and reward tests
-  integration/   world-to-environment and checkpoint compatibility tests
-  regression/    seeded spread, routing, and benchmark fixtures
-```
-
-Dependencies flow inward: UI/API -> service -> policy/operations ->
-simulation/world -> domain. The runtime reads shared path configuration but never
-imports source-fetching workflows. Training depends on policy and operations;
-runtime policy and simulation modules do not depend on the trainer.
-
-## 9. Remaining engineering priorities
-
-1. Calibrate and validate spread against observed perimeters and document error by
-   lead time, not only visually.
-2. Replace relative FBFM40 scores with moisture-aware physical fuel parameters.
-3. Move static route-context construction (station projection and Dijkstra
-   matrices) out of `InfernoEnv` behind an operations factory.
-4. Add a maintained browser client only after its product scope and API contract are
-   defined; the former prototypes were removed during cleanup.
-5. Add experiment configuration files and a benchmark matrix comparing learned,
-   heuristic, random, and no-action policies on held-out ignitions/seeds.
-6. Separate the forecast model from the dispatch policy if fire prediction becomes
-   a product goal; today the simulator generates dynamics and the auxiliary head is
-   only a one-step learning signal.
-
-## 10. Correctness fixes in this restructuring pass
-
-- one canonical zone partition now serves the environment, CNN, and target code;
-- wind conversion now consistently honors meteorological direction and grid axes;
-- no-dispatch is no longer accidentally masked from the learned policy;
-- rollout training reuses the exact target features seen during sampling;
-- the auxiliary head forecasts the next state instead of copying its input;
-- trench success is now representable and rewarded once;
-- heuristic evaluation uses its actual multi-dispatch interface;
-- checkpoints genuinely resume optimizer, normalizer, RNG, episode, and logs;
-- LANDFIRE fuel replaces the default terrain heuristic;
-- model/world incompatibility is detected before training or serving.
-- suppression and evacuation effects are isolated under `operations`;
-- semantic target resolution and inference are isolated under `policy`;
-- HTTP clients can own independent bounded sessions while sharing immutable model
-  and routing assets.
-- fire states, resource types, observations, actions, and raster-layer order are
-  explicit domain contracts instead of constants owned by the legacy environment;
-- operational effects accept a fire-engine protocol, leaving room for calibrated
-  simulator implementations without rewriting dispatch code;
-- dispatch selection and the complete resource lifecycle are isolated in a pure,
-  callback-driven `ResourceFleet` operations service;
-- tick-specific road routing and congestion occupancy are isolated in
-  `DynamicTrafficRouter`, while compatibility methods keep older callers working.

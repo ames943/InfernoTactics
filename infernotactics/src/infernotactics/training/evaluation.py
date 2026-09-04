@@ -19,7 +19,11 @@ from infernotactics.domain.resources import RESOURCE_TYPES  # noqa: E402
 from infernotactics.policy.models import RelativeInfernoModel
 from infernotactics.policy.targets import TARGET_TYPES, decode_action  # noqa: E402
 from infernotactics.policy import DEFAULT_MAX_DISPATCH_SLOTS, forward_policy  # noqa: E402
-from infernotactics.training.checkpoints import load_checkpoint, model_state_from_checkpoint  # noqa: E402
+from infernotactics.training.checkpoints import (
+    checkpoint_metadata,
+    load_checkpoint,
+    model_state_from_checkpoint,
+)
 
 
 MAX_DISPATCH_SLOTS = int(os.environ.get("INFERNO_MAX_DISPATCH_SLOTS", DEFAULT_MAX_DISPATCH_SLOTS))
@@ -196,12 +200,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--episodes", type=int, default=5)
+    parser.add_argument(
+        "--grid-static",
+        default=os.environ.get("INFERNO_GRID_STATIC"),
+        help="Static world grid paired with the checkpoint.",
+    )
+    parser.add_argument(
+        "--grid-meta",
+        default=os.environ.get("INFERNO_GRID_META"),
+        help="World metadata paired with --grid-static.",
+    )
     parser.add_argument("--random-points", type=int, default=0,
                         help="Evaluate this many fresh WUI ignition points instead of named scenarios.")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    env = InfernoEnv(seed=9100)
+    if bool(args.grid_static) != bool(args.grid_meta):
+        parser.error("--grid-static and --grid-meta must be provided together")
+    env_kwargs = {}
+    if args.grid_static:
+        env_kwargs = {
+            "grid_static_path": args.grid_static,
+            "grid_meta_path": args.grid_meta,
+        }
+    env = InfernoEnv(seed=9100, **env_kwargs)
     obs = env.reset(seed=9100)
     model = RelativeInfernoModel(
         n_grid_channels=obs["grid"].shape[0],
@@ -210,6 +232,11 @@ def main():
         n_zones=env.n_zones,
     ).to(device)
     checkpoint = load_checkpoint(args.checkpoint, map_location=device)
+    saved_world = checkpoint_metadata(checkpoint).get("world_fingerprint")
+    if saved_world and saved_world != env.world.fingerprint:
+        raise ValueError(
+            "Checkpoint/world mismatch: select the grid used to train this checkpoint."
+        )
     model.load_state_dict(model_state_from_checkpoint(checkpoint))
     print(f"checkpoint={os.path.abspath(args.checkpoint)} device={device} episodes_per_scenario={args.episodes}")
     t_total = time.perf_counter()
