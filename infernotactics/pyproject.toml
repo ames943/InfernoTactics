@@ -44,7 +44,11 @@ legacy-ui = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-infernotactics = ["data/*.json"]
+infernotactics = [
+  "data/*.json",
+  "visualization/static/*.html",
+  "visualization/static/models/*.glb",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

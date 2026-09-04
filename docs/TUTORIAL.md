@@ -98,6 +98,12 @@ The bundled historical checkpoint uses the preserved legacy grid. For a newly
 trained policy, set matching `INFERNO_CHECKPOINT`, `INFERNO_GRID_STATIC`, and
 `INFERNO_GRID_META` paths together before launch.
 
+For the Cesium playback interface, run this separately from the repository root:
+
+```powershell
+uvicorn infernotactics.api.playback:app --host 127.0.0.1 --port 8001
+```
+
 ## 7. Reproducibility rules
 
 - Treat the grid, metadata, source manifest, config, and checkpoint as one identity.

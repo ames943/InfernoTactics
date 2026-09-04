@@ -205,7 +205,7 @@ infernotactics/src/
     service/                     bounded, thread-safe simulation session ownership
     simulation/                  fire engine implementation and protocol
     validation/                  observed-perimeter validation workflow
-    visualization/               browser asset serialization
+    visualization/               browser export and packaged playback assets
     world/                       world build/load/validation/fingerprints
     training/                    trainer, evaluation, logging, plots, checkpoints
 infernotactics/tests/
@@ -213,15 +213,15 @@ infernotactics/tests/
   integration/                   environment and API boundary tests
 infernotactics/scripts/
   diagnostics/                   manual visual/performance diagnostics
-integration/
-  app.py                         Cesium playback API adapter
-  Simulation.html               interactive 3D timeline interface
-  *.glb                          local emergency-vehicle models
+infernotactics/data/
+  visualization/                 generated browser-facing map subsets
+infernotactics/models/
+  containment_policy_v10.pt      bundled policy used by both APIs
 ```
 
 The core API (`infernotactics.api.server`) owns live, isolated simulation
-sessions. The integration playback service is a deliberately separate adapter:
+sessions. The playback API (`infernotactics.api.playback`) is a separate adapter:
 it runs an episode with the matching bundled checkpoint, converts internal state
 to a compact visualization timeline, and serves the Cesium interface and its 3D
-assets. Both depend on the canonical package; there are no duplicate simulator,
-environment, policy, or training implementations under `integration/`.
+assets from `infernotactics.visualization.static`. Both use the same canonical
+simulator, environment, policy, and training contracts.

@@ -14,6 +14,7 @@ fingerprint it was trained on, so incompatible maps and policies fail clearly.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the detailed system model,
 data contracts, simulator mechanics, policy design, known limitations, and the
 implemented package structure.
+For setup and common workflows, see [docs/TUTORIAL.md](docs/TUTORIAL.md).
 
 ## Build the world
 
@@ -76,7 +77,7 @@ The Cesium timeline interface is a separate presentation service. It uses the
 preserved legacy world and the matching bundled v10 checkpoint by default:
 
 ```powershell
-uvicorn integration.app:app --port 8001
+uvicorn infernotactics.api.playback:app --port 8001
 ```
 
 Open `http://127.0.0.1:8001`. The service prepares the world once at startup,

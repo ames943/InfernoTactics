@@ -2,7 +2,7 @@
 InfernoTactics 3D Simulation — FastAPI backend (v10 rewrite).
 
 Endpoints:
-  GET /         -> serve Simulation.html
+  GET /         -> serve the packaged Cesium interface
   GET /world    -> static geometry, zones, coverage, delay (cached)
   GET /simulate -> run full episode, return timeline JSON
   GET /health   -> diagnostic info
@@ -17,24 +17,19 @@ Key design:
 
 import math
 import os
-import sys
 import requests
 import time
 from datetime import timezone
+from pathlib import Path
 
 import numpy as np
 import torch
 
-# ---------------------------------------------------------------------------
-# Path setup: import from infernotactics/src, NOT best_model/src
-# ---------------------------------------------------------------------------
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
-SRC_DIR = os.path.join(REPO_ROOT, "infernotactics", "src")
-
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
-
+from infernotactics.data.config import (  # noqa: E402
+    LEGACY_GRID_META_PATH,
+    LEGACY_GRID_STATIC_PATH,
+    PROJECT_ROOT,
+)
 from infernotactics.operations.environment import (  # noqa: E402
     InfernoEnv,
     TRAINING_IGNITION_POINT,
@@ -72,16 +67,13 @@ from pyproj import Transformer  # noqa: E402
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-CKPT_PATH = os.path.join(
-    REPO_ROOT, "infernotactics", "models",
-    "checkpoints_relative_v10_multi_dispatch_100", "latest.pt"
+CKPT_PATH = os.environ.get(
+    "INFERNO_CHECKPOINT",
+    os.path.join(PROJECT_ROOT, "models", "containment_policy_v10.pt"),
 )
-GRID_STATIC_PATH = os.path.join(
-    REPO_ROOT, "infernotactics", "data", "grid_static_legacy_heuristic.npy"
-)
-GRID_META_PATH = os.path.join(
-    REPO_ROOT, "infernotactics", "data", "grid_meta_legacy_heuristic.json"
-)
+GRID_STATIC_PATH = os.environ.get("INFERNO_GRID_STATIC", LEGACY_GRID_STATIC_PATH)
+GRID_META_PATH = os.environ.get("INFERNO_GRID_META", LEGACY_GRID_META_PATH)
+STATIC_DIR = Path(__file__).resolve().parents[1] / "visualization" / "static"
 MAX_DISPATCH_SLOTS = DEFAULT_MAX_DISPATCH_SLOTS
 DEVICE = torch.device("cpu")
 
@@ -108,7 +100,7 @@ transformer_from_wgs84: Transformer = None
 world_cache: dict = None
 
 app = FastAPI(title="InfernoTactics 3D Fire Simulator — v10")
-app.mount("/static", StaticFiles(directory=CURRENT_DIR), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 # ===========================================================================
@@ -867,10 +859,10 @@ async def startup():
     print("[startup] Ready.")
 
 
-SIMULATION_HTML_PATH = os.path.join(CURRENT_DIR, "Simulation.html")
+SIMULATION_HTML_PATH = STATIC_DIR / "index.html"
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
-    with open(SIMULATION_HTML_PATH, "r", encoding="utf-8") as f:
+    with SIMULATION_HTML_PATH.open("r", encoding="utf-8") as f:
         html_content = f.read()
     return HTMLResponse(content=html_content, headers={
         "Cache-Control": "no-cache, no-store, must-revalidate",

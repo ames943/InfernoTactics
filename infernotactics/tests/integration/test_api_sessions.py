@@ -10,8 +10,7 @@ CHECKPOINT = (
     REPOSITORY_ROOT
     / "infernotactics"
     / "models"
-    / "checkpoints_relative_v10_multi_dispatch_100"
-    / "latest.pt"
+    / "containment_policy_v10.pt"
 )
 
 

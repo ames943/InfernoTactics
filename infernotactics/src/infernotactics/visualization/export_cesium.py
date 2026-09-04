@@ -10,14 +10,12 @@ from pyproj import Transformer
 
 from infernotactics.data.config import (
     DATA_DIR,
-    PROJECT_ROOT as PYTHON_PROJECT_ROOT,
     REAL_DEPOTS_PATH,
     ROADS_GRAPHML_PATH,
 )
 
 DISPLAY_BBOX = {"north": 34.105, "south": 34.030, "east": -118.485, "west": -118.605}
-REPOSITORY_ROOT = os.path.dirname(PYTHON_PROJECT_ROOT)
-OUT_DIR = os.path.join(REPOSITORY_ROOT, "integration", "static", "data")
+OUT_DIR = os.path.join(DATA_DIR, "visualization")
 
 
 def export_buildings():

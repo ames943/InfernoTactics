@@ -40,12 +40,10 @@ from infernotactics.training.checkpoints import (  # noqa: E402
 )
 
 PYTHON_PROJECT_DIR = Path(PYTHON_PROJECT_ROOT)
-REPOSITORY_ROOT = PYTHON_PROJECT_DIR.parent
-STATIC_DIR = REPOSITORY_ROOT / "integration" / "static"
-DATA_DIR = STATIC_DIR / "data"
+STATIC_DATA_DIR = PYTHON_PROJECT_DIR / "data" / "visualization"
 CHECKPOINT = os.environ.get(
     "INFERNO_CHECKPOINT",
-    str(PYTHON_PROJECT_DIR / "models" / "checkpoints_relative_v10_multi_dispatch_100" / "latest.pt"),
+    str(PYTHON_PROJECT_DIR / "models" / "containment_policy_v10.pt"),
 )
 WORLD_GRID = os.environ.get("INFERNO_GRID_STATIC", LEGACY_GRID_STATIC_PATH)
 WORLD_META = os.environ.get("INFERNO_GRID_META", LEGACY_GRID_META_PATH)
@@ -313,7 +311,7 @@ def static_data(name: str):
     allowed = {"buildings": "palisades_buildings.geojson", "roads": "palisades_roads.geojson", "depots": "palisades_depots.json", "config": "display_config.json"}
     if name not in allowed:
         raise HTTPException(404, "Unknown static dataset")
-    return FileResponse(DATA_DIR / allowed[name])
+    return FileResponse(STATIC_DATA_DIR / allowed[name])
 
 
 @app.post("/api/reset")
