@@ -1,353 +1,92 @@
 # InfernoTactics
 
-A reinforcement-learning agent that learns to fight a real wildfire.
+InfernoTactics is a noncommercial wildfire-response research project. Its authoritative simulator is now `infernotactics/src/world`: a georeferenced wildland-fire world with explicit resource travel, work, return, and refill, plus policies that act through the same feasible candidate-action contract.
 
-It's built on a real 3D-mappable grid of the LA Westside (Topanga → Brentwood
-/ Bel-Air → Westwood/UCLA) and grounded in the real Palisades Fire
-(Jan 7–31, 2025 — ~23,400 acres burned, ~6,800 structures destroyed, 12
-deaths). Real terrain, buildings, roads, population density, and the actual
-Jan 7–8, 2025 Santa Ana weather that drove the fire all feed a CNN+MLP
-actor-critic that decides, tick by tick, where to send real LAFD-style fire
-resources (water tenders, brush-patrol/trench crews, rescue vehicles,
-helicopters) across a physically simulated, spreading fire.
+This replaces the course-project cellular automaton and zone-dispatch environment. It does **not** reproduce the Palisades Fire exactly, simulate building combustion, or provide an operational dispatch system. Synthetic examples are illustrative; a successful run is not historical validation or evidence of real-world response effectiveness.
 
-This is a UCLA ML/neural-network course final project. The course requirement
-was to genuinely fuse four ML concepts — not bolt them together, actually
-have each one do real work — and that requirement shaped the whole
-architecture:
+## Start here
 
-| Concept | What it actually does here |
-|---|---|
-| **CNN** | Reads the spatial grid (terrain, roads, buildings, fire) |
-| **MLP** | Reads the global scalars (wind, humidity, resource availability, time) |
-| **Classification** | An auxiliary head labeling every single grid cell Safe / Fuel / Threat / Blaze |
-| **RL (Actor-Critic)** | Drives the actual resource-dispatch decisions; the critic's TD-error is the same signal covered in the course's dopamine/reward-prediction-error lecture |
+Run these commands from the nested project directory:
 
-If you just want a trained model to run against fires immediately — no
-training, no data pipeline, nothing else from this repo required — see
-[`best_model/`](best_model/), a fully self-contained release folder with its
-own README.
-
-If you want to reproduce training, extend the research, or understand *why*
-the project looks the way it does, keep reading.
-
----
-
-## Table of contents
-
-1. [Architecture, in depth](#architecture-in-depth)
-2. [The simulation itself](#the-simulation-itself)
-3. [Real-world data grounding](#real-world-data-grounding)
-4. [Results — RL vs. a rule-based heuristic](#results--rl-vs-a-rule-based-heuristic)
-5. [The research journey — training this thing was not simple](#the-research-journey--training-this-thing-was-not-simple)
-6. [Known limitations, stated honestly](#known-limitations-stated-honestly)
-7. [Repo structure](#repo-structure)
-8. [Setting up from a fresh clone](#setting-up-from-a-fresh-clone)
-
----
-
-## Architecture, in depth
-
-`src/models/inferno_model.py` ties four sub-modules into one ~247K-parameter
-model:
-
-**CNN branch** (`cnn_branch.py`) reads the 9-channel grid observation
-(elevation, slope, building density, building height, road mask, fuel
-density, water mask, population density, and the live fire state) at full
-30m-per-cell resolution. Stride-1, same-padding convolutions keep a
-full-resolution per-cell feature map alive for the classification head,
-while a separate pooled path downsamples to a fixed 128-dim vector for
-fusion with the MLP branch. The CNN also exposes each of the environment's
-32 macro-zones' own pooled features separately (`zone_pooled`) rather than
-only a single global average — this turned out to be load-bearing (see
-below).
-
-**MLP branch** (`mlp_branch.py`) reads the global scalars: wind speed and
-direction, humidity, how many units of each resource type are currently
-available, and elapsed time.
-
-**Classification head** (`classification_head.py`) is a 1×1 convolution
-over the CNN's per-cell features, predicting a 4-class fire state (Safe /
-Fuel / Threat / Blaze — the fire simulation's 5th raw state, Burned Out,
-collapses into Safe, since a burned-out cell can't re-ignite and behaves
-identically to Safe for every tactical purpose) for every grid cell
-independently. Ground truth is free — it's literally the fire simulation's
-own state array — so this head trains against real signal, not a proxy.
-
-**Actor-critic** (`actor_critic.py`) is a *factored* policy: a
-`resource_type` head (4-way: water_team / trench_crew / rescue_vehicle /
-helicopter) and a `zone` head (32-way, one of the grid's macro-zones),
-sampled independently rather than as one flat 128-way distribution, plus a
-scalar critic. Factoring the action space this way was deliberate —
-resource type and target zone are genuinely different questions with
-different failure modes, and collapsing them into one distribution would
-make debugging (and interpreting) which part of a bad decision was wrong
-much harder.
-
-One detail worth knowing if you read the code: the zone head does **not**
-read the same shared fused trunk the resource-type head and critic use — it
-reads the raw MLP output plus each zone's own `zone_pooled` features
-directly. That split exists because of a real bug found mid-project (see
-the research journey section): a direct diagnostic showed the zone head was
-correlating at r=-0.05 with actual fire location, i.e. essentially ignoring
-it, while the same underlying features pooled per-zone instead of globally
-correlated at r=0.97. Global average pooling was diluting a handful of
-burning cells across ~188,000 total grid cells to the point of erasure
-before the zone head ever saw them. Feeding it the per-zone features
-directly, plus an auxiliary supervised loss and a cold-started head, raised
-that correlation to a sustained 0.31–0.39 and produced the first genuinely
-scenario-specific dispatch behavior in the project.
-
-## The simulation itself
-
-`src/env/fire_sim.py` (`FireSim`) is a deterministic cellular-automaton fire
-model — no ML involved, this is the physics the RL agent has to work
-against. States: Safe / Fuel / Threat / Blaze / Burned Out. Per-cell
-ignition probability combines a base rate, cell flammability, a directional
-slope factor, a directional wind factor, road resistance (roads
-meaningfully suppress spread — a real road corridor cuts ignition
-probability 4–5x), and humidity suppression, across all 8 neighbors. On top
-of adjacency spread, burning cells have a wind-scaled chance of **ember
-spotting** — igniting a fuel cell 4–12 cells downwind, bypassing roads
-entirely — which is how real fires jump containment lines; in a synthetic
-test this happened in 26/30 trials at 45 mph vs. 0/30 at 5 mph.
-
-`src/env/inferno_env.py` (`InfernoEnv`) wraps that physics in a Gym-style
-RL environment. Every tick (2 simulated minutes), the agent picks one
-`(resource_type, target_zone)` action or no-op. Resources are grounded in
-real LAFD data (`src/data_pipeline/real_depots.json`): 8 real stations, 15
-total units. Ground units (water_team, trench_crew, rescue_vehicle) route
-via real road-network Dijkstra shortest paths (`data/roads.graphml`);
-helicopters route by straight-line air distance and can reach a zone that
-no ground unit can via the real road graph — a genuine, intentional
-asymmetry of real air response, not an oversight.
-
-Reward: +50 for extinguishing fire, up to −200 per building destroyed
-(scaled by real population density, so losing a building in a dense area
-costs more than in a sparse one), −10 for a wasted dispatch (arrives late,
-or the target is already resolved), and a travel-time penalty.
-
-Weather isn't a fixed assumption — real hourly Jan 7–8, 2025 KSMO (Santa
-Monica Airport) ASOS data drives wind and humidity throughout an episode,
-including humidity crashing to 0.67% and sustained 25.3 mph wind, the
-textbook Santa Ana signature of the actual event.
-
-## Real-world data grounding
-
-| Data | Source | Notes |
-|---|---|---|
-| Roads | OSMnx (OpenStreetMap) | 3,760 nodes, 9,523 edges |
-| Buildings | LA GeoHub LARIAC4 | 46,585 footprints with real heights |
-| Elevation | USGS 3DEP 10m DEM | 1783×948px, 0–686m |
-| Weather | NOAA ASOS station KSMO | real Jan 7–8 2025 hourly Santa Ana event |
-| Population | US Census/ACS block-group data | normalized 0–1 grid layer |
-| Resource depots | Real LAFD Fire Station Directory | 8 stations, apparatus grounded where determinable |
-| Fire perimeter (validation) | WFIGS / LA GeoHub Palisades Perimeter | numerically compared to sim output, see below |
-
-The bare, unsuppressed fire-spread simulation (no resources dispatched) was
-checked numerically against the real historical fire perimeter:
-**IoU 0.636, recall 90.7%, precision 68.1%** against a Jan 21, 2025
-snapshot — a genuinely good result for an untuned cellular automaton, robust
-across 4 random seeds and confirmed against a second, independent, earlier
-real timestamp (Jan 11). `fire_sim.py`'s parameters were never tuned against
-this validation data. Error analysis found ~52% of the area the simulation
-under-predicts sits on road cells with reduced fuel density — a real,
-explained consequence of existing modeling choices, not an unexplained gap.
-
-## Results — RL vs. a rule-based heuristic
-
-`src/train/heuristic_policy.py` implements a simple rule-based baseline
-(nearest-fire dispatch, same real routing) for comparison, using the exact
-same environment interface as the trained policy.
-
-| Scenario | RL reward | RL destroyed | RL containment | Heuristic reward |
-|---|---|---|---|---|
-| `single_training` (the real Palisades ignition point) | **+44.2** | 0 | **100%** | −29,411 |
-| `stone_canyon` (a Santa Ana-corridor multi-ignition point) | −43,161 | 150 | 66.7% | −300 |
-
-The headline result: on its training scenario, the RL agent beats the
-heuristic by roughly **+29,400 reward**, going from 80% to 100% containment
-and 0 buildings destroyed. That result is real, reproducible, and not
-cherry-picked — see the limitations section for exactly where it stops
-holding.
-
-## The research journey
-
-This section exists so nobody has to rediscover what's already been ruled
-out. The short version: getting from "a model that can forward-pass" to
-"a model that reliably beats a simple heuristic" took multiple full rewrites
-and several genuinely negative results, each with real mechanistic evidence
-behind it rather than guesswork.
-
-**Generalizing across ignition points (v1–v3, task-conflict hypothesis).**
-The first fully-trained model solved its one training scenario but badly
-underperformed the heuristic on two held-out validation points — classic
-overfitting to a single scenario. Three targeted architectural fixes were
-tried to address a suspected reward-scale/critic-sharing conflict between
-scenarios: per-scenario return normalization, a scenario-identity input,
-and separate value heads per scenario. **All three came back flat** on
-every scenario except the one already-solved anchor — ruling out
-reward-scale conflict as the primary cause.
-
-**Entropy collapse (v4–v6, credit-assignment hypothesis).** Introducing
-GAE and multi-epoch PPO updates (the standard modern recipe) caused the
-policy to collapse to a deterministic, wrong action within ~100–200
-episodes, every time, across many hyperparameter variants (PPO epoch
-count, gradient clip magnitude, learning rate, advantage clipping,
-multi-trajectory batching) — seven independently negative results in a
-row. A bisect test proved the pre-rewrite training loop never collapsed on
-the same environment, localizing the regression to the GAE-based rewrite
-itself, not to RL being fundamentally unstable here. A feature-by-feature
-toggle diff then isolated the specific culprit to GAE. A critic-quality
-diagnostic explained the actual mechanism: the critic tracks value
-reliably during long, still-burning episodes, but is *reliably
-anti-correlated* with returns during short, already-won episodes — and
-that regime grows more common as the policy improves, so a policy getting
-better feeds itself an increasingly wrong learning signal. This closed the
-causal chain from "the collapse is a mystery" to "the collapse is a
-specific, diffable interaction between GAE and this environment's episode
-structure," which is a very different, much more useful thing to know.
-
-**The zone head was ignoring fire location (representation hypothesis).**
-Described in the architecture section above — found via direct probing of
-logit variance and correlation with real per-zone fire state, fixed with a
-per-zone scorer plus an auxiliary supervised loss.
-
-**A structural capacity ceiling.** A diagnostic on the resource dispatch
-arithmetic found that some scenarios' fire exceeds the entire 8-unit
-resource fleet within the first 2–4 ticks, while the environment's
-one-dispatch-per-tick action space needs 8 ticks just to commit that whole
-fleet, and helicopters are then locked ~15 ticks (mostly reload) before
-redeploying. Some scenarios may simply not be containable by *any* policy
-under this resource model — a real, environment-level ceiling independent
-of training quality, not a hidden training failure.
-
-The best checkpoint produced by this whole line of work is what's packaged
-in [`best_model/`](best_model/).
-
-## Known limitations
-
-- **Generalization to new ignition points is unsolved.** The model performs
-  far worse than a simple heuristic on ignition points it wasn't trained
-  near. This has been investigated extensively (see above) and is the
-  single biggest open item in the project.
-- **A structural resource-capacity ceiling exists** independent of policy
-  quality — some scenarios may be uncontainable by design under the current
-  8-unit resource model and one-dispatch-per-tick action space.
-- **`fuel_density`** (one of the 9 grid layers) is a placeholder heuristic,
-  not real LANDFIRE fuel-model data.
-- **1 of 32 macro-zones is unreachable by ground resources** via the real
-  road graph — only a helicopter can reach it. This is an intentional,
-  realistic asymmetry, not a bug.
-- **The classification head's auxiliary loss is a course requirement**,
-  fusing a required "Classification" concept into the model — it is not
-  load-bearing for the dispatch policy's own decisions.
-- **The 3D visualization is intentionally deferred** — it was scoped as the
-  last step, after training produced real results worth showing, not before.
-
-## Repo structure
-
-```
-infernotactics/
-├── data/                    real-world data + generated grid/sim outputs (gitignored except grid_meta.json)
-├── src/
-│   ├── data_pipeline/       scripts pulling real data (OSM, USGS, LA GeoHub, NOAA), config.py, real_depots.json
-│   ├── env/                 InfernoEnv (RL environment) + FireSim (fire-spread physics)
-│   ├── models/              CNN, MLP, classification head, actor-critic, InfernoModel
-│   ├── train/                training loops (the full experiment history — each script is a
-│   │                         self-contained, documented run) + heuristic_policy.py + eval.py
-│   ├── validation/           numerical fire-spread-vs-real-perimeter validation (WFIGS)
-│   └── viz/                  pydeck/Streamlit visualization (not yet started, deliberately deferred)
-├── models/                   checkpoints from every training run (each run gets its own subfolder)
-├── logs/                     per-run training/eval/diagnostic logs (csv/json/console output)
-└── notebooks/
-
-best_model/                  self-contained release: trained weights + everything needed to run
-                              them, independent of the rest of this repo (see its own README)
-
-Simulation                   in-progress CesiumJS 3D visualization prototype (separate from the
-                              Python RL project above; not yet wired to model output)
-```
-
-## Setting up from a fresh clone
-
-This section covers what's needed to train a new model from scratch. It
-does not repeat the research history above — see `logs/` and the
-diagnostic scripts in `src/train/` for the full detail behind any specific
-finding.
-
-### Why data setup is a separate step
-
-`data/*.tif`, `*.geojson`, `*.graphml`, `*.npy`, and `*.png` are gitignored
-(see `.gitignore`) — they're either large binaries or straightforward to
-regenerate from public sources, so they aren't committed. `models/` (model
-checkpoints) **is** committed, so warm-starting from a prior run works
-immediately after cloning with no extra setup.
-
-### 1. Environment
-
-Requires Python 3.14 (this is what the project was developed and pickled
-against; earlier versions may still work but are untested).
-
-```bash
+```sh
 cd infernotactics
-python3.14 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+
+# Offline, explicitly synthetic scenario; no real-data downloads required.
+python -m src.world.cli synthetic --out data/world-smoke --seed 7
+
+# The same World drives command-line rollouts and the local viewer.
+python -m src.world.cli run --scenario data/world-smoke --seed 7 --policy none --out logs/world-none
+streamlit run src/viz/world_app.py
 ```
 
-### 2. Fetch real-world data
+On Windows, activate the environment with `.venv\Scripts\Activate.ps1`. Existing command outputs are protected; use `--overwrite` only when you intend to replace the selected destination. Full CLI episodes use the scenario's horizon, so use the viewer's Step control for interactive exploration rather than expecting an immediate result from a six-hour simulation.
 
-Each script pulls from a live public source (OSM, USGS 3DEP, WorldPop, LA
-GeoHub, NOAA ASOS) — see the docstring at the top of each file for the exact
-source and any sourcing caveats. Run from `infernotactics/`:
+For the complete workflow, see [the project README](infernotactics/README.md) and [the tutorial](infernotactics/TUTORIAL.md).
 
-```bash
-python -m src.data_pipeline.fetch_elevation    # -> data/elevation.tif
-python -m src.data_pipeline.fetch_population   # -> data/population.tif
-python -m src.data_pipeline.fetch_buildings    # -> data/buildings.geojson
-python -m src.data_pipeline.fetch_roads        # -> data/roads.graphml
-python -m src.data_pipeline.fetch_weather      # -> data/palisades_weather_jan2025.csv (already committed, but safe to re-fetch)
+## One world, one contract
+
+- **Geography:** the real-data builder uses an outward-snapped **30 m EPSG:5070** grid, not the historical README's 200 m grid. The Palisades core study bounds are longitude `[-118.605, -118.440]`, latitude `[34.030, 34.150]`, with a 3 km simulation buffer and an explicit core mask. The offline synthetic fixture is a smaller illustrative landscape, not a measured Palisades reconstruction.
+- **Environmental inputs:** explicitly sourced terrain, supported fuel models, canopy, asset exposure, hourly weather, and moisture. Missing or incompatible real inputs are errors; they are not silently replaced by synthetic fuels or frozen weather. The builder checks source hashes, units, coordinate systems, and validity windows.
+- **Spread:** Pyretechnics-backed wildland spread and moisture coupling. Buildings are exposure assets, not combustible building-fire cells. Physical approximations and input uncertainty remain limitations.
+- **Operations:** engines, handcrews, and helicopters have explicit individual state and constrained actions. Road/off-road travel, access, supply, work duration, return, and refill matter; dispatch does not instantly erase fire. Operational parameters require source labels, including when they are assumptions.
+- **Time:** a canonical 60-second coupling interval joins fire, resource events, and completed treatments. Outputs use elapsed seconds and timestamps, not ambiguous course-project ticks.
+- **Observation:** policies receive the current simulated state (`oracle_current`), current weather and unit records, feasible candidates and masks, and provenance. This is perfect current simulated fire observation, not a sensor or forecasting model; future realized weather/fire are not policy observations.
+- **Policy:** no response, heuristic, and learned masked-candidate policies use the same World action interface. Training is experimental and does not bypass environmental or historical validity gates.
+
+## Train and compare experimental policies
+
+```sh
+cd infernotactics
+python -m src.world.cli train --scenario data/world-smoke --steps 512 --seed 7 --out models/world-smoke.pt
+python -m src.world.cli run --scenario data/world-smoke --seed 8 --policy checkpoint --checkpoint models/world-smoke.pt --out logs/world-learned
+python -m src.world.cli evaluate --scenario data/world-smoke --checkpoint models/world-smoke.pt --seeds 10000,10001 --out logs/world-evaluation
 ```
 
-`fetch_perimeter.py` (real fire perimeter, used only by validation, not
-training) is optional at this stage:
+These commands are a workflow example, not a claim that a short training run produces a useful policy. Use paired held-out comparisons against both no response and heuristic response. Keep training and evaluation seeds/scenarios separate, report uncertainty and per-episode outcomes, and do not interpret synthetic policy scores as incident validation.
 
-```bash
-python -m src.data_pipeline.fetch_perimeter    # -> data/palisades_perimeter_*.geojson
+## Build a sourced historical scenario
+
+```sh
+cd infernotactics
+python -m src.world.cli build --inputs /path/to/INPUTS.json --out data/palisades-world
 ```
 
-### 3. Build the simulation grid
+The explicit manifest format is documented in [`src/world/prepare.py`](infernotactics/src/world/prepare.py). A hindcast needs supported fuel/canopy, elevation, asset exposure, valid hourly weather and moisture, road coverage, and sourced resource parameters. Existing `src/data_pipeline` fetchers remain acquisition utilities; simply running the old GIS download sequence does not produce a complete valid World scenario. A station-weather CSV alone is not the gridded weather contract. Moisture priors must be labeled with uncertainty and do not make a historical scenario ready.
 
-Rasterizes everything from step 2 into the aligned static layer stack the
-env and CNN branch consume:
+Run a built scenario with `--longitude` and `--latitude` together to select an ignition. Coordinates must lie on supported, valid, burnable cells. For example, the synthetic fixture includes longitude `-118.5225`, latitude `34.09`; do not assume an arbitrary address is inside every scenario.
 
-```bash
-python -m src.env.grid_builder    # -> data/grid_static.npy, data/grid_meta.json
+A raw unsuppressed simulation compared with a late, suppressed final incident perimeter is not validation of spread physics or response effectiveness. Numerical, historical, suppression, and policy evidence are distinct gates.
+
+## Local viewer and security
+
+The local Streamlit viewer owns one persistent World per session. Explicit controls create the world, ignite it, dispatch units, step, and run to the horizon; rendering does not advance the simulation. It shows projected fuel/fire, resource routes, quality labels, and timestamped events. [`Simulation.html`](Simulation.html) now points to this authoritative viewer rather than running a separate sector simulation.
+
+The previous HTML exposed a map-service credential. Its owner must revoke or rotate that credential; removing it from the current file does not revoke copies or repository history. There is no live operational control endpoint.
+
+## Historical course artifacts
+
+Stored checkpoints, logs, figures, validation reports, and source datasets remain historical artifacts. In particular, `InfernoModel`, `RelativeInfernoModel`, zone-head/v8 checkpoints, and their old training scores describe the retired simulator; they are **unsupported by the World checkpoint loader**. There is no compatibility shim or automatic conversion. Train a World-format policy instead.
+
+The obsolete `src/env`, `src/train`, `src/models`, and `src/validation` implementations, their simulator-specific tests, experimental trainer/diagnostic entrypoints, and the v8 Colab training notebook have been retired. The supported simulator, training, evaluation, and viewer entrypoints are the World CLI and Streamlit commands above. Preserved historical artifacts must not be presented as a second runnable authoritative simulator or current validation evidence.
+
+## Layout
+
+```text
+InfernoTactics/
+  README.md                    # This entrypoint
+  Simulation.html              # Instructions for the authoritative local viewer
+  infernotactics/
+    README.md                  # Current implementation and interfaces
+    TUTORIAL.md                # Current reproducible workflow
+    requirements.txt
+    src/world/                 # Scenario, fire, operations, policies, CLI
+    src/viz/world_app.py        # Local World viewer
+    src/data_pipeline/         # Environmental acquisition utilities
+    tests/world/               # Current contract and engine tests
+    data/                      # Source inputs and prepared scenarios
+    models/                    # World policies and retained historical checkpoints
+    logs/                      # Run output and retained historical evidence
 ```
-
-### 4. Train
-
-`src/train/` contains the full experiment history (each script is a
-self-contained, one-off run — see individual docstrings). The current/final
-line is `train_zonehead_randign.py` (randomized-ignition training,
-warm-started from the best prior checkpoint, already present in
-`models/checkpoints_zonehead_zonehead_fix1_2k/` from the clone):
-
-```bash
-INFERNO_RUN_TAG=<your_run_name> INFERNO_N_EPISODES=2000 python -m src.train.train_zonehead_randign
-```
-
-`INFERNO_RUN_TAG` is required (keeps each run's checkpoints/logs in their
-own `models/checkpoints_zonehead_<tag>/` dir instead of colliding). Optional
-env vars: `INFERNO_N_EPISODES` (default 2000), `INFERNO_CHECKPOINT_EVERY`
-(default 25), `INFERNO_EVAL_EVERY` (default 50), `INFERNO_WARM_START_CKPT`
-(default: the zonehead_fix1_2k checkpoint referenced above).
-
-The run is crash-safe/resumable: re-running the same command with the same
-`INFERNO_RUN_TAG` picks up from `resume_state.pt` in that run's checkpoint
-dir if it exists.
-
-To train a model from scratch (no warm start), use
-`src/train/train_actor_critic.py` instead — the earliest, no-warm-start
-entry point in this line.

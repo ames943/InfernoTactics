@@ -1,6 +1,6 @@
 """
-Pull the real Palisades Fire perimeter for numerical validation of
-fire_sim.py's simulated spread against actual burned extent.
+Pull a historical Palisades Fire perimeter for comparison with modeled extent.
+This acquisition utility does not validate the authoritative world by itself.
 
 Source: LA County Public Works' "Palisades and Eaton Dissolved Fire
 Perimeters (2025)" dataset (LA GeoHub), a public, unauthenticated
@@ -18,8 +18,8 @@ FIRIS_public_view) turned up nothing with sub-14-day granularity for this
 specific fire -- WFIGS's "current year" perimeter layers roll over/clear
 after a fire is closed out and the older multi-year history layer's own
 documentation states it only covers "thru the 2024 fire season" (this fire
-is Jan 2025). See wfigs_perimeter_validation.py for how this single snapshot
-is actually used given that constraint.
+is Jan 2025). This final suppressed footprint is supporting evidence, not
+an early-time spread target or a validation of suppression effectiveness.
 """
 
 import os

@@ -1,7 +1,7 @@
 """
 Pull real Jan 7-8, 2025 hourly weather observations covering the Palisades
-Fire's onset, and save a clean wind/humidity time series for use by
-inferno_env.py (replaces the fixed synthetic Santa-Ana-ramp placeholder).
+Fire's onset, and save a historical station wind/humidity time series.
+This is supporting data, not the gridded, provenance-tagged world weather input.
 
 Source: NOAA ASOS via the Iowa Environmental Mesonet's public historical-data
 API (no auth needed) -- https://mesonet.agron.iastate.edu/request/download.phtml
@@ -11,8 +11,8 @@ study bbox), vs. KVNY's ~20km away on the far side of the Santa Monica
 Mountains, so it's much more representative of conditions at the fire.
 
 The pulled window (Jan 7 00:00 UTC - Jan 9 00:00 UTC) covers the fire's
-actual ignition (~10:30am PST / 18:30 UTC Jan 7, see FIRE_START_UTC in
-inferno_env.py) with a comfortable buffer on both sides.
+reported ignition (~10:30am PST / 18:30 UTC Jan 7) with a comfortable buffer
+on both sides. A hindcast must explicitly align and source its weather inputs.
 """
 
 import csv

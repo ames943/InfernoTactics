@@ -1,0 +1,1653 @@
+{
+  "area_censored": false,
+  "asset_exposure_m2": 0.0,
+  "burned_area_m2": 33300.0,
+  "dispatch_count": 0,
+  "domain_exit": false,
+  "historical_validation": "unvalidated",
+  "no_new_growth_s": 720,
+  "observation_mode": "oracle_current",
+  "policy": "none",
+  "resource_time_s": 0.0,
+  "reward": -0.00390625,
+  "scenario": "synthetic-flat-grass",
+  "seed": 7,
+  "suppression_validation": "experimental",
+  "time_s": 21600,
+  "trajectory": [
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 60
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 120
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 180
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 240
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 300
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 360
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 420
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 480
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 540
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 600
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 660
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 720
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 780
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 840
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 900
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 960
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1020
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1080
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1140
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1200
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1260
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1320
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1380
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1440
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1500
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1560
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1620
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1680
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1740
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1800
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1860
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1920
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 1980
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2040
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2100
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2160
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2220
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2280
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2340
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2400
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2460
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2520
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2580
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2640
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2700
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2760
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2820
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2880
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 2940
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3000
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3060
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3120
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3180
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3240
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3300
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3360
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3420
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3480
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3540
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3600
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3660
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3720
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3780
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3840
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3900
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 3960
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 4020
+    },
+    {
+      "burned_area_m2": 900.0,
+      "time_s": 4080
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4140
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4200
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4260
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4320
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4380
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4440
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4500
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4560
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4620
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4680
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4740
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4800
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4860
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4920
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 4980
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5040
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5100
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5160
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5220
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5280
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5340
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5400
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5460
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5520
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5580
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5640
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5700
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5760
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5820
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5880
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 5940
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6000
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6060
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6120
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6180
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6240
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6300
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6360
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6420
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6480
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6540
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6600
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6660
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6720
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6780
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6840
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6900
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 6960
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7020
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7080
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7140
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7200
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7260
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7320
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7380
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7440
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7500
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7560
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7620
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7680
+    },
+    {
+      "burned_area_m2": 4500.0,
+      "time_s": 7740
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 7800
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 7860
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 7920
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 7980
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8040
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8100
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8160
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8220
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8280
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8340
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8400
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8460
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8520
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8580
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8640
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8700
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8760
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8820
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8880
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 8940
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9000
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9060
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9120
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9180
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9240
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9300
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9360
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9420
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9480
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9540
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9600
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9660
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9720
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9780
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9840
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9900
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 9960
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10020
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10080
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10140
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10200
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10260
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10320
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10380
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10440
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10500
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10560
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10620
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10680
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10740
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10800
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10860
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10920
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 10980
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11040
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11100
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11160
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11220
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11280
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11340
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11400
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11460
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11520
+    },
+    {
+      "burned_area_m2": 8100.0,
+      "time_s": 11580
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 11640
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 11700
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 11760
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 11820
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 11880
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 11940
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12000
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12060
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12120
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12180
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12240
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12300
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12360
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12420
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12480
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12540
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12600
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12660
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12720
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12780
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12840
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12900
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 12960
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13020
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13080
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13140
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13200
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13260
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13320
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13380
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13440
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13500
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13560
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13620
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13680
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13740
+    },
+    {
+      "burned_area_m2": 11700.0,
+      "time_s": 13800
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 13860
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 13920
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 13980
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14040
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14100
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14160
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14220
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14280
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14340
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14400
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14460
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14520
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14580
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14640
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14700
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14760
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14820
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14880
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 14940
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15000
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15060
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15120
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15180
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15240
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15300
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15360
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15420
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15480
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15540
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15600
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15660
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15720
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15780
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15840
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15900
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 15960
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16020
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16080
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16140
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16200
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16260
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16320
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16380
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16440
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16500
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16560
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16620
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16680
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16740
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16800
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16860
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16920
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 16980
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17040
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17100
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17160
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17220
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17280
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17340
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17400
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17460
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17520
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17580
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17640
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17700
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17760
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17820
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17880
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 17940
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18000
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18060
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18120
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18180
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18240
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18300
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18360
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18420
+    },
+    {
+      "burned_area_m2": 18900.0,
+      "time_s": 18480
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18540
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18600
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18660
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18720
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18780
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18840
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18900
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 18960
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 19020
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 19080
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 19140
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 19200
+    },
+    {
+      "burned_area_m2": 22500.0,
+      "time_s": 19260
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19320
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19380
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19440
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19500
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19560
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19620
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19680
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19740
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19800
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19860
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19920
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 19980
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20040
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20100
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20160
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20220
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20280
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20340
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20400
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20460
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20520
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20580
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20640
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20700
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20760
+    },
+    {
+      "burned_area_m2": 26100.0,
+      "time_s": 20820
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 20880
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 20940
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21000
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21060
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21120
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21180
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21240
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21300
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21360
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21420
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21480
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21540
+    },
+    {
+      "burned_area_m2": 33300.0,
+      "time_s": 21600
+    }
+  ],
+  "units": [
+    {
+      "air_corridor_available": true,
+      "assignment": null,
+      "base_id": "synthetic-base",
+      "blocked": false,
+      "capacity_l": 2000.0,
+      "event_timestamps": {},
+      "home_x": -2044944.9349341074,
+      "home_y": 1466920.04671682,
+      "id": "synthetic-engine",
+      "kind": "engine",
+      "line_progress_m": 0.0,
+      "line_rate_m_s": 0.0,
+      "max_access_m": 100.0,
+      "max_slope": 1.0,
+      "max_wind_m_s": 15.0,
+      "min_ground_speed_m_s": 5.0,
+      "mobilization_s": 30.0,
+      "offroad_speed_m_s": 2.0,
+      "parameter_sources": {
+        "air_corridor_available": "synthetic illustrative assumption; not operational data",
+        "assignment": "synthetic illustrative assumption; not operational data",
+        "base_id": "synthetic illustrative assumption; not operational data",
+        "capacity_l": "synthetic illustrative assumption; not operational data",
+        "home_x": "synthetic illustrative assumption; not operational data",
+        "home_y": "synthetic illustrative assumption; not operational data",
+        "id": "synthetic illustrative assumption; not operational data",
+        "kind": "synthetic illustrative assumption; not operational data",
+        "line_rate_m_s": "synthetic illustrative assumption; not operational data",
+        "max_access_m": "synthetic illustrative assumption; not operational data",
+        "max_slope": "synthetic illustrative assumption; not operational data",
+        "max_wind_m_s": "synthetic illustrative assumption; not operational data",
+        "min_ground_speed_m_s": "synthetic illustrative assumption; not operational data",
+        "mobilization_s": "synthetic illustrative assumption; not operational data",
+        "offroad_speed_m_s": "synthetic illustrative assumption; not operational data",
+        "refill_rate_l_s": "synthetic illustrative assumption; not operational data",
+        "route": "synthetic illustrative assumption; not operational data",
+        "route_progress_m": "synthetic illustrative assumption; not operational data",
+        "shift_end_s": "synthetic illustrative assumption; not operational data",
+        "speed_m_s": "synthetic illustrative assumption; not operational data",
+        "status": "synthetic illustrative assumption; not operational data",
+        "supply_l": "synthetic illustrative assumption; not operational data",
+        "water_rate_l_s": "synthetic illustrative assumption; not operational data",
+        "work_duration_s": "synthetic illustrative assumption; not operational data",
+        "x": "synthetic illustrative assumption; not operational data",
+        "y": "synthetic illustrative assumption; not operational data"
+      },
+      "refill_rate_l_s": 20.0,
+      "refill_waiting": false,
+      "remaining_work_s": 0.0,
+      "route": [],
+      "route_progress_m": 0.0,
+      "shift_end_s": 21600.0,
+      "speed_m_s": 10.0,
+      "status": "available",
+      "supply_l": 2000.0,
+      "suspended": false,
+      "water_delivered_l": 0.0,
+      "water_rate_l_s": 10.0,
+      "work_duration_s": 60.0,
+      "work_progress_s": 0.0,
+      "x": -2044944.9349341074,
+      "y": 1466920.04671682
+    },
+    {
+      "air_corridor_available": true,
+      "assignment": null,
+      "base_id": "synthetic-base",
+      "blocked": false,
+      "capacity_l": 0.0,
+      "event_timestamps": {},
+      "home_x": -2044944.9349341074,
+      "home_y": 1466920.04671682,
+      "id": "synthetic-handcrew",
+      "kind": "handcrew",
+      "line_progress_m": 0.0,
+      "line_rate_m_s": 0.2,
+      "max_access_m": 2880.0,
+      "max_slope": 1.0,
+      "max_wind_m_s": 15.0,
+      "min_ground_speed_m_s": 5.0,
+      "mobilization_s": 30.0,
+      "offroad_speed_m_s": 1.4,
+      "parameter_sources": {
+        "air_corridor_available": "synthetic illustrative assumption; not operational data",
+        "assignment": "synthetic illustrative assumption; not operational data",
+        "base_id": "synthetic illustrative assumption; not operational data",
+        "capacity_l": "synthetic illustrative assumption; not operational data",
+        "home_x": "synthetic illustrative assumption; not operational data",
+        "home_y": "synthetic illustrative assumption; not operational data",
+        "id": "synthetic illustrative assumption; not operational data",
+        "kind": "synthetic illustrative assumption; not operational data",
+        "line_rate_m_s": "synthetic illustrative assumption; not operational data",
+        "max_access_m": "synthetic illustrative assumption; not operational data",
+        "max_slope": "synthetic illustrative assumption; not operational data",
+        "max_wind_m_s": "synthetic illustrative assumption; not operational data",
+        "min_ground_speed_m_s": "synthetic illustrative assumption; not operational data",
+        "mobilization_s": "synthetic illustrative assumption; not operational data",
+        "offroad_speed_m_s": "synthetic illustrative assumption; not operational data",
+        "refill_rate_l_s": "synthetic illustrative assumption; not operational data",
+        "route": "synthetic illustrative assumption; not operational data",
+        "route_progress_m": "synthetic illustrative assumption; not operational data",
+        "shift_end_s": "synthetic illustrative assumption; not operational data",
+        "speed_m_s": "synthetic illustrative assumption; not operational data",
+        "status": "synthetic illustrative assumption; not operational data",
+        "supply_l": "synthetic illustrative assumption; not operational data",
+        "water_rate_l_s": "synthetic illustrative assumption; not operational data",
+        "work_duration_s": "synthetic illustrative assumption; not operational data",
+        "x": "synthetic illustrative assumption; not operational data",
+        "y": "synthetic illustrative assumption; not operational data"
+      },
+      "refill_rate_l_s": 0.0,
+      "refill_waiting": false,
+      "remaining_work_s": 0.0,
+      "route": [],
+      "route_progress_m": 0.0,
+      "shift_end_s": 21600.0,
+      "speed_m_s": 10.0,
+      "status": "available",
+      "supply_l": 0.0,
+      "suspended": false,
+      "water_delivered_l": 0.0,
+      "water_rate_l_s": 0.0,
+      "work_duration_s": 60.0,
+      "work_progress_s": 0.0,
+      "x": -2044944.9349341074,
+      "y": 1466920.04671682
+    },
+    {
+      "air_corridor_available": true,
+      "assignment": null,
+      "base_id": "synthetic-base",
+      "blocked": false,
+      "capacity_l": 1000.0,
+      "event_timestamps": {},
+      "home_x": -2044944.9349341074,
+      "home_y": 1466920.04671682,
+      "id": "synthetic-helicopter",
+      "kind": "helicopter",
+      "line_progress_m": 0.0,
+      "line_rate_m_s": 0.0,
+      "max_access_m": 2880.0,
+      "max_slope": 1.0,
+      "max_wind_m_s": 15.0,
+      "min_ground_speed_m_s": 5.0,
+      "mobilization_s": 30.0,
+      "offroad_speed_m_s": 2.0,
+      "parameter_sources": {
+        "air_corridor_available": "synthetic illustrative assumption; not operational data",
+        "assignment": "synthetic illustrative assumption; not operational data",
+        "base_id": "synthetic illustrative assumption; not operational data",
+        "capacity_l": "synthetic illustrative assumption; not operational data",
+        "home_x": "synthetic illustrative assumption; not operational data",
+        "home_y": "synthetic illustrative assumption; not operational data",
+        "id": "synthetic illustrative assumption; not operational data",
+        "kind": "synthetic illustrative assumption; not operational data",
+        "line_rate_m_s": "synthetic illustrative assumption; not operational data",
+        "max_access_m": "synthetic illustrative assumption; not operational data",
+        "max_slope": "synthetic illustrative assumption; not operational data",
+        "max_wind_m_s": "synthetic illustrative assumption; not operational data",
+        "min_ground_speed_m_s": "synthetic illustrative assumption; not operational data",
+        "mobilization_s": "synthetic illustrative assumption; not operational data",
+        "offroad_speed_m_s": "synthetic illustrative assumption; not operational data",
+        "refill_rate_l_s": "synthetic illustrative assumption; not operational data",
+        "route": "synthetic illustrative assumption; not operational data",
+        "route_progress_m": "synthetic illustrative assumption; not operational data",
+        "shift_end_s": "synthetic illustrative assumption; not operational data",
+        "speed_m_s": "synthetic illustrative assumption; not operational data",
+        "status": "synthetic illustrative assumption; not operational data",
+        "supply_l": "synthetic illustrative assumption; not operational data",
+        "water_rate_l_s": "synthetic illustrative assumption; not operational data",
+        "work_duration_s": "synthetic illustrative assumption; not operational data",
+        "x": "synthetic illustrative assumption; not operational data",
+        "y": "synthetic illustrative assumption; not operational data"
+      },
+      "refill_rate_l_s": 20.0,
+      "refill_waiting": false,
+      "remaining_work_s": 0.0,
+      "route": [],
+      "route_progress_m": 0.0,
+      "shift_end_s": 21600.0,
+      "speed_m_s": 40.0,
+      "status": "available",
+      "supply_l": 1000.0,
+      "suspended": false,
+      "water_delivered_l": 0.0,
+      "water_rate_l_s": 10.0,
+      "work_duration_s": 60.0,
+      "work_progress_s": 0.0,
+      "x": -2044944.9349341074,
+      "y": 1466920.04671682
+    }
+  ]
+}

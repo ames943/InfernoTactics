@@ -1,0 +1,178 @@
+{
+  "edges": [
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2044944.9349341074,
+          1466920.04671682
+        ],
+        [
+          -2042124.9349341074,
+          1466920.04671682
+        ]
+      ],
+      "id": "0-1",
+      "length_m": 2820.0,
+      "source": "0",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "1"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2042124.9349341074,
+          1466920.04671682
+        ],
+        [
+          -2044944.9349341074,
+          1466920.04671682
+        ]
+      ],
+      "id": "1-0",
+      "length_m": 2820.0,
+      "source": "1",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "0"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2042124.9349341074,
+          1466920.04671682
+        ],
+        [
+          -2042124.9349341074,
+          1469740.04671682
+        ]
+      ],
+      "id": "1-2",
+      "length_m": 2820.0,
+      "source": "1",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "2"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2042124.9349341074,
+          1469740.04671682
+        ],
+        [
+          -2042124.9349341074,
+          1466920.04671682
+        ]
+      ],
+      "id": "2-1",
+      "length_m": 2820.0,
+      "source": "2",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "1"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2042124.9349341074,
+          1469740.04671682
+        ],
+        [
+          -2044944.9349341074,
+          1469740.04671682
+        ]
+      ],
+      "id": "2-3",
+      "length_m": 2820.0,
+      "source": "2",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "3"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2044944.9349341074,
+          1469740.04671682
+        ],
+        [
+          -2042124.9349341074,
+          1469740.04671682
+        ]
+      ],
+      "id": "3-2",
+      "length_m": 2820.0,
+      "source": "3",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "2"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2044944.9349341074,
+          1469740.04671682
+        ],
+        [
+          -2044944.9349341074,
+          1466920.04671682
+        ]
+      ],
+      "id": "3-0",
+      "length_m": 2820.0,
+      "source": "3",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "0"
+    },
+    {
+      "closed": false,
+      "geometry": [
+        [
+          -2044944.9349341074,
+          1466920.04671682
+        ],
+        [
+          -2044944.9349341074,
+          1469740.04671682
+        ]
+      ],
+      "id": "0-3",
+      "length_m": 2820.0,
+      "source": "0",
+      "speed_m_s": 10.0,
+      "speed_source": "illustrative_not_measured",
+      "target": "3"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "0",
+      "x": -2044944.9349341074,
+      "y": 1466920.04671682
+    },
+    {
+      "id": "1",
+      "x": -2042124.9349341074,
+      "y": 1466920.04671682
+    },
+    {
+      "id": "2",
+      "x": -2042124.9349341074,
+      "y": 1469740.04671682
+    },
+    {
+      "id": "3",
+      "x": -2044944.9349341074,
+      "y": 1469740.04671682
+    }
+  ]
+}

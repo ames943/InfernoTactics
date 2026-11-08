@@ -42,9 +42,9 @@ BUILDINGS_PATH = os.path.join(DATA_DIR, "buildings.geojson")
 ELEVATION_PATH = os.path.join(DATA_DIR, "elevation.tif")
 POPULATION_PATH = os.path.join(DATA_DIR, "population.tif")
 
-# Real LAFD depot locations (one per RL resource type) -- see the file itself
-# for sourcing notes. Lives alongside this config rather than under DATA_DIR
-# since it's small, hand-curated, and version-controlled, not a pipeline output.
+# Historical course-project LAFD depot locations; see the file for sourcing.
+# These are supporting station records, not a complete world resource fleet.
+# World scenarios must explicitly provide and source operational parameters.
 REAL_DEPOTS_PATH = os.path.join(_THIS_DIR, "real_depots.json")
 
 # Real Jan 7-8 2025 wind/humidity time series (NOAA ASOS, Santa Monica Airport

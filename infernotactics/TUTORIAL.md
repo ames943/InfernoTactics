@@ -1,346 +1,126 @@
-# InfernoTactics — Complete Tutorial
+# InfernoTactics World tutorial
 
-Wildfire suppression RL agent trained on real LA Westside geography and the Palisades Fire (Jan 2025).
+This workflow uses one authoritative `src.world.World` for fire spread, resource operations, policy training, evaluation, and visualization. It replaces the course-project `FireSim` / `InfernoEnv` training workflow. All examples are research experiments, not operational fire-management advice.
 
----
+## 1. Install
 
-## 1. Quick Start
+From the repository's `infernotactics` directory:
 
-### Prerequisites
-- Windows/macOS/Linux with **Conda**
-- ~8 GB free disk space (for DEM, population raster, OSM roads, building footprints)
-
-### One-time setup
-```powershell
-# Clone or extract project
-cd A:\AI\InfernoTactics\infernotactics
-
-# Create and activate environment
-conda create -n cosmos-venv python=3.11 -y
-conda activate cosmos-venv
-
-# Install dependencies
-pip install -r requirements.txt
-# If PyTorch fails, install CPU version first:
-# conda install pytorch cpuonly -c pytorch
-
-# Verify
-python -c "import torch,osmnx,geopandas,rasterio; print('OK:', torch.__version__)"
+```sh
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
----
+Windows PowerShell activation is `.venv\Scripts\Activate.ps1`. Use the pinned Pyretechnics dependency in `requirements.txt`; do not substitute the removed cellular automaton if installation fails. Weather acquisition also uses the ecCodes/cfgrib stack; platform-specific native dependencies may be needed.
 
-## 2. Data Pipeline (Run Once)
+## 2. Create an offline scenario
 
-The pipeline downloads raw data and builds the unified 30 m grid (`data/grid_static.npy`).
-
-```powershell
-cd A:\AI\InfernoTactics\infernotactics
-conda activate cosmos-venv
-
-# 1. Roads (OSM) → data/roads.graphml
-python -m src.data_pipeline.fetch_roads
-
-# 2. Building footprints (LA GeoHub) → data/buildings.geojson
-python -m src.data_pipeline.fetch_buildings
-
-# 3. Elevation (USGS 3DEP 10 m DEM) → data/elevation.tif
-python -m src.data_pipeline.fetch_elevation
-
-# 4. Population (WorldPop 1 km) → data/population.tif
-python -m src.data_pipeline.fetch_population
-
-# 5. Weather (NOAA ASOS KSMO Jan 7–8 2025) → data/palisades_weather_jan2025.csv
-python -m src.data_pipeline.fetch_weather
-
-# 6. Build unified grid → data/grid_static.npy (8, 316, 595) + data/grid_meta.json
-python -m src.env.grid_builder
+```sh
+python -m src.world.cli synthetic --out data/world-smoke --seed 7
 ```
 
-**Expected output**: `grid_static.npy` with 8 layers:
-```
-0: elevation        1: slope
-2: building_density 3: building_height
-4: road_mask        5: fuel_density (heuristic)
-6: water_mask       7: population_density
-```
+This creates an explicitly labeled synthetic fixture centered near longitude `-118.5225`, latitude `34.09` within the Palisades study region. Its terrain, fuels, weather, and resource parameters are illustrative inputs, not observations of the actual incident. The default fixture is 96 by 96 cells at **30 m** resolution in **EPSG:5070** and has a six-hour horizon.
 
----
+The World uses an explicit scenario contract and provenance rather than the retired eight-channel `grid_static.npy` format. Keep the generated scenario files together. An existing destination is an error unless you explicitly supply `--overwrite`; that flag replaces the selected output, so choose paths carefully.
 
-## 3. Environment Sanity Check
+## 3. Inspect and operate the same World locally
 
-```powershell
-conda activate cosmos-venv
-python -c "
-from src.env.inferno_env import InfernoEnv
-env = InfernoEnv(seed=42)
-obs = env.reset()
-print('Grid shape:', obs['grid'].shape)  # (9, 316, 595) = 8 static + 1 fire state
-print('Zones:', env.n_zones)             # 32
-print('Resources:', {k: len(v) for k,v in env.resources.items()})
-"
+```sh
+streamlit run src/viz/world_app.py
 ```
 
----
+In the viewer:
 
-## 4. Training — Three Modes
+1. Choose the offline synthetic source or load a prepared scenario directory, then explicitly create the world.
+2. Enter ignition longitude and latitude. The synthetic fixture includes `-118.5225`, `34.09`. Submit ignition explicitly; invalid, out-of-domain, nonburnable, or unsupported cells are rejected.
+3. Select an available unit, operation, and feasible target. Dispatch through the explicit form control.
+4. Use **Step** to advance one coupling interval or **Run to horizon** to continue the episode.
+5. Inspect the projected fuel/fire map, unit positions/routes, data-quality labels, and timestamped event table.
 
-All trainers use `cosmos-venv` and read `INFERNO_RUN_TAG` for isolated checkpoints/logs.
+One World persists in the Streamlit session. Widget reruns and rendering do not mutate it. A coupling interval is 60 simulated seconds, except the final partial interval. Fire and operations advance together; a dispatched resource must travel and work before its treatment is available. Explicit return/refill and availability constraints matter. No action instantly rewrites burning cells into safe cells.
 
-### A. Single-Ignition (Original, 2000 episodes)
-Trains on the **real Palisades Fire origin** (Skull Rock trailhead).
+The browser's `Simulation.html` is an instruction/link page, not another simulator or a polling client. This local research viewer has no live emergency-dispatch connection.
 
-```powershell
-$env:PYTHONPATH="A:\AI\InfernoTactics\infernotactics\src"
-$env:INFERNO_N_EPISODES="2000"
-$env:INFERNO_RUN_TAG="single_2000"
-conda run -n cosmos-venv python -m src.train.train_actor_critic
+## 4. Write a reproducible rollout
+
+```sh
+python -m src.world.cli run --scenario data/world-smoke --longitude -118.5225 --latitude 34.09 --seed 7 --policy none --out logs/world-none
+python -m src.world.cli run --scenario data/world-smoke --longitude -118.5225 --latitude 34.09 --seed 7 --policy heuristic --out logs/world-heuristic
 ```
 
-- Checkpoints: `models/checkpoints_single_2000/episode_XXXX.pt`
-- Logs: `logs/train_log.csv`, `logs/eval_log.csv`
-- Evaluation every 20 episodes on: Skull Rock + 2 held-out (Mandeville, Getty)
+Supply longitude and latitude together, or omit both to use the scenario's default ignition. The available policies are `none`, `heuristic`, and `checkpoint`; `checkpoint` additionally requires `--checkpoint`. Every policy acts through the same World action contract and feasibility rules.
 
-### B. Multi-Ignition Curriculum (Fixed 4 scenarios, 3500 episodes)
-Cycles through Skull Rock + 3 additional WUI ignitions (Topanga, Sullivan, Stone Canyon).
+Rollouts write `events.jsonl`, `metrics.json`, and timestamped NPZ snapshots to the selected output directory. Read status and provenance as well as outcome metrics: reaching a domain boundary is not containment, and a synthetic run is not a validated hindcast. Invalid inputs should exit nonzero rather than producing a successful-run report. A full six-hour episode may take substantial wall-clock time; use Step in the viewer when exploring interactively.
 
-```powershell
-$env:PYTHONPATH="A:\AI\InfernoTactics\infernotactics\src"
-$env:INFERNO_N_EPISODES="3500"
-$env:INFERNO_RUN_TAG="multi_3500"
-conda run -n cosmos-venv python -m src.train.train_actor_critic_multi
+## 5. Train an experimental response policy
+
+```sh
+python -m src.world.cli train --scenario data/world-smoke --steps 512 --seed 7 --out models/world-smoke.pt
+python -m src.world.cli run --scenario data/world-smoke --seed 8 --policy checkpoint --checkpoint models/world-smoke.pt --out logs/world-learned
 ```
 
-### C. **v8 Relative-Action** (Recommended for generalization)
-Uses **semantic targets** (`active_fire`, `adjacent_fuel`, `threatened_population`, `downwind_fire_front`, `nearest_reachable_fire`, `noop`) resolved to current zones each tick. Training samples from ~94k WUI ignition points.
+The learned policy scores explicit unit/operation/target candidates with a feasibility mask; wait remains available. PPO and rule-based response share the same feasible candidate generator, not separate action semantics. Recorded training configuration and scenario provenance are part of reproducibility. The small command above demonstrates the interface, not convergence or useful firefighting performance.
 
-```powershell
-$env:PYTHONPATH="A:\AI\InfernoTactics\infernotactics\src"
-$env:INFERNO_N_EPISODES="500"
-$env:INFERNO_V8_EVAL_EVERY="20"
-$env:INFERNO_RUN_TAG="relative_v8_500"
-$env:INFERNO_V8_CHECKPOINT_EVERY="20"
-conda run -n cosmos-venv python -m src.train.train_relative
+The baseline observation mode is **`oracle_current`**: perfect current simulated fire state. It is not a real sensor system. Policy observations contain current grid/weather/unit records, candidate actions and masks, elapsed time, and provenance—not future realized fire or weather and not mutable engine objects. Resource costs, burned area, and asset exposure are modeled research outcomes, not direct monetary or operational guarantees.
+
+Only the new World checkpoint format is supported. Old `InfernoModel`, `RelativeInfernoModel`, fixed-zone, and v8 checkpoints are historical artifacts and must be rejected rather than converted or silently loaded.
+
+## 6. Compare held-out policies
+
+```sh
+python -m src.world.cli evaluate --scenario data/world-smoke --checkpoint models/world-smoke.pt --seeds 10000,10001 --out logs/world-evaluation
 ```
 
-**Key env vars:**
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `INFERNO_N_EPISODES` | 2000 | Training length |
-| `INFERNO_RUN_TAG` | `""` | Suffix for checkpoint/log dirs |
-| `INFERNO_V8_EVAL_EVERY` | 50 | Evaluation cadence (v8 only) |
-| `INFERNO_V8_CHECKPOINT_EVERY` | 2 | Checkpoint cadence (v8 only) |
-| `INFERNO_V8_LR` | 3e-4 | Learning rate (v8 only) |
-| `INFERNO_V8_AUX_COEFF` | 0.05 | Auxiliary target loss coeff (v8 only) |
+Keep evaluation seeds and scenario draws disjoint from training. Compare learned response with **both** no response and heuristic response on paired scenarios. Report per-episode metrics and uncertainty, not just one best rollout. Use more held-out episodes than this short interface example when drawing research conclusions.
 
-**Outputs:**
-- Checkpoints: `models/checkpoints_<RUN_TAG>/episode_XXXX.pt` + `latest.pt`
-- Logs: `logs/train_log_<RUN_TAG>.csv`, `logs/eval_log_<RUN_TAG>.csv`
-- Probe: `logs/probe_log_<RUN_TAG>.csv` (zone-logit vs fire correlation)
+Policy evaluation does not establish historical spread validity or suppression-effect validity. A policy can exploit inaccurate assumptions in a simulator; better synthetic rewards are not evidence that dispatch would help on a real incident. Read the current [project README](README.md) for implemented policy and evaluation details.
 
----
+## 7. Build a sourced historical scenario
 
-## 5. Evaluation
-
-### Deterministic eval on named scenarios
-```powershell
-$env:PYTHONPATH="A:\AI\InfernoTactics\infernotactics\src"
-conda run -n cosmos-venv python -m src.train.eval_relative `
-  --checkpoint "models/checkpoints_relative_v8_500/latest.pt" `
-  --episodes 5
+```sh
+python -m src.world.cli build --inputs /path/to/INPUTS.json --out data/palisades-world
 ```
 
-### Randomized WUI ignition test
-```powershell
-conda run -n cosmos-venv python -m src.train.eval_relative `
-  --checkpoint "models/checkpoints_relative_v8_500/latest.pt" `
-  --random-points 30 `
-  --episodes 3
-```
-- Samples 30 fresh ignitions from WUI pool (excludes 30-cell buffer around held-out points)
-- Reports per-point: reward, buildings destroyed, containment, dispatched resources, max concurrent
+Do not run the removed `src.env.grid_builder`. The World builder reads an explicit local-input manifest, whose full format is documented in [`src/world/prepare.py`](src/world/prepare.py). It expects:
 
-### Heuristic baseline (rule-based, no learning)
-```powershell
-conda run -n cosmos-venv python -m src.train.heuristic_policy
-```
-Runs on all 4 scenarios (Skull Rock, Mandeville, Getty, Multi-ignition).
+- A schema version, name, mode, UTC start, duration, study bounds, buffer, and source registry.
+- Local source paths with SHA-256 hashes, provider, version, license, retrieval time, source CRS, units, and validity windows. Data applicability is distinct from download time.
+- Elevation, supported fuel models, canopy cover/height/base-height/bulk-density, and asset exposure; source-unit scale/offset conversions are explicit.
+- Contiguous hourly weather records, horizontal vector basis, and all required moisture fields. Future realized values remain environmental inputs, not policy observations.
+- Explicit roads, closures where supplied, resources, operational parameters, and source labels for assumptions. Station names alone do not define unit capabilities.
 
----
+Real hindcasts use the Palisades bounds `[-118.605, 34.030, -118.440, 34.150]` in west/south/east/north order, a 3 km buffer, and an outward-snapped **30 m EPSG:5070** grid with a separate core mask. Categorical fuels must remain categories; wind vectors must respect CRS/vector conventions. Missing source coverage or unsupported fuels are errors, not invitations to invent a replacement layer.
 
-## 6. Architecture Summary
+The `src/data_pipeline` acquisition utilities remain available for source data. For example, the existing roads, buildings, elevation, population, station-weather, and perimeter fetchers download supporting evidence; they do not by themselves form a complete valid World scenario. LANDFIRE and HRRR acquisition support the new sourced workflow. Follow their documented inputs and the builder contract rather than assuming raw downloads are already aligned.
 
-```
-src/
-├── env/
-│   ├── inferno_env.py      # Gym-style env, 32 zones, real LAFD roster
-│   ├── fire_sim.py         # Cellular automaton (deterministic)
-│   └── grid_builder.py     # Builds 30 m aligned grid
-├── models/
-│   ├── cnn_branch.py       # Stride-1 convs + per-zone pooling
-│   ├── mlp_branch.py       # Scalars → 128-dim
-│   ├── actor_critic.py     # Factored actor (resource × zone)
-│   ├── relative_model.py   # v8: resource → semantic target
-│   └── inferno_model.py    # Fusion + classification head
-├── train/
-│   ├── train_actor_critic.py     # Single-ignition trainer
-│   ├── train_relative.py         # v8 relative-action trainer
-│   ├── eval.py / eval_relative.py
-│   ├── heuristic_policy.py       # Rule-based baseline
-│   ├── relative_actions.py       # Semantic target resolver
-│   └── test_relative_actions.py  # Unit tests
-└── data_pipeline/
-    ├── fetch_*.py          # Raw data downloaders
-    └── config.py           # BBox, paths, constants
-```
+A KSMO station CSV cannot stand in for the required spatial weather fields. Moisture priors must be explicitly labeled with uncertainty, and prior-mode data do not confer historical-readiness status. Missing real fuels/weather/coverage must remain visible. Do not relabel the offline synthetic fixture as measured Palisades data.
 
----
+## 8. Interpret outcomes honestly
 
-## 7. Action Spaces
+Separate these questions:
 
-### Legacy (Absolute Zone)
-```python
-(resource_type, zone_id)  # zone_id ∈ [0, 31] — fixed geographic regions
-```
+1. **Numerical correctness:** do units, terrain, weather interpolation, fire integration, routing, and treatment timing satisfy their contracts?
+2. **Historical spread evidence:** do simulations agree with appropriate timed observations under documented input uncertainty?
+3. **Suppression evidence:** are modeled travel, delivery, treatment duration, and effectiveness supported independently?
+4. **Policy performance:** does response improve paired held-out outcomes relative to no response and a feasible heuristic?
 
-### v8 Relative (Semantic Target)
-```python
-(resource_type, target_type)
-target_type ∈ {active_fire, adjacent_fuel, threatened_population,
-               downwind_fire_front, nearest_reachable_fire, noop}
-```
-Resolved at each tick by `resolve_relative_targets(env, obs)` → current zone ID.
+An unsuppressed simulation compared with a late final perimeter shaped by a large real firefighting response does not validate spread physics or policy benefit. Asset exposure is not building combustion, structure-loss prediction, or a casualty estimate. Ground walking speed, environmental downscaling, treatment persistence, and resource parameter choices include approximations; provenance and sensitivity are essential.
 
-**Resource counts (from real LAFD roster):**
-| Resource | Units | Travel | Reload |
-|----------|-------|--------|--------|
-| water_team | 3 | Road | 5 ticks |
-| trench_crew | 4 | Road | 5 ticks |
-| rescue_vehicle | 3 | Road | 5 ticks |
-| helicopter | 5 | Air (straight-line) | 12 ticks |
+## 9. Historical artifacts and retired commands
 
----
+Existing data, figures, logs, checkpoint files, and stored reports have been retained. They describe the retired course-project system unless explicitly generated by the new World workflow. Retention does not imply loader compatibility or current validation.
 
-## 8. Reward Function
+The obsolete `src/env`, `src/train`, `src/models`, and `src/validation` implementations, their simulator-only tests, experimental course trainers/diagnostics, and the v8 Colab training notebook are retired. There are no legacy import shims, old zone-action adapters, or second authoritative simulator. Use `python -m src.world.cli` and `streamlit run src/viz/world_app.py` instead.
 
-| Event | Reward |
-|-------|--------|
-| Fire extinguished (water/heli arrival) | +50 |
-| Building destroyed | -100 × pop_mult (1×–4×) |
-| Building destroyed but evacuated | -100 × pop_mult × (1 – rescue_reduction) |
-| Resource wasted (no unit / no effect) | -10 |
-| Travel time penalty | -0.02 × seconds |
+## Troubleshooting
 
----
-
-## 9. Common Tasks
-
-### Resume interrupted training
-```powershell
-# Just re-run with same RUN_TAG — trainer auto-resumes from latest.pt
-$env:INFERNO_RUN_TAG="relative_v8_500"
-conda run -n cosmos-venv python -m src.train.train_relative
-```
-
-### Test a specific checkpoint
-```powershell
-conda run -n cosmos-venv python -m src.train.eval_relative `
-  --checkpoint "models/checkpoints_relative_v8_500/episode_0260.pt" `
-  --episodes 5
-```
-
-### Compare policies
-```powershell
-# Heuristic baseline
-python -m src.train.heuristic_policy
-
-# Trained model (v8)
-python -m src.train.eval_relative --checkpoint "models/checkpoints_relative_v8_500/best.pt"
-```
-
-### Monitor training live
-```powershell
-# Tail the CSV
-Get-Content logs/train_log_relative_v8_500.csv -Wait -Tail 10
-```
-
----
-
-## 10. Project Structure After Cleanup
-
-```
-infernotactics/
-├── TUTORIAL.md              # This file
-├── requirements.txt
-├── context.txt              # Full project history
-├── data/                    # Generated (git-ignored large files)
-│   ├── grid_static.npy
-│   ├── grid_meta.json
-│   ├── roads.graphml
-│   ├── buildings.geojson
-│   ├── elevation.tif
-│   ├── population.tif
-│   └── palisades_weather_jan2025.csv
-├── models/
-│   ├── checkpoints/                 # 2000-ep single-ignition run
-│   │   ├── best.pt                  # Episode 260 (selected)
-│   │   ├── latest.pt
-│   │   └── episode_XXXX.pt
-│   ├── checkpoints_relative_v8_500/ # v8 current experiment
-│   └── best_model/                  # Best model archive
-├── logs/
-│   ├── train_log.csv
-│   ├── eval_log.csv
-│   ├── wfigs_validation_report.json
-│   └── wfigs_validation_jan11_report.json
-├── experiments/             # Archived training scripts (reference only)
-│   ├── train_actor_critic_multi_v2.py ... v6
-│   ├── train_multiscenario_oldloop*.py
-│   ├── train_zonehead_*.py
-│   ├── train_toggle_diff.py
-│   └── diagnostic_*.py
-└── src/
-    ├── env/
-    ├── models/
-    ├── train/               # Core: train_actor_critic.py, train_relative.py, eval*.py, heuristic_policy.py
-    ├── data_pipeline/
-    └── validation/
-```
-
----
-
-## 11. Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `ModuleNotFoundError: env` | Set `PYTHONPATH` to `.../infernotactics/src` |
-| `grid_static.npy not found` | Run data pipeline (§2) |
-| `scipy not installed` | `conda install -n cosmos-venv scipy -y` |
-| MPS errors on Mac | Trainer falls back to CPU automatically |
-| OOM on GPU | Reduce batch or use CPU (`device=cpu`) |
-| `roads.graphml` missing | Re-run `fetch_roads` |
-| Checkpoint load mismatch | Ensure model architecture matches (v8 uses `RelativeInfernoModel`) |
-
----
-
-## 12. Key References
-
-- `context.txt` — Complete project history, experimental results, negative findings
-- `src/env/inferno_env.py` — Environment API, resources, rewards, ignition points
-- `src/train/relative_actions.py` — Semantic target definitions & resolver
-- `src/train/train_relative.py` — v8 training loop (Monte Carlo returns, no GAE/PPO)
-- `logs/wfigs_validation_report.json` — Fire sim vs real perimeter (IoU 0.636)
-- `experiments/` — Archived experiments with diagnostic details
-
----
-
-## 13. Next Steps for Generalization
-
-The v8 relative-action approach is the current best direction. Remaining open problems:
-
-1. **Resource diversity** — Policy still over-relies on helicopters (only resource with +50 reward)
-2. **Trench/rescue utility** — Their value is indirect; needs denser reward shaping
-3. **Capacity limits** — Fire exceeds 8-unit fleet by tick 2–4; one-dispatch-per-tick is binding
-4. **Action-space abstraction** — Consider fire-relative discrete actions (`n≈6–8`) instead of 32 zones
-
-See `context.txt` sections "Action-Space Capacity Analysis" and "Future work — relative action space" for full analysis.
+| Symptom | Action |
+|---|---|
+| Output already exists | Choose a new destination or explicitly use `--overwrite` for that command. |
+| Ignition is rejected | Check both coordinate arguments, scenario extent, validity, burnability, and supported fuels. |
+| A unit cannot dispatch | Inspect status, supply, operation, access, weather/closure constraints, and current feasible candidates. |
+| Historical scenario build fails | Fix the specific source hash, units, CRS, validity window, coverage, or missing-field error; do not switch silently to synthetic data. |
+| Old checkpoint is rejected | Train a World-format policy. Historical checkpoints have no compatibility loader. |
+| Full run appears slow | CLI rollouts run to the scenario horizon; explore one 60-second step at a time in the viewer. |
+| Legacy `src.env` / `src.train` command fails | Those entrypoints are intentionally retired; use the World commands above. |
